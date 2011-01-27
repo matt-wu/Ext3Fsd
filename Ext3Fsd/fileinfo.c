@@ -150,7 +150,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             FSI = (PFILE_STANDARD_INFORMATION) Buffer;
 
-            FSI->NumberOfLinks = Fcb->Inode->i_links_count;
+            FSI->NumberOfLinks = Fcb->Inode->i_nlink;
 
             if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY))
                 FSI->DeletePending = FALSE;
@@ -184,7 +184,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             FileInternalInformation = (PFILE_INTERNAL_INFORMATION) Buffer;
 
             /* we use the inode number as the internal index */
-            FileInternalInformation->IndexNumber.QuadPart = (LONGLONG)Fcb->Mcb->iNo;
+            FileInternalInformation->IndexNumber.QuadPart = (LONGLONG)Fcb->Inode->i_ino;
 
             Irp->IoStatus.Information = sizeof(FILE_INTERNAL_INFORMATION);
             Status = STATUS_SUCCESS;
@@ -301,7 +301,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 FileBasicInformation->FileAttributes = FILE_ATTRIBUTE_NORMAL;
             }
 
-            FSI->NumberOfLinks = Fcb->Inode->i_links_count;
+            FSI->NumberOfLinks = Fcb->Inode->i_nlink;
 
             if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY))
                 FSI->DeletePending = FALSE;
@@ -319,7 +319,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             // The "inode number"
-            FileInternalInformation->IndexNumber.QuadPart = (LONGLONG)Fcb->Mcb->iNo;
+            FileInternalInformation->IndexNumber.QuadPart = (LONGLONG)Fcb->Inode->i_ino;
 
             // Romfs doesn't have any extended attributes
             FileEaInformation->EaSize = 0;
@@ -430,7 +430,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             break;
 
         default:
-            DEBUG(DL_USR, ( "Ext2QueryInformation: invalid class: %d\n",
+            DEBUG(DL_WRN, ( "Ext2QueryInformation: invalid class: %d\n",
                             FileInformationClass));
             Status = STATUS_INVALID_PARAMETER; /* STATUS_INVALID_INFO_CLASS; */
             break;
@@ -617,23 +617,23 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
         case FileBasicInformation:
         {
             PFILE_BASIC_INFORMATION FBI = (PFILE_BASIC_INFORMATION) Buffer;
-            PEXT2_INODE Ext2Inode = Fcb->Inode;
+            struct inode *Inode = Fcb->Inode;
 
             if (FBI->CreationTime.QuadPart != 0 && FBI->CreationTime.QuadPart != -1) {
-                Ext2Inode->i_ctime = Ext2LinuxTime(FBI->CreationTime);
-                Fcb->Mcb->CreationTime = Ext2NtTime(Ext2Inode->i_ctime);
+                Inode->i_ctime = Ext2LinuxTime(FBI->CreationTime);
+                Fcb->Mcb->CreationTime = Ext2NtTime(Inode->i_ctime);
                 NotifyFilter |= FILE_NOTIFY_CHANGE_CREATION;
             }
 
             if (FBI->LastAccessTime.QuadPart != 0 && FBI->LastAccessTime.QuadPart != -1) {
-                Ext2Inode->i_atime = Ext2LinuxTime(FBI->LastAccessTime);
-                Fcb->Mcb->LastAccessTime = Ext2NtTime(Ext2Inode->i_atime);
+                Inode->i_atime = Ext2LinuxTime(FBI->LastAccessTime);
+                Fcb->Mcb->LastAccessTime = Ext2NtTime(Inode->i_atime);
                 NotifyFilter |= FILE_NOTIFY_CHANGE_LAST_ACCESS;
             }
 
             if (FBI->LastWriteTime.QuadPart != 0 && FBI->LastWriteTime.QuadPart != -1) {
-                Ext2Inode->i_mtime = Ext2LinuxTime(FBI->LastWriteTime);
-                Fcb->Mcb->LastWriteTime = Ext2NtTime(Ext2Inode->i_mtime);
+                Inode->i_mtime = Ext2LinuxTime(FBI->LastWriteTime);
+                Fcb->Mcb->LastWriteTime = Ext2NtTime(Inode->i_mtime);
                 NotifyFilter |= FILE_NOTIFY_CHANGE_LAST_WRITE;
                 SetFlag(Ccb->Flags, CCB_LAST_WRITE_UPDATED);
             }
@@ -667,8 +667,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             if (NotifyFilter != 0) {
-                if ( Ext2SaveInode( IrpContext, Vcb,
-                                    Fcb->Mcb->iNo, Ext2Inode)) {
+                if (Ext2SaveInode(IrpContext, Vcb, Inode)) {
                     Status = STATUS_SUCCESS;
                 }
             }
@@ -761,10 +760,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
                     if (Fcb->Mcb->FileSize.QuadPart > AllocationSize.QuadPart) {
                         Fcb->Mcb->FileSize.QuadPart = AllocationSize.QuadPart;
-                        Fcb->Mcb->Inode->i_size = AllocationSize.LowPart;
-                        if (S_ISREG(Fcb->Mcb->Inode->i_mode)) {
-                            Fcb->Mcb->Inode->i_size_high = (__u32)(AllocationSize.HighPart);
-                        }
+                        Fcb->Mcb->Inode.i_size = AllocationSize.QuadPart;
                     }
 
                 } else {
@@ -779,10 +775,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
                 SetFlag(FileObject->Flags, FO_FILE_MODIFIED);
                 SetLongFlag(Fcb->Flags, FCB_FILE_MODIFIED);
-                Ext2SaveInode( IrpContext,
-                               Vcb,
-                               Fcb->Mcb->iNo,
-                               Fcb->Inode );
+                Ext2SaveInode(IrpContext, Vcb, Fcb->Inode);
 
                 if (CcIsFileCached(FileObject)) {
                     CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
@@ -843,10 +836,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 if (RealSize.QuadPart < EndOfFile.QuadPart) {
 
                     Fcb->Mcb->FileSize = EndOfFile;
-                    Fcb->Inode->i_size = EndOfFile.LowPart;
-                    if (S_ISREG(Fcb->Inode->i_mode)) {
-                        Fcb->Inode->i_size_high = (__u32)(EndOfFile.HighPart);
-                    }
+                    Fcb->Inode->i_size = EndOfFile.QuadPart;
                     NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
                     goto FileEndChanged;
                 }
@@ -919,10 +909,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
                     if (Fcb->Mcb->FileSize.QuadPart > FileSize.QuadPart) {
                         Fcb->Mcb->FileSize.QuadPart = FileSize.QuadPart;
-                        Fcb->Mcb->Inode->i_size = FileSize.LowPart;
-                        if (S_ISREG(Fcb->Mcb->Inode->i_mode)) {
-                            Fcb->Mcb->Inode->i_size_high = (__u32)FileSize.HighPart;
-                        }
+                        Fcb->Mcb->Inode.i_size = FileSize.QuadPart;
                     }
                 }
 
@@ -934,12 +921,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 Fcb->Header.FileSize.QuadPart = Fcb->Mcb->FileSize.QuadPart = EndOfFile.QuadPart;
                 if (Fcb->Header.ValidDataLength.QuadPart > Fcb->Header.FileSize.QuadPart)
                     Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
-
-                Fcb->Inode->i_size = EndOfFile.LowPart;
-                if (S_ISREG(Fcb->Inode->i_mode)) {
-                    Fcb->Inode->i_size_high = (__u32)(EndOfFile.HighPart);
-                }
-
+                Fcb->Inode->i_size = EndOfFile.QuadPart;
                 if (Fcb->Header.FileSize.QuadPart >= 0x80000000 &&
                         !IsFlagOn(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE)) {
                     SetFlag(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE);
@@ -953,7 +935,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
 FileEndChanged:
 
-            Ext2SaveInode( IrpContext, Vcb, Fcb->Mcb->iNo, Fcb->Inode);
+            Ext2SaveInode( IrpContext, Vcb, Fcb->Inode);
 
             if (CcIsFileCached(FileObject)) {
                 CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
@@ -1021,7 +1003,7 @@ FileEndChanged:
             break;
 
         default:
-            DEBUG(DL_USR, ( "Ext2SetInformation: invalid class: %d\n",
+            DEBUG(DL_WRN, ( "Ext2SetInformation: invalid class: %d\n",
                             FileInformationClass));
             Status = STATUS_INVALID_PARAMETER;/* STATUS_INVALID_INFO_CLASS; */
         }
@@ -1120,10 +1102,10 @@ Ext2ExpandFile(
 
             /* set block hint to avoid fragments */
             if (Hint == 0) {
-                if (Mcb->Inode->i_block[Slot] != 0) {
-                    Hint = Mcb->Inode->i_block[Slot];
+                if (Mcb->Inode.i_block[Slot] != 0) {
+                    Hint = Mcb->Inode.i_block[Slot];
                 } else if (Slot > 1) {
-                    Hint = Mcb->Inode->i_block[Slot-1];
+                    Hint = Mcb->Inode.i_block[Slot-1];
                 }
             }
 
@@ -1136,7 +1118,7 @@ Ext2ExpandFile(
                          Layer,
                          Start,
                          (Layer == 0) ? (Vcb->NumBlocks[Layer] - Start) : 1,
-                         &Mcb->Inode->i_block[Slot],
+                         &Mcb->Inode.i_block[Slot],
                          &Hint,
                          &Extra
                      );
@@ -1155,14 +1137,7 @@ Ext2ExpandFile(
     Size->QuadPart = ((LONGLONG)(End - Extra)) << BLOCK_BITS;
 
     /* save inode whatever it succeeds to expand or not */
-    Ext2SaveInode(
-        IrpContext,
-        Vcb,
-        Mcb->iNo,
-        Mcb->Inode
-    );
-
-    Ext2SaveInode(IrpContext, Vcb, Mcb->iNo, Mcb->Inode);
+    Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
 
     return Status;
 }
@@ -1212,10 +1187,10 @@ Ext2TruncateFile(
         }
 
         if (Layer - 1 == 0) {
-            BlockArray = &Mcb->Inode->i_block[0];
+            BlockArray = &Mcb->Inode.i_block[0];
             SizeArray = End;
         } else {
-            BlockArray = &Mcb->Inode->i_block[EXT2_NDIR_BLOCKS - 1 + Layer - 1];
+            BlockArray = &Mcb->Inode.i_block[EXT2_NDIR_BLOCKS - 1 + Layer - 1];
             SizeArray = 1;
         }
 
@@ -1247,14 +1222,10 @@ Ext2TruncateFile(
         }
         Ext2ClearAllExtents(&Mcb->Extents);
     }
-
-    Mcb->Inode->i_size = Size->LowPart;
-    if (S_ISREG(Mcb->Inode->i_mode)) {
-        Mcb->Inode->i_size_high = (__u32)(Size->HighPart);
-    }
+    Mcb->Inode.i_size = Size->QuadPart;
 
     /* save inode */
-    Ext2SaveInode(IrpContext, Vcb, Mcb->iNo, Mcb->Inode);
+    Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
 
     return Status;
 }
@@ -1272,7 +1243,7 @@ Ext2IsFileRemovable(
         return STATUS_CANNOT_DELETE;
     }
 
-    if (Fcb->Mcb->iNo == EXT2_ROOT_INO) {
+    if (Fcb->Inode->i_ino == EXT2_ROOT_INO) {
         return STATUS_CANNOT_DELETE;
     }
 
@@ -1369,7 +1340,8 @@ Ext2SetRenameInfo(
     PFILE_OBJECT            FileObject;
     PFILE_OBJECT            TargetObject;
 
-    ULONG                   PrevEntryOffset;
+    struct dentry          *NewEntry = NULL;
+
     BOOLEAN                 ReplaceIfExists;
     BOOLEAN                 bMove = FALSE;
     BOOLEAN                 bTargetRemoved = FALSE;
@@ -1383,7 +1355,7 @@ Ext2SetRenameInfo(
         Mcb = Ccb->SymLink;
     }
 
-    if (Mcb->iNo == EXT2_ROOT_INO) {
+    if (Mcb->Inode.i_ino == EXT2_ROOT_INO) {
         Status = STATUS_INVALID_PARAMETER;
         goto errorout;
     }
@@ -1419,7 +1391,7 @@ Ext2SetRenameInfo(
         FileName = NewName;
 
         TargetMcb = Mcb->Parent;
-        if (IsMcbSymlink(TargetMcb)) {
+        if (IsMcbSymLink(TargetMcb)) {
             TargetMcb = TargetMcb->Target;
         }
 
@@ -1449,7 +1421,7 @@ Ext2SetRenameInfo(
         goto errorout;
     }
 
-    if (TargetMcb->iNo == Mcb->Parent->iNo) {
+    if (TargetMcb->Inode.i_ino == Mcb->Parent->Inode.i_ino) {
         if (FsRtlAreNamesEqual( &FileName,
                                 &(Mcb->ShortName),
                                 FALSE,
@@ -1476,7 +1448,7 @@ Ext2SetRenameInfo(
     ParentMcb = Mcb->Parent;
     ParentDcb = ParentMcb->Fcb;
 
-    if ((TargetMcb->iNo != ParentMcb->iNo)) {
+    if ((TargetMcb->Inode.i_ino != ParentMcb->Inode.i_ino)) {
 
         if (ParentDcb == NULL) {
             ParentDcb = Ext2AllocateFcb(Vcb, ParentMcb);
@@ -1521,7 +1493,7 @@ Ext2SetRenameInfo(
         } else {
 
             if ( (ExistingFcb = ExistingMcb->Fcb) &&
-                    !IsMcbSymlink(ExistingMcb) ) {
+                    !IsMcbSymLink(ExistingMcb) ) {
 
                 Status = Ext2IsFileRemovable(IrpContext, Vcb, ExistingFcb);
                 if (!NT_SUCCESS(Status)) {
@@ -1545,133 +1517,43 @@ Ext2SetRenameInfo(
         }
     }
 
-    PrevEntryOffset = Mcb->EntryOffset;
+    /* add new entry for new target name */
+    Status = Ext2AddEntry(IrpContext, Vcb, TargetDcb, &Mcb->Inode, &FileName, &NewEntry);
+    if (!NT_SUCCESS(Status)) {
+        DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to add entry for %wZ with status: %xh.\n",
+                       &FileName, Status));
+        goto errorout;
+    }
 
-    if (Ext2InodeType(Mcb) == EXT2_FT_DIR) {
-
-        Status = Ext2AddEntry(
-                     IrpContext, Vcb,
-                     TargetDcb,
-                     EXT2_FT_DIR,
-                     Mcb->iNo,
-                     &FileName,
-                     &Mcb->EntryOffset
-                 );
-
+    /* correct the inode number in ..  entry */
+    if (IsMcbDirectory(Mcb)) {
+        Status = Ext2SetParentEntry(
+                     IrpContext, Vcb, Fcb,
+                     ParentMcb->Inode.i_ino,
+                     TargetMcb->Inode.i_ino );
         if (!NT_SUCCESS(Status)) {
-            DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to add entry for %wZ with status: %xh.\n",
-                           &FileName, Status));
-            goto errorout;
-        }
-
-        if (!Ext2SaveInode( IrpContext,
-                            Vcb,
-                            TargetMcb->iNo,
-                            TargetMcb->Inode)) {
-
-            DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to save target Mcb %wZ.\n",
-                           &TargetMcb->FullName));
-            Status = STATUS_UNSUCCESSFUL;
-            DbgBreak();
-            goto errorout;
-        }
-
-        Status = Ext2RemoveEntry(
-                     IrpContext, Vcb,
-                     ParentDcb,
-                     PrevEntryOffset,
-                     EXT2_FT_DIR,
-                     Mcb->iNo
-                 );
-
-        if (!NT_SUCCESS(Status)) {
-            DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to remove entry %wZ with status %xh.\n",
+            DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to set parent refer of %wZ with %xh.\n",
                            &Mcb->FullName, Status));
             DbgBreak();
             goto errorout;
         }
+    }
 
-        if (!Ext2SaveInode( IrpContext,
-                            Vcb,
-                            ParentMcb->iNo,
-                            ParentMcb->Inode)) {
+    /* remove directory entry of old name */
+    Status = Ext2RemoveEntry(IrpContext, Vcb, ParentDcb, Mcb);
+    if (!NT_SUCCESS(Status)) {
+        DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to remove entry %wZ with status %xh.\n",
+                       &Mcb->FullName, Status));
+        DbgBreak();
+        goto errorout;
+    }
 
-            DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to save parent Mcb %wZ.\n",
-                           &ParentMcb->FullName));
-            Status = STATUS_UNSUCCESSFUL;
-            DbgBreak();
-            goto errorout;
-        }
-
-        if (IsMcbSymlink(Mcb)) {
-            Status = STATUS_SUCCESS;
-        } else {
-            Status = Ext2SetParentEntry(
-                         IrpContext, Vcb, Fcb,
-                         ParentMcb->iNo,
-                         TargetMcb->iNo );
-
-            if (!NT_SUCCESS(Status)) {
-                DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to set parent refer of %wZ with %xh.\n",
-                               &Mcb->FullName, Status));
-                DbgBreak();
-                goto errorout;
-            }
-        }
-
-    } else {
-
-        Status = Ext2AddEntry( IrpContext,
-                               Vcb, TargetDcb,
-                               Ext2InodeType(Mcb),
-                               Mcb->iNo,
-                               &FileName,
-                               &Mcb->EntryOffset
-                             );
-
-        if (!NT_SUCCESS(Status)) {
-            DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to add entry for %wZ with status: %xh.\n",
-                           &FileName, Status));
-            DbgBreak();
-            goto errorout;
-        }
-
-        if (!Ext2SaveInode( IrpContext,
-                            Vcb,
-                            TargetMcb->iNo,
-                            TargetMcb->Inode)) {
-
-            DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to save target Mcb %wZ.\n",
-                           &TargetMcb->FullName));
-
-            Status = STATUS_UNSUCCESSFUL;
-            DbgBreak();
-            goto errorout;
-        }
-
-        Status = Ext2RemoveEntry( IrpContext, Vcb,
-                                  ParentDcb,
-                                  PrevEntryOffset,
-                                  Ext2InodeType(Mcb),
-                                  Mcb->iNo );
-        if (!NT_SUCCESS(Status)) {
-            DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to remove entry %wZ with status %xh.\n",
-                           &Mcb->FullName, Status));
-            DbgBreak();
-            goto errorout;
-        }
-
-        if (!Ext2SaveInode( IrpContext,
-                            Vcb,
-                            ParentMcb->iNo,
-                            ParentMcb->Inode)) {
-
-            DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to save parent Mcb %wZ.\n",
-                           &ParentMcb->FullName));
-            Status = STATUS_UNSUCCESSFUL;
-            DbgBreak();
-            goto errorout;
-        }
+    /* Update current dentry from the newly created one. We need keep the original
+       dentry to assure children's links are valid if current entry is a directory */
+    if (Mcb->de) {
+        char *np = Mcb->de->d_name.name;
+        *(Mcb->de) = *NewEntry;
+        NewEntry->d_name.name = np;
     }
 
     if (bTargetRemoved) {
@@ -1709,7 +1591,7 @@ Ext2SetRenameInfo(
 
         }
 
-        if (TargetMcb->iNo != ParentMcb->iNo) {
+        if (TargetMcb->Inode.i_ino != ParentMcb->Inode.i_ino) {
             Ext2RemoveMcb(Vcb, Mcb);
             Ext2InsertMcb(Vcb, TargetMcb, Mcb);
         }
@@ -1751,8 +1633,11 @@ Ext2SetRenameInfo(
 
 errorout:
 
+    if (NewEntry)
+        Ext2FreeEntry(NewEntry);
+
     if (TargetDcb) {
-        if (ParentDcb && ParentDcb->Mcb->iNo != TargetDcb->Mcb->iNo) {
+        if (ParentDcb && ParentDcb->Inode->i_ino != TargetDcb->Inode->i_ino) {
             ClearLongFlag(ParentDcb->Flags, FCB_STATE_BUSY);
         }
         ClearLongFlag(TargetDcb->Flags, FCB_STATE_BUSY);
@@ -1784,7 +1669,7 @@ errorout:
 ULONG
 Ext2InodeType(PEXT2_MCB Mcb)
 {
-    if (IsMcbSymlink(Mcb)) {
+    if (IsMcbSymLink(Mcb)) {
         return EXT2_FT_SYMLINK;
     }
 
@@ -1818,13 +1703,13 @@ Ext2DeleteFile(
     LARGE_INTEGER   SysTime;
 
     DEBUG(DL_INF, ( "Ext2DeleteFile: File %wZ (%xh) will be deleted!\n",
-                    &Mcb->FullName, Mcb->iNo));
+                    &Mcb->FullName, Mcb->Inode.i_ino));
 
     if (Fcb && IsFlagOn(Fcb->Flags, FCB_FILE_DELETED)) {
         return STATUS_SUCCESS;
     }
 
-    if (!IsMcbSymlink(Mcb) && IsMcbDirectory(Mcb)) {
+    if (!IsMcbSymLink(Mcb) && IsMcbDirectory(Mcb)) {
         if (!Ext2IsDirectoryEmpty(IrpContext, Vcb, Mcb)) {
             if (Fcb) {
                 ClearLongFlag(Fcb->Flags, FCB_DELETE_PENDING);
@@ -1852,12 +1737,7 @@ Ext2DeleteFile(
                 ExAcquireResourceExclusiveLite(&Dcb->MainResource, TRUE);
 
             /* remove it's entry form it's parent */
-            Status = Ext2RemoveEntry(
-                         IrpContext,
-                         Vcb, Dcb,
-                         Mcb->EntryOffset,
-                         Ext2InodeType(Mcb),
-                         Mcb->iNo );
+            Status = Ext2RemoveEntry(IrpContext, Vcb, Dcb, Mcb);
         }
 
         if (NT_SUCCESS(Status)) {
@@ -1870,19 +1750,16 @@ Ext2DeleteFile(
                     ExAcquireResourceExclusiveLite(&Fcb->PagingIoResource, TRUE);
             }
 
-            /* decrease and check i_links_count */
-            Mcb->Inode->i_links_count--;
-
-            if (IsMcbSymlink(Mcb)) {
-                if (Mcb->Inode->i_links_count > 0) {
+            if (IsMcbSymLink(Mcb)) {
+                if (Mcb->Inode.i_nlink > 0) {
                     Status = STATUS_CANNOT_DELETE;
                 }
             } else if (!IsMcbDirectory(Mcb)) {
-                if (Mcb->Inode->i_links_count > 0) {
+                if (Mcb->Inode.i_nlink > 0) {
                     goto SkipTruncate;
                 }
             } else {
-                if (Mcb->Inode->i_links_count >= 2) {
+                if (Mcb->Inode.i_nlink >= 2) {
                     goto SkipTruncate;
                 }
             }
@@ -1891,17 +1768,17 @@ Ext2DeleteFile(
                 __leave;
             }
 
-            if (IsMcbSymlink(Mcb)) {
+            if (IsMcbSymLink(Mcb)) {
 
                 /* for symlink, we should do differenctly  */
-                if (Mcb->Inode->i_size > EXT2_LINKLEN_IN_INODE) {
-                    ASSERT(Mcb->Inode->i_block[0]);
-                    ASSERT(Mcb->Inode->i_blocks == (BLOCK_SIZE >> 9));
-                    Status = Ext2FreeBlock(IrpContext, Vcb, Mcb->Inode->i_block[0], 1);
+                if (Mcb->Inode.i_size > EXT2_LINKLEN_IN_INODE) {
+                    ASSERT(Mcb->Inode.i_block[0]);
+                    ASSERT(Mcb->Inode.i_blocks == (BLOCK_SIZE >> 9));
+                    Status = Ext2FreeBlock(IrpContext, Vcb, Mcb->Inode.i_block[0], 1);
                     if (NT_SUCCESS(Status)) {
-                        Mcb->Inode->i_block[0] = 0;
-                        Mcb->Inode->i_size = 0;
-                        Mcb->Inode->i_blocks = 0;
+                        Mcb->Inode.i_block[0] = 0;
+                        Mcb->Inode.i_size = 0;
+                        Mcb->Inode.i_blocks = 0;
                     }
                 }
 
@@ -1932,24 +1809,21 @@ Ext2DeleteFile(
 
                 if (Mcb->FileSize.QuadPart > Size.QuadPart) {
                     Mcb->FileSize.QuadPart = Size.QuadPart;
-                    Mcb->Inode->i_size = Size.LowPart;
-                    if (S_ISREG(Mcb->Inode->i_mode)) {
-                        Mcb->Inode->i_size_high = (__u32)(Size.HighPart);
-                    }
+                    Mcb->Inode.i_size = Size.QuadPart;
                 }
             }
 
             /* set delete time and free the inode */
             KeQuerySystemTime(&SysTime);
-            Mcb->Inode->i_links_count = 0;
-            Mcb->Inode->i_dtime = Ext2LinuxTime(SysTime);
-            Ext2FreeInode(IrpContext, Vcb, Mcb->iNo, Ext2InodeType(Mcb));
+            Mcb->Inode.i_nlink = 0;
+            Mcb->Inode.i_dtime = Ext2LinuxTime(SysTime);
+            Ext2FreeInode(IrpContext, Vcb, Mcb->Inode.i_ino, Ext2InodeType(Mcb));
 
 SkipTruncate:
 
-            Ext2SaveInode(IrpContext, Vcb, Mcb->iNo, Mcb->Inode);
+            Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
 
-            if (Fcb && !IsMcbSymlink(Mcb)) {
+            if (Fcb && !IsMcbSymLink(Mcb)) {
                 SetFlag(Fcb->Flags, FCB_FILE_DELETED);
             }
 

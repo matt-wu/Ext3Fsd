@@ -138,7 +138,7 @@ Ext2Close (IN PEXT2_IRP_CONTEXT IrpContext)
 
         if (IsFlagOn(Fcb->Flags, FCB_STATE_BUSY)) {
             SetFlag(IrpContext->Flags, IRP_CONTEXT_FLAG_FILE_BUSY);
-            DEBUG(DL_USR, ( "Ext2Close: busy bit set: %wZ\n", &Fcb->Mcb->FullName ));
+            DEBUG(DL_WRN, ( "Ext2Close: busy bit set: %wZ\n", &Fcb->Mcb->FullName ));
             Status = STATUS_PENDING;
             __leave;
         }

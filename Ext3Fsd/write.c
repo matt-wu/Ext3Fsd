@@ -105,7 +105,7 @@ Ext2FloppyFlush(IN PVOID Parameter)
     }
 
     IoSetTopLevelIrp(NULL);
-    ExFreePoolWithTag(Parameter, EXT2_FLPFLUSH_MAGIC);
+    Ext2FreePool(Parameter, EXT2_FLPFLUSH_MAGIC);
 }
 
 VOID
@@ -136,7 +136,7 @@ Ext2StartFloppyFlushDpc (
 
     ASSERT(IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK));
 
-    Context = ExAllocatePoolWithTag(
+    Context = Ext2AllocatePool(
                   NonPagedPool,
                   sizeof(EXT2_FLPFLUSH_CONTEXT),
                   EXT2_FLPFLUSH_MAGIC
@@ -1034,12 +1034,8 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
                 Fcb->Header.FileSize.QuadPart =
                     Fcb->Mcb->FileSize.QuadPart = ExtendSize.QuadPart;
-
-                Fcb->Inode->i_size = ExtendSize.LowPart;
-                if (S_ISREG(Fcb->Inode->i_mode)) {
-                    Fcb->Inode->i_size_high = (ULONG) ExtendSize.HighPart;
-                }
-                Ext2SaveInode(IrpContext, Vcb, Fcb->Mcb->iNo, Fcb->Inode);
+                Fcb->Inode->i_size = ExtendSize.QuadPart;
+                Ext2SaveInode(IrpContext, Vcb, Fcb->Inode);
 
                 if (Fcb->Header.FileSize.QuadPart >= 0x80000000 &&
                         !IsFlagOn(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE)) {

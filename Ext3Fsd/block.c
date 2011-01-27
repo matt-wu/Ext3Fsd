@@ -223,7 +223,7 @@ Ext2ReadWriteBlockAsyncCompletionRoutine (
         /* mark current Irp StackLocation as pending */
         IoMarkIrpPending(pContext->MasterIrp);
 
-        ExFreePoolWithTag(pContext, EXT2_RWC_MAGIC);
+        Ext2FreePool(pContext, EXT2_RWC_MAGIC);
         DEC_MEM_COUNT(PS_RW_CONTEXT, pContext, sizeof(EXT2_RW_CONTEXT));
     }
 
@@ -251,7 +251,7 @@ Ext2ReadWriteBlocks(
 
     __try {
 
-        pContext = ExAllocatePoolWithTag(NonPagedPool, sizeof(EXT2_RW_CONTEXT), EXT2_RWC_MAGIC);
+        pContext = Ext2AllocatePool(NonPagedPool, sizeof(EXT2_RW_CONTEXT), EXT2_RWC_MAGIC);
 
         if (!pContext) {
             DEBUG(DL_ERR, ( "Ex2ReadWriteBlocks: failed to allocate pContext.\n"));
@@ -345,7 +345,6 @@ Ext2ReadWriteBlocks(
         }
 
         MasterIrp->AssociatedIrp.IrpCount = pContext->Blocks;
-
         if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
             MasterIrp->AssociatedIrp.IrpCount += 1;
         }
@@ -355,6 +354,7 @@ Ext2ReadWriteBlocks(
         for (Extent = Chain; Extent != NULL; Extent = Extent->Next) {
             Status = IoCallDriver ( Vcb->TargetDeviceObject,
                                     Extent->Irp);
+            Extent->Irp = NULL;
         }
 
         if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
@@ -366,23 +366,23 @@ Ext2ReadWriteBlocks(
 
     } __finally {
 
+        for (Extent = Chain; Extent != NULL; Extent = Extent->Next)  {
+            if (Extent->Irp != NULL ) {
+                if (Extent->Irp->MdlAddress != NULL) {
+                    IoFreeMdl(Extent->Irp->MdlAddress );
+                }
+                IoFreeIrp(Extent->Irp);
+            }
+        }
+
         if (AbnormalTermination()) {
 
             if (bBugCheck) {
                 Ext2BugCheck(EXT2_BUGCHK_BLOCK, 0, 0, 0);
             }
 
-            for (Extent = Chain; Extent != NULL; Extent = Extent->Next)  {
-                if (Extent->Irp != NULL ) {
-                    if (Extent->Irp->MdlAddress != NULL) {
-                        IoFreeMdl(Extent->Irp->MdlAddress );
-                    }
-                    IoFreeIrp(Extent->Irp);
-                }
-            }
-
             if (pContext) {
-                ExFreePoolWithTag(pContext, EXT2_RWC_MAGIC);
+                Ext2FreePool(pContext, EXT2_RWC_MAGIC);
                 DEC_MEM_COUNT(PS_RW_CONTEXT, pContext, sizeof(EXT2_RW_CONTEXT));
             }
 
@@ -393,7 +393,7 @@ Ext2ReadWriteBlocks(
                     Status = MasterIrp->IoStatus.Status;
                 }
                 if (pContext) {
-                    ExFreePoolWithTag(pContext, EXT2_RWC_MAGIC);
+                    Ext2FreePool(pContext, EXT2_RWC_MAGIC);
                     DEC_MEM_COUNT(PS_RW_CONTEXT, pContext, sizeof(EXT2_RW_CONTEXT));
                 }
             } else {
@@ -428,7 +428,7 @@ Ext2ReadSync(
 
     __try {
 
-        Event = ExAllocatePoolWithTag(NonPagedPool, sizeof(KEVENT), 'EK2E');
+        Event = Ext2AllocatePool(NonPagedPool, sizeof(KEVENT), 'EK2E');
 
         if (NULL == Event) {
             DEBUG(DL_ERR, ( "Ex2ReadSync: failed to allocate Event.\n"));
@@ -476,7 +476,7 @@ Ext2ReadSync(
     } __finally {
 
         if (Event) {
-            ExFreePoolWithTag(Event, 'EK2E');
+            Ext2FreePool(Event, 'EK2E');
             DEC_MEM_COUNT(PS_DISK_EVENT, Event, sizeof(KEVENT));
         }
     }
@@ -502,7 +502,7 @@ Ext2ReadDisk(
     Length = (ULONG)(Size + Offset + SECTOR_SIZE - 1 - Lba) &
              (~((ULONG)SECTOR_SIZE - 1));
 
-    Buf = ExAllocatePoolWithTag(PagedPool, Length, EXT2_DATA_MAGIC);
+    Buf = Ext2AllocatePool(PagedPool, Length, EXT2_DATA_MAGIC);
     if (!Buf) {
         DEBUG(DL_ERR, ( "Ext2ReadDisk: failed to allocate Buffer.\n"));
         Status = STATUS_INSUFFICIENT_RESOURCES;
@@ -528,7 +528,7 @@ Ext2ReadDisk(
 errorout:
 
     if (Buf) {
-        ExFreePoolWithTag(Buf, EXT2_DATA_MAGIC);
+        Ext2FreePool(Buf, EXT2_DATA_MAGIC);
         DEC_MEM_COUNT(PS_DISK_BUFFER, Buf, Length);
     }
 

@@ -109,7 +109,7 @@ Ext2AcquireForReadAhead (IN PVOID    Context,
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
     DEBUG(CMCB_DEBUG_LEVEL, ("Ext2AcquireForReadAhead: i=%xh Fcb=%p\n",
-                             Fcb->Mcb->iNo, Fcb));
+                             Fcb->Mcb->Inode.i_ino, Fcb));
 
     if (!ExAcquireResourceSharedLite(
                 &Fcb->MainResource, Wait  ))
@@ -135,7 +135,7 @@ Ext2ReleaseFromReadAhead (IN PVOID Context)
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
     DEBUG(CMCB_DEBUG_LEVEL, ("Ext2ReleaseFromReadAhead: i=%xh Fcb=%p\n",
-                             Fcb->Mcb->iNo, Fcb));
+                             Fcb->Mcb->Inode.i_ino, Fcb));
 
     IoSetTopLevelIrp( NULL );
 

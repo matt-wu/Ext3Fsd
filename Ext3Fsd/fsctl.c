@@ -80,7 +80,7 @@ Ext2IsHandleCountZero(IN PEXT2_VCB Vcb)
                (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
         DEBUG(DL_INF, ( "Ext2IsHandleCountZero: Inode:%xh File:%S OpenHandleCount=%xh\n",
-                        Fcb->Mcb->iNo, Fcb->Mcb->ShortName.Buffer, Fcb->OpenHandleCount));
+                        Fcb->Inode->i_ino, Fcb->Mcb->ShortName.Buffer, Fcb->OpenHandleCount));
 
         if (Fcb->OpenHandleCount) {
             return FALSE;
@@ -711,7 +711,7 @@ Ext2QueryExtentMappings(
             }
 
             /* allocate extent array */
-            PartialRuns = ExAllocatePoolWithTag(
+            PartialRuns = Ext2AllocatePool(
                               NonPagedPool,
                               (Ext2CountExtents(Chain) + 2) *
                               (2 * sizeof(LARGE_INTEGER)),
@@ -729,7 +729,7 @@ Ext2QueryExtentMappings(
                 RtlMoveMemory(PartialRuns,
                               MappedRuns,
                               i * 2 * sizeof(LARGE_INTEGER));
-                ExFreePoolWithTag(MappedRuns, 'RE2E');
+                Ext2FreePool(MappedRuns, 'RE2E');
             }
             MappedRuns = PartialRuns;
 
@@ -749,7 +749,7 @@ Ext2QueryExtentMappings(
 
         if (!NT_SUCCESS(Status) || Status == STATUS_PENDING) {
             if (MappedRuns) {
-                ExFreePoolWithTag(MappedRuns, 'RE2E');
+                Ext2FreePool(MappedRuns, 'RE2E');
             }
             *pMappedRuns = NULL;
         }
@@ -1121,7 +1121,7 @@ Ext2GetRetrievalPointers (
 exit_to_get_rps:
 
             if (MappedRuns) {
-                ExFreePoolWithTag(MappedRuns, 'RE2E');
+                Ext2FreePool(MappedRuns, 'RE2E');
             }
         }
 #endif
@@ -1600,7 +1600,7 @@ Ext2MountVolume (IN PEXT2_IRP_CONTEXT IrpContext)
                 Ext2DestroyVcb(Vcb);
             } else {
                 if (Ext2Sb) {
-                    ExFreePoolWithTag(Ext2Sb, EXT2_SB_MAGIC);
+                    Ext2FreePool(Ext2Sb, EXT2_SB_MAGIC);
                 }
                 if (VolumeDeviceObject) {
                     IoDeleteDevice(VolumeDeviceObject);
@@ -1828,7 +1828,7 @@ Ext2VerifyVolume (IN PEXT2_IRP_CONTEXT IrpContext)
     } __finally {
 
         if (ext2_sb)
-            ExFreePoolWithTag(ext2_sb, EXT2_SB_MAGIC);
+            Ext2FreePool(ext2_sb, EXT2_SB_MAGIC);
 
         if (VcbResourceAcquired) {
             ExReleaseResourceLite(&Vcb->MainResource);
@@ -1961,7 +1961,7 @@ Ext2CheckDismount (
     BOOLEAN bDeleted = FALSE, bTearDown = FALSE;
     ULONG   UnCleanCount = 0;
 
-    NewVpb = ExAllocatePoolWithTag(NonPagedPool, VPB_SIZE, TAG_VPB);
+    NewVpb = Ext2AllocatePool(NonPagedPool, VPB_SIZE, TAG_VPB);
     if (NewVpb == NULL) {
         DEBUG(DL_ERR, ( "Ex2CheckDismount: failed to allocate NewVpb.\n"));
         return FALSE;
@@ -2045,7 +2045,7 @@ Ext2CheckDismount (
 
     if (NewVpb != NULL) {
         DEBUG(DL_DBG, ( "Ext2CheckDismount: freeing Vpb %p\n", NewVpb));
-        ExFreePoolWithTag(NewVpb, TAG_VPB);
+        Ext2FreePool(NewVpb, TAG_VPB);
         DEC_MEM_COUNT(PS_VPB, NewVpb, sizeof(VPB));
     }
 
@@ -2086,7 +2086,7 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
 
             DEBUG(DL_INF, ( "Ext2PurgeVolume: %wZ refercount=%xh\n", &Fcb->Mcb->FullName, Fcb->ReferenceCount));
 
-            FcbListEntry = ExAllocatePoolWithTag(
+            FcbListEntry = Ext2AllocatePool(
                                PagedPool,
                                sizeof(FCB_LIST_ENTRY),
                                EXT2_FLIST_MAGIC
@@ -2122,7 +2122,7 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
                 }
             }
 
-            ExFreePoolWithTag(FcbListEntry, EXT2_FLIST_MAGIC);
+            Ext2FreePool(FcbListEntry, EXT2_FLIST_MAGIC);
         }
 
         if (FlushBeforePurge) {

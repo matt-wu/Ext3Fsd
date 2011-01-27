@@ -163,7 +163,7 @@ Ext2AllocateFcb (
 {
     PEXT2_FCB Fcb;
 
-    ASSERT(!IsMcbSymlink(Mcb));
+    ASSERT(!IsMcbSymLink(Mcb));
 
     Fcb = (PEXT2_FCB) ExAllocateFromNPagedLookasideList(
               &(Ext2Global->Ext2FcbLookasideList));
@@ -190,7 +190,7 @@ Ext2AllocateFcb (
     Fcb->OpenHandleCount = 0;
     Fcb->ReferenceCount = 0;
     Fcb->Vcb = Vcb;
-    Fcb->Inode = Mcb->Inode;
+    Fcb->Inode = &Mcb->Inode;
 
     ASSERT(Mcb->Fcb == NULL);
     Ext2ReferMcb(Mcb);
@@ -352,7 +352,7 @@ Ext2FreeCcb (IN PEXT2_CCB Ccb)
     if (Ccb->DirectorySearchPattern.Buffer != NULL) {
         DEC_MEM_COUNT(PS_DIR_PATTERN, Ccb->DirectorySearchPattern.Buffer,
                       Ccb->DirectorySearchPattern.MaximumLength );
-        ExFreePoolWithTag(Ccb->DirectorySearchPattern.Buffer, EXT2_DIRSP_MAGIC);
+        Ext2FreePool(Ccb->DirectorySearchPattern.Buffer, EXT2_DIRSP_MAGIC);
     }
 
     ExFreeToPagedLookasideList(&(Ext2Global->Ext2CcbLookasideList), Ccb);
@@ -362,10 +362,10 @@ Ext2FreeCcb (IN PEXT2_CCB Ccb)
 PEXT2_INODE
 Ext2AllocateInode (PEXT2_VCB  Vcb)
 {
-    PEXT2_INODE inode = NULL;
+    PVOID inode = NULL;
 
-    inode = (PEXT2_INODE) (ExAllocateFromNPagedLookasideList(
-                               &(Vcb->InodeLookasideList)));
+    inode = ExAllocateFromNPagedLookasideList(
+                &(Vcb->InodeLookasideList));
     if (!inode) {
         return NULL;
     }
@@ -373,7 +373,7 @@ Ext2AllocateInode (PEXT2_VCB  Vcb)
     RtlZeroMemory(inode, INODE_SIZE);
 
     DEBUG(DL_INF, ("ExtAllocateInode: Inode created: %ph.\n", inode));
-    // INC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
+    INC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
 
     return inode;
 }
@@ -386,7 +386,78 @@ Ext2DestroyInode (IN PEXT2_VCB Vcb, IN PEXT2_INODE inode)
     DEBUG(DL_INF, ("Ext2FreeInode: Inode = %ph.\n", inode));
 
     ExFreeToNPagedLookasideList(&(Vcb->InodeLookasideList), inode);
-    //DEC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
+    DEC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
+}
+
+struct dentry * Ext2AllocateEntry()
+{
+    struct dentry *de;
+
+    de = (struct dentry *)ExAllocateFromPagedLookasideList(
+             &(Ext2Global->Ext2DentryLookasideList));
+    if (!de) {
+        return NULL;
+    }
+
+    RtlZeroMemory(de, sizeof(struct dentry));
+    INC_MEM_COUNT(PS_DENTRY, de, sizeof(struct dentry));
+
+    return de;
+}
+
+VOID Ext2FreeEntry (IN struct dentry *de)
+{
+    ASSERT(de != NULL);
+
+    if (de->d_name.name)
+        ExFreePool(de->d_name.name);
+
+    ExFreeToPagedLookasideList(&(Ext2Global->Ext2DentryLookasideList), de);
+    DEC_MEM_COUNT(PS_DENTRY, de, sizeof(struct dentry));
+}
+
+
+struct dentry *Ext2BuildEntry(PEXT2_VCB Vcb, PEXT2_MCB Dcb, PUNICODE_STRING FileName)
+{
+    OEM_STRING      Oem = { 0 };
+    struct dentry  *de = NULL;
+    NTSTATUS        Status = STATUS_INSUFFICIENT_RESOURCES;
+
+    __try {
+
+        de = Ext2AllocateEntry();
+        if (!de) {
+            DEBUG(DL_ERR, ("Ext2BuildEntry: failed to allocate dentry.\n"));
+            __leave;
+        }
+        de->d_sb = &Vcb->sb;
+        if (Dcb)
+            de->d_parent = Dcb->de;
+
+        Oem.MaximumLength = (USHORT)Ext2UnicodeToOEMSize(Vcb, FileName) + 1;
+        Oem.Buffer = ExAllocatePool(PagedPool, Oem.MaximumLength);
+        if (!Oem.Buffer) {
+            DEBUG(DL_ERR, ( "Ex2BuildEntry: failed to allocate OEM name.\n"));
+            __leave;
+        }
+        de->d_name.name = Oem.Buffer;
+        RtlZeroMemory(Oem.Buffer, Oem.MaximumLength);
+        Status = Ext2UnicodeToOEM(Vcb, &Oem, FileName);
+        if (!NT_SUCCESS(Status)) {
+            DEBUG(DL_CP, ("Ext2BuildEntry: failed to convert %S to OEM.\n", FileName->Buffer));
+            __leave;
+        }
+        de->d_name.len  = Oem.Length;
+
+    } __finally {
+
+        if (!NT_SUCCESS(Status)) {
+            if (de)
+                Ext2FreeEntry(de);
+        }
+    }
+
+    return de;
 }
 
 PEXT2_EXTENT
@@ -969,7 +1040,7 @@ Ext2InitializeZone(
         Block = Mapped = 0;
 
         /* mapping file offset to ext2 block */
-        if (Mcb->Inode->i_flags & EXT2_EXTENTS_FL) {
+        if (Mcb->Inode.i_flags & EXT2_EXTENTS_FL) {
             Status = Ext2ExtentMap(
                          IrpContext,
                          Vcb,
@@ -1096,7 +1167,7 @@ Ext2BuildExtents(
         /* try to BlockMap in case failed to access Extents cache */
         if (!IsZoneInited(Mcb) || (bAlloc && Block == 0)) {
 
-            if (Mcb->Inode->i_flags & EXT2_EXTENTS_FL) {
+            if (Mcb->Inode.i_flags & EXT2_EXTENTS_FL) {
                 Status = Ext2ExtentMap(
                              IrpContext,
                              Vcb,
@@ -1198,7 +1269,7 @@ Ext2BuildName(
     /* free the original buffer */
     if (Target->Buffer) {
         DEC_MEM_COUNT(PS_MCB_NAME, Target->Buffer, Target->MaximumLength);
-        ExFreePoolWithTag(Target->Buffer, EXT2_FNAME_MAGIC);
+        Ext2FreePool(Target->Buffer, EXT2_FNAME_MAGIC);
         Target->Length = Target->MaximumLength = 0;
     }
 
@@ -1220,7 +1291,7 @@ Ext2BuildName(
     Length  = File->Length;
     Length += (ParentLen + (bBackslash ? 1 : 0)) * sizeof(WCHAR);
 
-    Target->Buffer = ExAllocatePoolWithTag(
+    Target->Buffer = Ext2AllocatePool(
                          PagedPool,
                          Length + 2,
                          EXT2_FNAME_MAGIC
@@ -1283,12 +1354,8 @@ Ext2AllocateMcb (
     Mcb->Identifier.Size = sizeof(EXT2_MCB);
     Mcb->FileAttr = FileAttr;
 
-    /* allocate inode structure */
-    Mcb->Inode = Ext2AllocateInode(Vcb);
-    if (Mcb->Inode == NULL) {
-        Status = STATUS_INSUFFICIENT_RESOURCES;
-        goto errorout;
-    }
+    Mcb->Inode.i_priv = (PVOID)Mcb;
+    Mcb->Inode.i_sb = &Vcb->sb;
 
     /* initialize Mcb names */
     if (FileName) {
@@ -1346,20 +1413,16 @@ errorout:
 
     if (Mcb) {
 
-        if (Mcb->Inode) {
-            Ext2DestroyInode(Vcb, Mcb->Inode);
-        }
-
         if (Mcb->ShortName.Buffer) {
             DEC_MEM_COUNT(PS_MCB_NAME, Mcb->ShortName.Buffer,
                           Mcb->ShortName.MaximumLength);
-            ExFreePoolWithTag(Mcb->ShortName.Buffer, EXT2_FNAME_MAGIC);
+            Ext2FreePool(Mcb->ShortName.Buffer, EXT2_FNAME_MAGIC);
         }
 
         if (Mcb->FullName.Buffer) {
             DEC_MEM_COUNT(PS_MCB_NAME, Mcb->FullName.Buffer,
                           Mcb->FullName.MaximumLength);
-            ExFreePoolWithTag(Mcb->FullName.Buffer, EXT2_FNAME_MAGIC);
+            Ext2FreePool(Mcb->FullName.Buffer, EXT2_FNAME_MAGIC);
         }
 
         ExFreeToPagedLookasideList(&(Ext2Global->Ext2McbLookasideList), Mcb);
@@ -1385,7 +1448,7 @@ Ext2FreeMcb (IN PEXT2_VCB Vcb, IN PEXT2_MCB Mcb)
 
     DEBUG(DL_INF, ( "Ext2FreeMcb: Mcb %wZ will be freed.\n", &Mcb->FullName));
 
-    if (IsMcbSymlink(Mcb) && Mcb->Target) {
+    if (IsMcbSymLink(Mcb) && Mcb->Target) {
         Ext2DerefMcb(Mcb->Target);
     }
 
@@ -1394,20 +1457,21 @@ Ext2FreeMcb (IN PEXT2_VCB Vcb, IN PEXT2_MCB Mcb)
     FsRtlUninitializeLargeMcb(&(Mcb->Extents));
     ClearLongFlag(Mcb->Flags, MCB_ZONE_INIT);
 
-    if (Mcb->Inode) {
-        Ext2DestroyInode(Vcb, Mcb->Inode);
-    }
-
     if (Mcb->ShortName.Buffer) {
         DEC_MEM_COUNT(PS_MCB_NAME, Mcb->ShortName.Buffer,
                       Mcb->ShortName.MaximumLength);
-        ExFreePoolWithTag(Mcb->ShortName.Buffer, EXT2_FNAME_MAGIC);
+        Ext2FreePool(Mcb->ShortName.Buffer, EXT2_FNAME_MAGIC);
     }
 
     if (Mcb->FullName.Buffer) {
         DEC_MEM_COUNT(PS_MCB_NAME, Mcb->FullName.Buffer,
                       Mcb->FullName.MaximumLength);
-        ExFreePoolWithTag(Mcb->FullName.Buffer, EXT2_FNAME_MAGIC);
+        Ext2FreePool(Mcb->FullName.Buffer, EXT2_FNAME_MAGIC);
+    }
+
+    /* free dentry */
+    if (Mcb->de) {
+        Ext2FreeEntry(Mcb->de);
     }
 
     Mcb->Identifier.Type = 0;
@@ -1456,16 +1520,13 @@ Ext2SearchMcbWithoutLock(
 
         Ext2ReferMcb(Parent);
 
-        if ( FileName->Length == 2 &&
-                FileName->Buffer[0] == L'.') {
+        if (Ext2IsDot(FileName)) {
             TmpMcb = Parent;
             Ext2ReferMcb(Parent);
             __leave;
         }
 
-        if ( FileName->Length == 4 &&
-                FileName->Buffer[0] == L'.' &&
-                FileName->Buffer[1] == L'.' ) {
+        if (Ext2IsDotDot(FileName)) {
             if (IsMcbRoot(Parent)) {
                 TmpMcb = Parent;
             } else {
@@ -1477,10 +1538,10 @@ Ext2SearchMcbWithoutLock(
             __leave;
         }
 
-        if (IsMcbSymlink(Parent)) {
+        if (IsMcbSymLink(Parent)) {
             if (Parent->Target) {
                 TmpMcb = Parent->Target->Child;
-                ASSERT(!IsMcbSymlink(Parent->Target));
+                ASSERT(!IsMcbSymLink(Parent->Target));
             } else {
                 TmpMcb = NULL;
                 __leave;
@@ -1527,10 +1588,10 @@ Ext2InsertMcb (
         LockAcquired = TRUE;
 
         /* use it's target if it's a symlink */
-        if (IsMcbSymlink(Parent)) {
+        if (IsMcbSymLink(Parent)) {
             Parent = Parent->Target;
         }
-        ASSERT(!IsMcbSymlink(Parent));
+        ASSERT(!IsMcbSymLink(Parent));
 
         Mcb = Parent->Child;
         while (Mcb) {
@@ -1556,6 +1617,7 @@ Ext2InsertMcb (
             Child->Next = Parent->Child;
             Parent->Child = Child;
             Child->Parent = Parent;
+            Child->de->d_parent = Parent->de;
             Ext2ReferMcb(Parent);
             SetLongFlag(Child->Flags, MCB_ENTRY_TREE);
         }
@@ -1617,6 +1679,7 @@ Ext2RemoveMcb (
                 DbgBreak();
             }
             Mcb->Parent = NULL;
+            Mcb->de->d_parent = NULL;
         }
 
     } __finally {
@@ -1645,7 +1708,7 @@ Ext2CleanupAllMcbs(PEXT2_VCB Vcb)
         while (Mcb = Ext2FirstUnusedMcb(Vcb, TRUE, Vcb->NumOfMcb)) {
             while (Mcb) {
                 PEXT2_MCB Next = Mcb->Next;
-                if (IsMcbSymlink(Mcb)) {
+                if (IsMcbSymLink(Mcb)) {
                     Mcb->Target = NULL;
                 }
                 Ext2FreeMcb(Vcb, Mcb);
@@ -1678,9 +1741,7 @@ Ext2CheckSetBlock(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb, ULONG Block)
 
 
     Group = (Block - EXT2_FIRST_DATA_BLOCK) / BLOCKS_PER_GROUP;
-
     dwBlk = (Block - EXT2_FIRST_DATA_BLOCK) % BLOCKS_PER_GROUP;
-
 
     Offset.QuadPart = (LONGLONG) Vcb->BlockSize;
     Offset.QuadPart = Offset.QuadPart * Vcb->GroupDesc[Group].bg_block_bitmap;
@@ -1750,10 +1811,10 @@ Ext2CheckBitmapConsistency(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb)
 
         if (i == Vcb->NumOfGroups - 1) {
             InodeBlocks = ((INODES_COUNT % INODES_PER_GROUP) *
-                           INODE_SIZE + Vcb->BlockSize - 1) /
+                           Vcb->InodeSize + Vcb->BlockSize - 1) /
                           (Vcb->BlockSize);
         } else {
-            InodeBlocks = (INODES_PER_GROUP * INODE_SIZE +
+            InodeBlocks = (INODES_PER_GROUP * Vcb->InodeSize +
                            Vcb->BlockSize - 1) / (Vcb->BlockSize);
         }
 
@@ -1813,7 +1874,7 @@ Ext2QueryVolumeParams(IN PEXT2_VCB Vcb, IN PUNICODE_STRING Params)
     }
 
     /* allocating memory for UniBuffer */
-    UniBuffer = ExAllocatePoolWithTag(PagedPool, 1024, EXT2_PARAM_MAGIC);
+    UniBuffer = Ext2AllocatePool(PagedPool, 1024, EXT2_PARAM_MAGIC);
     if (NULL == UniBuffer) {
         Status = STATUS_INSUFFICIENT_RESOURCES;
         goto errorout;
@@ -1847,7 +1908,7 @@ errorout:
         *Params = UniName;
     } else {
         if (UniBuffer) {
-            ExFreePoolWithTag(UniBuffer, EXT2_PARAM_MAGIC);
+            Ext2FreePool(UniBuffer, EXT2_PARAM_MAGIC);
         }
     }
 
@@ -1988,7 +2049,6 @@ Ext2PerformRegistryVolumeParams(IN PEXT2_VCB Vcb)
             Status = STATUS_SUCCESS;
         } else {
             Status = STATUS_UNSUCCESSFUL;
-            DbgBreak();
             goto errorout;
         }
 
@@ -2034,7 +2094,7 @@ Ext2PerformRegistryVolumeParams(IN PEXT2_VCB Vcb)
 errorout:
 
     if (VolumeParams.Buffer) {
-        ExFreePoolWithTag(VolumeParams.Buffer, EXT2_PARAM_MAGIC);
+        Ext2FreePool(VolumeParams.Buffer, EXT2_PARAM_MAGIC);
     }
 
     return Status;
@@ -2094,6 +2154,29 @@ static __inline BOOLEAN Ext2IsNullUuid (__u8 * uuid)
     return (i >= 16);
 }
 
+/*
+ * Maximal file size.  There is a direct, and {,double-,triple-}indirect
+ * block limit, and also a limit of (2^32 - 1) 512-byte sectors in i_blocks.
+ * We need to be 1 filesystem block less than the 2^32 sector limit.
+ */
+static loff_t ext3_max_size(int bits)
+{
+    loff_t res = EXT3_NDIR_BLOCKS;
+    /* This constant is calculated to be the largest file size for a
+     * dense, 4k-blocksize file such that the total number of
+     * sectors in the file, including data and all indirect blocks,
+     * does not exceed 2^32. */
+    const loff_t upper_limit = 0x1ff7fffd000LL;
+
+    res += 1LL << (bits-2);
+    res += 1LL << (2*(bits-2));
+    res += 1LL << (3*(bits-2));
+    res <<= bits;
+    if (res > upper_limit)
+        res = upper_limit;
+    return res;
+}
+
 NTSTATUS
 Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
                    IN PEXT2_VCB         Vcb,
@@ -2110,6 +2193,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
     USHORT                      Buffer[2];
     ULONG                       ChangeCount = 0;
     CC_FILE_SIZES               FileSizes;
+    int                         i;
 
     BOOLEAN                     VcbResourceInitialized = FALSE;
     BOOLEAN                     NotifySyncInitialized = FALSE;
@@ -2184,14 +2268,13 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
 
         /* set inode size */
         Vcb->InodeSize = (ULONG)sb->s_inode_size;
-        if (INODE_SIZE == 0) {
-            DbgBreak();
+        if (Vcb->InodeSize == 0) {
             Vcb->InodeSize = EXT2_GOOD_OLD_INODE_SIZE;
         }
 
         /* initialize inode lookaside list */
         ExInitializeNPagedLookasideList(&(Vcb->InodeLookasideList),
-                                        NULL, NULL, 0, INODE_SIZE,
+                                        NULL, NULL, 0, sizeof(EXT2_INODE),
                                         'SNIE', 0);
 
         InodeLookasideInitialized = TRUE;
@@ -2323,6 +2406,36 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         }
         ExtentsInitialized = TRUE;
 
+        /* set block device */
+        Vcb->bd.bd_dev = Vcb->RealDevice;
+        Vcb->bd.bd_geo = Vcb->DiskGeometry;
+        Vcb->bd.bd_part = Vcb->PartitionInformation;
+        Vcb->bd.bd_volume = Vcb->Volume;
+        Vcb->bd.bd_priv = (void *) Vcb;
+        INIT_LIST_HEAD(&Vcb->bd.bd_bh_list);
+        spin_lock_init(&Vcb->bd.bd_bh_lock);
+        Vcb->bd.bd_bh_cache = kmem_cache_create("bd_bh_buffer",
+                                                Vcb->BlockSize, 0, 0, NULL);
+        if (!Vcb->bd.bd_bh_cache) {
+            __leave;
+        }
+
+        Vcb->sb.s_magic = sb->s_magic;
+        Vcb->sb.s_bdev = &Vcb->bd;
+        Vcb->sb.s_blocksize = BLOCK_SIZE;
+        Vcb->sb.s_blocksize_bits = BLOCK_BITS;
+        Vcb->sb.s_priv = (void *) Vcb;
+        Vcb->sb.s_fs_info = &Vcb->sbi;
+        Vcb->sb.s_maxbytes = ext3_max_size(BLOCK_BITS);
+
+        Vcb->sbi.s_es = sb;
+        Vcb->sbi.s_blocks_per_group = sb->s_blocks_per_group;
+        Vcb->sbi.s_first_ino = sb->s_first_ino;
+        for (i=0; i < 4; i++) {
+            Vcb->sbi.s_hash_seed[i] = sb->s_hash_seed[i];
+        }
+        Vcb->sbi.s_def_hash_version = sb->s_def_hash_version;
+
         /* calculate maximum file bocks ... */
         {
             ULONG   dwData[EXT2_BLOCK_TYPES] = {EXT2_NDIR_BLOCKS, 1, 1, 1};
@@ -2360,6 +2473,11 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             __leave;
         }
 
+        /* mount ext4 read-only to be safe */
+        if (IsFlagOn(sb->s_feature_ro_compat, EXT4_FEATURE_RO_COMPAT_GDT_CSUM)) {
+            SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
+        }
+
         /* recovery journal since it's ext3 */
         if (Vcb->IsExt3fs) {
             Ext2RecoverJournal(IrpContext, Vcb);
@@ -2367,11 +2485,6 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
                     IsFlagOn(sb->s_feature_incompat, EXT3_FEATURE_INCOMPAT_META_BG)) {
                 SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
             }
-        }
-
-        /* mount ext4 read-only to be safe */
-        if (IsFlagOn(sb->s_feature_ro_compat, 0x0010)) {
-            SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
         }
 
         /* Now allocating the mcb for root ... */
@@ -2389,21 +2502,30 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             __leave;
         }
 
+        Vcb->sb.s_root = Ext2BuildEntry(Vcb, NULL, &RootNode);
+        if (!Vcb->sb.s_root) {
+            DbgBreak();
+            Status = STATUS_UNSUCCESSFUL;
+            __leave;
+        }
+        Vcb->sb.s_root->d_sb = &Vcb->sb;
+        Vcb->sb.s_root->d_inode = &Vcb->McbTree->Inode;
+        Vcb->McbTree->de = Vcb->sb.s_root;
+
         /* load root inode */
-        Vcb->McbTree->iNo = EXT2_ROOT_INO;
-        if (!Ext2LoadInode(Vcb, EXT2_ROOT_INO, Vcb->McbTree->Inode)) {
+        Vcb->McbTree->Inode.i_ino = EXT2_ROOT_INO;
+        if (!Ext2LoadInode(Vcb, &Vcb->McbTree->Inode)) {
             DbgBreak();
             Status = STATUS_CANT_WAIT;
             __leave;
         }
 
         /* initializeroot node */
-        Vcb->McbTree->FileSize.LowPart = Vcb->McbTree->Inode->i_size;
-        Vcb->McbTree->FileSize.HighPart = 0;
-        Vcb->McbTree->CreationTime = Ext2NtTime(Vcb->McbTree->Inode->i_ctime);
-        Vcb->McbTree->LastAccessTime = Ext2NtTime(Vcb->McbTree->Inode->i_atime);
-        Vcb->McbTree->LastWriteTime = Ext2NtTime(Vcb->McbTree->Inode->i_mtime);
-        Vcb->McbTree->ChangeTime = Ext2NtTime(Vcb->McbTree->Inode->i_mtime);
+        Vcb->McbTree->FileSize.QuadPart = Vcb->McbTree->Inode.i_size;
+        Vcb->McbTree->CreationTime = Ext2NtTime(Vcb->McbTree->Inode.i_ctime);
+        Vcb->McbTree->LastAccessTime = Ext2NtTime(Vcb->McbTree->Inode.i_atime);
+        Vcb->McbTree->LastWriteTime = Ext2NtTime(Vcb->McbTree->Inode.i_mtime);
+        Vcb->McbTree->ChangeTime = Ext2NtTime(Vcb->McbTree->Inode.i_mtime);
 
         /* check bitmap if user specifies it */
         if (IsFlagOn(Ext2Global->Flags, EXT2_CHECKING_BITMAP)) {
@@ -2423,6 +2545,8 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             }
 
             if (ExtentsInitialized) {
+                if (Vcb->bd.bd_bh_cache)
+                    kmem_cache_destroy(Vcb->bd.bd_bh_cache);
                 FsRtlUninitializeLargeMcb(&(Vcb->Extents));
             }
 
@@ -2442,7 +2566,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             }
 
             if (Vcb->GroupDesc) {
-                ExFreePoolWithTag(Vcb->GroupDesc, EXT2_GD_MAGIC);
+                Ext2FreePool(Vcb->GroupDesc, EXT2_GD_MAGIC);
                 Vcb->GroupDesc = NULL;
             }
 
@@ -2506,19 +2630,22 @@ Ext2DestroyVcb (IN PEXT2_VCB Vcb)
 
     Ext2CleanupAllMcbs(Vcb);
 
+    if (Vcb->bd.bd_bh_cache)
+        kmem_cache_destroy(Vcb->bd.bd_bh_cache);
+
     if (Vcb->GroupDesc) {
-        ExFreePoolWithTag(Vcb->GroupDesc, EXT2_GD_MAGIC);
+        Ext2FreePool(Vcb->GroupDesc, EXT2_GD_MAGIC);
         Vcb->GroupDesc = NULL;
     }
 
     if (Vcb->SuperBlock) {
-        ExFreePoolWithTag(Vcb->SuperBlock, EXT2_SB_MAGIC);
+        Ext2FreePool(Vcb->SuperBlock, EXT2_SB_MAGIC);
         Vcb->SuperBlock = NULL;
     }
 
     if (IsFlagOn(Vcb->Flags, VCB_NEW_VPB)) {
         ASSERT(Vcb->Vpb2 != NULL);
-        ExFreePoolWithTag(Vcb->Vpb2, TAG_VPB);
+        Ext2FreePool(Vcb->Vpb2, TAG_VPB);
         DEC_MEM_COUNT(PS_VPB, Vcb->Vpb2, sizeof(VPB));
         Vcb->Vpb2 = NULL;
     }
@@ -2571,7 +2698,7 @@ Ext2SyncUninitializeCacheMap (
 VOID
 Ext2LinkTailMcb(PEXT2_VCB Vcb, PEXT2_MCB Mcb)
 {
-    if (Mcb->iNo == EXT2_ROOT_INO) {
+    if (Mcb->Inode.i_ino == EXT2_ROOT_INO) {
         return;
     }
 
@@ -2594,7 +2721,7 @@ Ext2LinkTailMcb(PEXT2_VCB Vcb, PEXT2_MCB Mcb)
 VOID
 Ext2LinkHeadMcb(PEXT2_VCB Vcb, PEXT2_MCB Mcb)
 {
-    if (Mcb->iNo == EXT2_ROOT_INO) {
+    if (Mcb->Inode.i_ino == EXT2_ROOT_INO) {
         return;
     }
 
@@ -2616,7 +2743,7 @@ Ext2LinkHeadMcb(PEXT2_VCB Vcb, PEXT2_MCB Mcb)
 VOID
 Ext2UnlinkMcb(PEXT2_VCB Vcb, PEXT2_MCB Mcb)
 {
-    if (Mcb->iNo == EXT2_ROOT_INO) {
+    if (Mcb->Inode.i_ino == EXT2_ROOT_INO) {
         return;
     }
 
@@ -2659,7 +2786,7 @@ Ext2FirstUnusedMcb(PEXT2_VCB Vcb, BOOLEAN Wait, ULONG Number)
                 ASSERT(IsFlagOn(Mcb->Flags, MCB_VCB_LINK));
 
                 if (Mcb->Fcb == NULL && !IsMcbRoot(Mcb) &&
-                        (IsMcbSymlink(Mcb) || Mcb->Child == NULL) &&
+                        (IsMcbSymLink(Mcb) || Mcb->Child == NULL) &&
                         Mcb->Refercount == 0 ) {
 
                     Ext2RemoveMcb(Vcb, Mcb);

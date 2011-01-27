@@ -25,4 +25,4 @@ BROWSER_INFO=1
 !ENDIF
 
 # The source code:
-SOURCES= generic.c recover.c
+SOURCES= generic.c htree.c recover.c

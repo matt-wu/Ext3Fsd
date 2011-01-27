@@ -16,7 +16,8 @@
 #ifndef _LINUX_EXT3_FS_H
 #define _LINUX_EXT3_FS_H
 
-#include <linux/types.h>
+#include <linux/module.h>
+#include <linux/fs.h>
 #include <linux/magic.h>
 
 /*
@@ -503,7 +504,6 @@ struct ext3_super_block {
     __u32	s_reserved[190];	/* Padding to the end of the block */
 };
 
-#if 0
 #ifdef __KERNEL__
 #include <linux/ext3_fs_i.h>
 #include <linux/ext3_fs_sb.h>
@@ -511,9 +511,9 @@ static inline struct ext3_sb_info * EXT3_SB(struct super_block *sb)
 {
     return sb->s_fs_info;
 }
-static inline struct ext3_inode_info *EXT3_I(struct inode *inode)
+static inline struct inode *EXT3_I(struct inode *inode)
 {
-    return container_of(inode, struct ext3_inode_info, vfs_inode);
+    return inode;
 }
 
 static inline int ext3_valid_inum(struct super_block *sb, unsigned long ino)
@@ -587,19 +587,32 @@ static inline int ext3_valid_inum(struct super_block *sb, unsigned long ino)
 #define EXT3_FEATURE_RO_COMPAT_SPARSE_SUPER	0x0001
 #define EXT3_FEATURE_RO_COMPAT_LARGE_FILE	0x0002
 #define EXT3_FEATURE_RO_COMPAT_BTREE_DIR	0x0004
+#define EXT4_FEATURE_RO_COMPAT_GDT_CSUM		0x0010
+#define EXT4_FEATURE_RO_COMPAT_DIR_NLINK	0x0020
+#define EXT4_FEATURE_RO_COMPAT_EXTRA_ISIZE	0x0040
 
 #define EXT3_FEATURE_INCOMPAT_COMPRESSION	0x0001
 #define EXT3_FEATURE_INCOMPAT_FILETYPE		0x0002
 #define EXT3_FEATURE_INCOMPAT_RECOVER		0x0004 /* Needs recovery */
 #define EXT3_FEATURE_INCOMPAT_JOURNAL_DEV	0x0008 /* Journal device */
 #define EXT3_FEATURE_INCOMPAT_META_BG		0x0010
+#define EXT3_FEATURE_INCOMPAT_EXTENTS		0x0040 /* extents support */
+#define EXT3_FEATURE_INCOMPAT_MMP           0x0100
+#define EXT3_FEATURE_INCOMPAT_DIRDATA		0x1000
 
 #define EXT3_FEATURE_COMPAT_SUPP	EXT2_FEATURE_COMPAT_EXT_ATTR
 #define EXT3_FEATURE_INCOMPAT_SUPP	(EXT3_FEATURE_INCOMPAT_FILETYPE| \
 					 EXT3_FEATURE_INCOMPAT_RECOVER| \
-					 EXT3_FEATURE_INCOMPAT_META_BG)
+					 EXT3_FEATURE_INCOMPAT_META_BG| \
+					 EXT3_FEATURE_INCOMPAT_EXTENTS| \
+					 EXT3_FEATURE_INCOMPAT_MMP| \
+					 EXT3_FEATURE_INCOMPAT_DIRDATA)
+
 #define EXT3_FEATURE_RO_COMPAT_SUPP	(EXT3_FEATURE_RO_COMPAT_SPARSE_SUPER| \
 					 EXT3_FEATURE_RO_COMPAT_LARGE_FILE| \
+					 EXT4_FEATURE_RO_COMPAT_GDT_CSUM| \
+					 EXT4_FEATURE_RO_COMPAT_DIR_NLINK| \
+					 EXT4_FEATURE_RO_COMPAT_EXTRA_ISIZE| \
 					 EXT3_FEATURE_RO_COMPAT_BTREE_DIR)
 
 /*
@@ -661,7 +674,70 @@ struct ext3_dir_entry_2 {
 #define EXT3_FT_SYMLINK		7
 
 #define EXT3_FT_MAX		8
+#define EXT3_FT_MASK 		0xf
 
+#if EXT3_FT_MAX > EXT3_FT_MASK
+#error "conflicting EXT3_FT_MAX and EXT3_FT_MASK"
+#endif
+
+#define EXT3_LUFID_MAGIC    0xAD200907UL
+
+#pragma pack(1)
+struct ext3_dentry_param {
+    __u32  edp_magic;       /* EXT3_LUFID_MAGIC */
+    char   edp_len;         /* size of edp_data in bytes */
+    char   edp_data[0];     /* packed array of data */
+} __attribute__((packed));
+#pragma pack()
+
+static inline unsigned char *ext3_dentry_get_data(struct super_block *sb,
+        struct ext3_dentry_param* p)
+
+{
+    if (!EXT3_HAS_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_DIRDATA))
+        return NULL;
+    if (p && p->edp_magic == EXT3_LUFID_MAGIC)
+        return &p->edp_len;
+    else
+        return NULL;
+}
+
+/*
+ * Compute the total directory entry data length.
+ * This includes the filename and an implicit NUL terminator (always present),
+ * and optional extensions.  Each extension has a bit set in the high 4 bits of
+ * de->file_type, and the extension length is the first byte in each entry.
+ */
+
+static inline int ext3_get_dirent_data_len(struct ext3_dir_entry_2 *de)
+{
+    char *len = de->name + de->name_len + 1 /* NUL terminator */;
+    int dlen = 0;
+    __u8 extra_data_flags = (de->file_type & ~EXT3_FT_MASK) >> 4;
+
+    while (extra_data_flags) {
+        if (extra_data_flags & 1) {
+            dlen += *len + (dlen == 0);
+            len += *len;
+        }
+        extra_data_flags >>= 1;
+    }
+    return dlen;
+}
+
+/*
+ * d_type has 4 unused bits, so it can hold four types data. these different
+ * type of data (e.g. lustre data, high 32 bits of 64-bit inode number) can be
+ * stored, in flag order, after file-name in ext3 dirent.
+*/
+/*
+ * this flag is added to d_type if ext3 dirent has extra data after
+ * filename. this data length is variable and length is stored in first byte
+ * of data. data start after filename NUL byte.
+ * This is used by Lustre FS.
+ */
+
+#define EXT3_DIRENT_LUFID		0x10
 /*
  * EXT3_DIR_PAD defines the directory entries boundaries
  *
@@ -669,15 +745,15 @@ struct ext3_dir_entry_2 {
  */
 #define EXT3_DIR_PAD			4
 #define EXT3_DIR_ROUND			(EXT3_DIR_PAD - 1)
-#define EXT3_DIR_REC_LEN(name_len)	(((name_len) + 8 + EXT3_DIR_ROUND) & \
-					 ~EXT3_DIR_ROUND)
+#define EXT3_DIR_REC_LEN(len)   (((len) + 8 + EXT3_DIR_ROUND) & \
+                                 ~EXT3_DIR_ROUND)
 #define EXT3_MAX_REC_LEN		((1<<16)-1)
 
 static inline unsigned ext3_rec_len_from_disk(__le16 dlen)
 {
     unsigned len = le16_to_cpu(dlen);
 
-    if (len == EXT3_MAX_REC_LEN)
+    if (len == EXT3_MAX_REC_LEN || len == 0)
         return 1 << 16;
     return len;
 }
@@ -696,17 +772,23 @@ static inline __le16 ext3_rec_len_to_disk(unsigned len)
  * (c) Daniel Phillips, 2001
  */
 
+#ifdef EXT2_HTREE_INDEX
 #define is_dx(dir) (EXT3_HAS_COMPAT_FEATURE(dir->i_sb, \
-				      EXT3_FEATURE_COMPAT_DIR_INDEX) && \
+					      EXT3_FEATURE_COMPAT_DIR_INDEX) && \
 		      (EXT3_I(dir)->i_flags & EXT3_INDEX_FL))
 #define EXT3_DIR_LINK_MAX(dir) (!is_dx(dir) && (dir)->i_nlink >= EXT3_LINK_MAX)
 #define EXT3_DIR_LINK_EMPTY(dir) ((dir)->i_nlink == 2 || (dir)->i_nlink == 1)
+#else
+#define is_dx(dir) 0
+#define EXT3_DIR_LINK_MAX(dir) ((dir)->i_nlink >= EXT3_LINK_MAX)
+#define EXT3_DIR_LINK_EMPTY(dir) ((dir)->i_nlink == 2)
+#endif
 
 /* Legal values for the dx_root hash_version field: */
 
-#define DX_HASH_LEGACY		0
-#define DX_HASH_HALF_MD4	1
-#define DX_HASH_TEA		2
+#define DX_HASH_LEGACY      0
+#define DX_HASH_HALF_MD4    1
+#define DX_HASH_TEA         2
 
 #ifdef __KERNEL__
 
@@ -771,142 +853,60 @@ ext3_group_first_block_no(struct super_block *sb, unsigned long group_no)
 #define ERR_BAD_DX_DIR	-75000
 
 /*
- * Function prototypes
+ * This structure will be used for multiple mount protection. It will be
+ * written into the block number saved in the s_mmp_block field in the
+ * superblock. Programs that check MMP should assume that if
+ * SEQ_FSCK (or any unknown code above SEQ_MAX) is present then it is NOT safe
+ * to use the filesystem, regardless of how old the timestamp is.
  */
+#define EXT3_MMP_MAGIC     0x004D4D50U /* ASCII for MMP */
+#define EXT3_MMP_SEQ_CLEAN 0xFF4D4D50U /* mmp_seq value for clean unmount */
+#define EXT3_MMP_SEQ_FSCK  0xE24D4D50U /* mmp_seq value when being fscked */
+#define EXT3_MMP_SEQ_MAX   0xE24D4D4FU /* maximum valid mmp_seq value */
+
+struct mmp_struct {
+    __le32	mmp_magic;
+    __le32	mmp_seq;
+    __le64	mmp_time;
+    char	mmp_nodename[64];
+    char	mmp_bdevname[32];
+    __le16	mmp_check_interval;
+    __le16	mmp_pad1;
+    __le32	mmp_pad2[227];
+};
 
 /*
- * Ok, these declarations are also in <linux/kernel.h> but none of the
- * ext3 source programs needs to include it so they are duplicated here.
+ * Default interval in seconds to update the MMP sequence number.
  */
-# define NORET_TYPE    /**/
-# define ATTRIB_NORET  __attribute__((noreturn))
-# define NORET_AND     noreturn,
-
-/* balloc.c */
-extern int ext3_bg_has_super(struct super_block *sb, int group);
-extern unsigned long ext3_bg_num_gdb(struct super_block *sb, int group);
-extern ext3_fsblk_t ext3_new_block (handle_t *handle, struct inode *inode,
-                                        ext3_fsblk_t goal, int *errp);
-extern ext3_fsblk_t ext3_new_blocks (handle_t *handle, struct inode *inode,
-                                         ext3_fsblk_t goal, unsigned long *count, int *errp);
-extern void ext3_free_blocks (handle_t *handle, struct inode *inode,
-                                  ext3_fsblk_t block, unsigned long count);
-extern void ext3_free_blocks_sb (handle_t *handle, struct super_block *sb,
-                                     ext3_fsblk_t block, unsigned long count,
-                                     unsigned long *pdquot_freed_blocks);
-extern ext3_fsblk_t ext3_count_free_blocks (struct super_block *);
-extern void ext3_check_blocks_bitmap (struct super_block *);
-extern struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
-                        unsigned int block_group,
-                        struct buffer_head ** bh);
-extern int ext3_should_retry_alloc(struct super_block *sb, int *retries);
-extern void ext3_init_block_alloc_info(struct inode *);
-extern void ext3_rsv_window_add(struct super_block *sb, struct ext3_reserve_window_node *rsv);
-
-/* dir.c */
-extern int ext3_check_dir_entry(const char *, struct inode *,
-                                    struct ext3_dir_entry_2 *,
-                                    struct buffer_head *, unsigned long);
-extern int ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
-                                       __u32 minor_hash,
-                                       struct ext3_dir_entry_2 *dirent);
-extern void ext3_htree_free_dir_info(struct dir_private_info *p);
-
-/* fsync.c */
-extern int ext3_sync_file (struct file *, struct dentry *, int);
-
-/* hash.c */
-extern int ext3fs_dirhash(const char *name, int len, struct
-                              dx_hash_info *hinfo);
-
-/* ialloc.c */
-extern struct inode * ext3_new_inode (handle_t *, struct inode *, int);
-extern void ext3_free_inode (handle_t *, struct inode *);
-extern struct inode * ext3_orphan_get (struct super_block *, unsigned long);
-extern unsigned long ext3_count_free_inodes (struct super_block *);
-extern unsigned long ext3_count_dirs (struct super_block *);
-extern void ext3_check_inodes_bitmap (struct super_block *);
-extern unsigned long ext3_count_free (struct buffer_head *, unsigned);
-
-
-/* inode.c */
-int ext3_forget(handle_t *handle, int is_metadata, struct inode *inode,
-                struct buffer_head *bh, ext3_fsblk_t blocknr);
-struct buffer_head * ext3_getblk (handle_t *, struct inode *, long, int, int *);
-struct buffer_head * ext3_bread (handle_t *, struct inode *, int, int, int *);
-int ext3_get_blocks_handle(handle_t *handle, struct inode *inode,
-                           sector_t iblock, unsigned long maxblocks, struct buffer_head *bh_result,
-                           int create, int extend_disksize);
-
-extern struct inode *ext3_iget(struct super_block *, unsigned long);
-extern int  ext3_write_inode (struct inode *, int);
-extern int  ext3_setattr (struct dentry *, struct iattr *);
-extern void ext3_delete_inode (struct inode *);
-extern int  ext3_sync_inode (handle_t *, struct inode *);
-extern void ext3_discard_reservation (struct inode *);
-extern void ext3_dirty_inode(struct inode *);
-extern int ext3_change_inode_journal_flag(struct inode *, int);
-extern int ext3_get_inode_loc(struct inode *, struct ext3_iloc *);
-extern void ext3_truncate (struct inode *);
-extern void ext3_set_inode_flags(struct inode *);
-extern void ext3_get_inode_flags(struct ext3_inode_info *);
-extern void ext3_set_aops(struct inode *inode);
-
-/* ioctl.c */
-extern int ext3_ioctl (struct inode *, struct file *, unsigned int,
-                           unsigned long);
-extern long ext3_compat_ioctl (struct file *, unsigned int, unsigned long);
-
-/* namei.c */
-extern int ext3_orphan_add(handle_t *, struct inode *);
-extern int ext3_orphan_del(handle_t *, struct inode *);
-extern int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
-                                    __u32 start_minor_hash, __u32 *next_hash);
-
-/* resize.c */
-extern int ext3_group_add(struct super_block *sb,
-                              struct ext3_new_group_data *input);
-extern int ext3_group_extend(struct super_block *sb,
-                                 struct ext3_super_block *es,
-                                 ext3_fsblk_t n_blocks_count);
-
-/* super.c */
-extern void ext3_error (struct super_block *, const char *, const char *, ...)
-    __attribute__ ((format (printf, 3, 4)));
-extern void __ext3_std_error (struct super_block *, const char *, int);
-extern void ext3_abort (struct super_block *, const char *, const char *, ...)
-    __attribute__ ((format (printf, 3, 4)));
-extern void ext3_warning (struct super_block *, const char *, const char *, ...)
-    __attribute__ ((format (printf, 3, 4)));
-extern void ext3_update_dynamic_rev (struct super_block *sb);
-
-#define ext3_std_error(sb, errno)				\
-do {								\
-	if ((errno))						\
-		__ext3_std_error((sb), __FUNCTION__, (errno));	\
-} while (0)
+#define EXT3_MMP_UPDATE_INTERVAL   1
 
 /*
- * Inodes and files operations
+ * Minimum interval for MMP checking in seconds.
  */
+#define EXT3_MMP_MIN_CHECK_INTERVAL	5
 
-/* dir.c */
-extern const struct file_operations ext3_dir_operations;
+/*
+ * Indicates that ctime should not be updated in ext3_xattr_set_handle()
+ */
+#ifndef XATTR_NO_CTIME
+#define XATTR_NO_CTIME 0x80
+#endif
 
-/* file.c */
-extern const struct inode_operations ext3_file_inode_operations;
-extern const struct file_operations ext3_file_operations;
-
-/* namei.c */
-extern const struct inode_operations ext3_dir_inode_operations;
-extern const struct inode_operations ext3_special_inode_operations;
-
-/* symlink.c */
-extern const struct inode_operations ext3_symlink_inode_operations;
-extern const struct inode_operations ext3_fast_symlink_inode_operations;
-
+/*
+ * NOTE! unlike strncmp, ext3_match returns 1 for success, 0 for failure.
+ *
+ * `len <= EXT3_NAME_LEN' is guaranteed by caller.
+ * `de != NULL' is guaranteed by caller.
+ */
+static inline int ext3_match (int len, const char * const name,
+                              struct ext3_dir_entry_2 * de)
+{
+    if (len != de->name_len)
+        return 0;
+    if (!de->inode)
+        return 0;
+    return !_strnicmp(name, de->name, len);
+}
 
 #endif	/* __KERNEL__ */
-
-#endif /* 0 */
 #endif	/* _LINUX_EXT3_FS_H */

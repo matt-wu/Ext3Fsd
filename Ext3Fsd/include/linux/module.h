@@ -13,14 +13,8 @@
 
 /* INCLUDES *************************************************************/
 
-#include <ntifs.h>
-#include <ntdddisk.h>
-#include <windef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <wchar.h>
 #include <linux/types.h>
+#include <linux/errno.h>
 #include <linux/fs.h>
 
 #if _WIN32_WINNT <= 0x500
@@ -30,12 +24,12 @@
 /* STRUCTS ******************************************************/
 
 #ifndef offsetof
-# define offsetof(type,member) ((ULONG_PTR)&(((type *)0)->member))
+# define offsetof(type, member) ((ULONG_PTR)&(((type *)0)->member))
 #endif
 
 #ifndef container_of
-#define container_of(ptr, type, member) (                  \
-                ((char *)ptr - (char *)offset(type, member))
+#define container_of(ptr, type, member)                  \
+                ((type *)((char *)ptr - (char *)offsetof(type, member)))
 #endif
 
 //
@@ -525,22 +519,12 @@ struct block_device {
 #define page_address(_page) ((char*)_page + sizeof(struct page))
 
 typedef struct page {
-//	struct list_head list;          /* ->mapping has some page lists. */
-    struct address_space *mapping;  /* The inode (or ...) we belong to. */
-    unsigned long index;            /* Our offset within mapping. */
-#if 0
-    struct page *next_hash;         /* Next page sharing our hash bucket in
-                                       the pagecache hash table. */
-#endif
-    atomic_t count;                 /* Usage count, see below. */
-    unsigned long flags;            /* atomic flags, some possibly
-                                       updated asynchronously */
-#if 0
-    struct list_head lru;           /* Pageout list, eg. active_list;
-                                       protected by pagemap_lru_lock !! */
-    struct page **pprev_hash;       /* Complement to *next_hash. */
-    struct buffer_head * buffers;   /* Buffer maps us to a disk block. */
-#endif
+    void           *addr;
+    void           *mapping;
+    void           *private;
+    atomic_t        count;
+    __u32           index;
+    __u32           flags;
 } mem_map_t;
 
 #define get_page(p) atomic_inc(&(p)->count)
@@ -676,22 +660,22 @@ typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
  * for backward compatibility reasons (e.g. submit_bh).
  */
 struct buffer_head {
-    unsigned long b_state;		           /* buffer state bitmap (see above) */
-    // struct buffer_head *b_this_page;    /* circular list of page's buffers */
-    struct page *b_page;		           /* the page this bh is mapped to */
+    unsigned long b_state;		            /* buffer state bitmap (see above) */
+    struct page *b_page;                    /* the page this bh is mapped to */
+    PMDL         b_mdl;                     /* MDL of the locked buffer */
 
-    // kdev_t b_dev;                       /* device (B_FREE = free) */
-    struct block_device *b_bdev;           /* block device object */
+    // kdev_t b_dev;                        /* device (B_FREE = free) */
+    struct block_device *b_bdev;            /* block device object */
 
-    unsigned long b_blocknr;		       /* start block number */
-    size_t        b_size;			       /* size of mapping */
-    char *        b_data;			       /* pointer to data within the page */
-    // bh_end_io_t *b_end_io;		       /* I/O completion */
-    void *b_private;		               /* reserved for b_end_io */
-    // struct list_head b_assoc_buffers;   /* associated with another mapping */
-    // struct address_space *b_assoc_map;  /* mapping this buffer is associated with */
-    atomic_t b_count;		               /* users using this buffer_head */
-    struct list_head b_list;               /* list entry */
+    unsigned long b_blocknr;		        /* start block number */
+    size_t        b_size;			        /* size of mapping */
+    char *        b_data;			        /* pointer to data within the page */
+    // bh_end_io_t *b_end_io;		        /* I/O completion */
+    void *b_private;		                /* reserved for b_end_io */
+    // struct list_head b_assoc_buffers;    /* associated with another mapping */
+    // struct address_space *b_assoc_map;   /* mapping this buffer is associated with */
+    atomic_t b_count;		                /* users using this buffer_head */
+    struct list_head b_list;                /* list entry */
 };
 
 
@@ -888,7 +872,8 @@ static inline void get_bh(struct buffer_head *bh)
 
 static inline void put_bh(struct buffer_head *bh)
 {
-    __brelse(bh);
+    if (bh)
+        __brelse(bh);
 }
 
 static inline void brelse(struct buffer_head *bh)
@@ -903,7 +888,12 @@ static inline void bforget(struct buffer_head *bh)
         __bforget(bh);
 }
 
-#if 0
+static inline struct buffer_head *
+            sb_getblk(struct super_block *sb, sector_t block)
+{
+    return __getblk(sb->s_bdev, block, sb->s_blocksize);
+}
+
 static inline struct buffer_head *
             sb_bread(struct super_block *sb, sector_t block)
 {
@@ -914,12 +904,6 @@ static inline void
 sb_breadahead(struct super_block *sb, sector_t block)
 {
     __breadahead(sb->s_bdev, block, sb->s_blocksize);
-}
-
-static inline struct buffer_head *
-            sb_getblk(struct super_block *sb, sector_t block)
-{
-    return __getblk(sb->s_bdev, block, sb->s_blocksize);
 }
 
 static inline struct buffer_head *
@@ -936,7 +920,6 @@ map_bh(struct buffer_head *bh, struct super_block *sb, sector_t block)
     bh->b_blocknr = block;
     bh->b_size = sb->s_blocksize;
 }
-#endif
 
 /*
  * Calling wait_on_buffer() for a zero-ref buffer is illegal, so we call into
@@ -1035,10 +1018,21 @@ ExAllocatePoolWithTag(
 #define  ExFreePoolWithTag(_P, _T) ExFreePool(_P)
 #endif
 
+PVOID Ext2AllocatePool(
+    IN POOL_TYPE PoolType,
+    IN SIZE_T NumberOfBytes,
+    IN ULONG Tag
+);
+
+VOID
+Ext2FreePool(
+    IN PVOID P,
+    IN ULONG Tag
+);
 
 void *kzalloc(int size, int flags);
-#define kmalloc(size, gfp) ExAllocatePoolWithTag(NonPagedPool, size, 'JBDM')
-#define kfree(p) ExFreePoolWithTag(p, 'JBDM')
+#define kmalloc(size, gfp) Ext2AllocatePool(NonPagedPool, size, 'JBDM')
+#define kfree(p) Ext2FreePool(p, 'JBDM')
 
 
 /* memory slab */

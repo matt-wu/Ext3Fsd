@@ -120,8 +120,7 @@ Ext2FlushFile (
 
             Fcb->Inode->i_mtime = Ext2LinuxTime(SysTime);
             Fcb->Mcb->LastWriteTime = Ext2NtTime(Fcb->Inode->i_mtime);
-            Ext2SaveInode(IrpContext, Fcb->Vcb,
-                          Fcb->Mcb->iNo, Fcb->Inode);
+            Ext2SaveInode(IrpContext, Fcb->Vcb, Fcb->Inode);
         }
     }
 
@@ -130,7 +129,7 @@ Ext2FlushFile (
     }
 
     DEBUG(DL_INF, ( "Ext2FlushFile: Flushing File Inode=%xh %S ...\n",
-                    Fcb->Mcb->iNo, Fcb->Mcb->ShortName.Buffer));
+                    Fcb->Inode->i_ino, Fcb->Mcb->ShortName.Buffer));
 
     CcFlushCache(&(Fcb->SectionObject), NULL, 0, &IoStatus);
     ClearFlag(Fcb->Flags, FCB_FILE_MODIFIED);

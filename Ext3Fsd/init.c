@@ -75,6 +75,7 @@ DriverUnload (IN PDRIVER_OBJECT DriverObject)
 
     ExDeleteResourceLite(&Ext2Global->Resource);
 
+    ExDeleteNPagedLookasideList(&(Ext2Global->Ext2DentryLookasideList));
     ExDeleteNPagedLookasideList(&(Ext2Global->Ext2ExtLookasideList));
     ExDeleteNPagedLookasideList(&(Ext2Global->Ext2McbLookasideList));
     ExDeleteNPagedLookasideList(&(Ext2Global->Ext2CcbLookasideList));
@@ -90,7 +91,7 @@ DriverUnload (IN PDRIVER_OBJECT DriverObject)
     /* cleanup linux lib */
     ext2_destroy_linux();
 
-    ExFreePoolWithTag(Ext2Global, 'LG2E');
+    Ext2FreePool(Ext2Global, 'LG2E');
     Ext2Global = NULL;
 }
 
@@ -120,13 +121,14 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
         RegistryPath->Length + sizeof(PARAMETERS_KEY) + sizeof(WCHAR);
 
     ParameterPath.Buffer =
-        (PWSTR) ExAllocatePoolWithTag(
+        (PWSTR) Ext2AllocatePool(
             PagedPool,
             ParameterPath.MaximumLength,
             'LG2E'
         );
 
     if (!ParameterPath.Buffer) {
+        DbgBreak();
         DEBUG(DL_ERR, ( "Ex2QueryParameters: failed to allocate Parameters...\n"));
         return FALSE;
     }
@@ -148,7 +150,7 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
                  NULL,
                  NULL        );
 
-    DEBUG(DL_USR, ( "Ext2QueryParameters: WritingSupport=%xh\n", WritingSupport));
+    DEBUG(DL_ERR, ( "Ext2QueryParameters: WritingSupport=%xh\n", WritingSupport));
 
     /* querying value of CheckingBitmap */
     RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
@@ -163,7 +165,7 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
                  NULL,
                  NULL        );
 
-    DEBUG(DL_USR, ( "Ext2QueryParameters: CheckingBitmap=%xh\n", CheckingBitmap));
+    DEBUG(DL_ERR, ( "Ext2QueryParameters: CheckingBitmap=%xh\n", CheckingBitmap));
 
     /* querying value of Ext3ForceWriting */
     RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
@@ -178,7 +180,7 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
                  NULL,
                  NULL        );
 
-    DEBUG(DL_USR, ( "Ext2QueryParameters: Ext3ForceWriting=%xh\n", Ext3ForceWriting));
+    DEBUG(DL_ERR, ( "Ext2QueryParameters: Ext3ForceWriting=%xh\n", Ext3ForceWriting));
 
 
     /* querying value of AutoMount */
@@ -200,7 +202,7 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
         ClearLongFlag(Ext2Global->Flags, EXT2_AUTO_MOUNT);
     }
 
-    DEBUG(DL_USR, ( "Ext2QueryParameters: AutoMount=%xh\n", AutoMount));
+    DEBUG(DL_ERR, ( "Ext2QueryParameters: AutoMount=%xh\n", AutoMount));
 
     /* querying codepage */
     RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
@@ -219,7 +221,7 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
                  NULL        );
 
     if (NT_SUCCESS(Status)) {
-        DEBUG(DL_USR, ( "Ext2QueryParameters: Ext2CodePage=%wZ\n", &UniName));
+        DEBUG(DL_ERR, ( "Ext2QueryParameters: Ext2CodePage=%wZ\n", &UniName));
         AnsiName.MaximumLength = CODEPAGE_MAXLEN;
         AnsiName.Length = 0;
         AnsiName.Buffer = &(Ext2Global->Codepage.AnsiName[0]);
@@ -230,11 +232,11 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
                      FALSE);
 
         if (!NT_SUCCESS(Status)) {
-            DEBUG(DL_USR, ( "Ext2QueryParameters: Wrong CodePage ...\n"));
+            DEBUG(DL_ERR, ( "Ext2QueryParameters: Wrong CodePage %wZ ...\n", &UniName));
             RtlCopyMemory(&(Ext2Global->Codepage.AnsiName[0]),"default\0", 8);
         }
     } else {
-        DEBUG(DL_USR, ( "Ext2QueryParameters: CodePage not specified.\n"));
+        DEBUG(DL_ERR, ( "Ext2QueryParameters: CodePage not specified.\n"));
         RtlCopyMemory(&(Ext2Global->Codepage.AnsiName[0]),"default\0", 8);
     }
     Ext2Global->Codepage.AnsiName[CODEPAGE_MAXLEN - 1] = 0;
@@ -256,7 +258,7 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
                  NULL        );
 
     if (NT_SUCCESS(Status)) {
-        DEBUG(DL_USR, ( "Ext2QueryParameters: HidingPrefix=%wZ\n", &UniName));
+        DEBUG(DL_ERR, ( "Ext2QueryParameters: HidingPrefix=%wZ\n", &UniName));
         AnsiName.MaximumLength =HIDINGPAT_LEN;
         AnsiName.Length = 0;
         AnsiName.Buffer = &(Ext2Global->sHidingPrefix[0]);
@@ -268,11 +270,10 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
         if (NT_SUCCESS(Status)) {
             Ext2Global->bHidingPrefix = TRUE;
         } else {
-            DEBUG(DL_USR, ( "Ext2QueryParameters: Wrong HidingPrefix ...\n"));
+            DEBUG(DL_ERR, ( "Ext2QueryParameters: Wrong HidingPrefix ...\n"));
         }
     } else {
-        DEBUG(DL_USR, ( "Ext2QueryParameters: HidingPrefix not specified.\n"));
-        RtlCopyMemory(&(Ext2Global->Codepage.AnsiName[0]),"default\0", 8);
+        DEBUG(DL_ERR, ( "Ext2QueryParameters: HidingPrefix not specified.\n"));
     }
     Ext2Global->sHidingPrefix[HIDINGPAT_LEN - 1] = 0;
 
@@ -295,7 +296,7 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
 
     if (NT_SUCCESS(Status)) {
 
-        DEBUG(DL_USR, ( "Ext2QueryParameters: HidingSuffix=%wZ\n", &UniName));
+        DEBUG(DL_ERR, ( "Ext2QueryParameters: HidingSuffix=%wZ\n", &UniName));
         AnsiName.MaximumLength = HIDINGPAT_LEN;
         AnsiName.Length = 0;
         AnsiName.Buffer = &(Ext2Global->sHidingSuffix[0]);
@@ -307,10 +308,10 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
         if (NT_SUCCESS(Status)) {
             Ext2Global->bHidingSuffix = TRUE;
         } else {
-            DEBUG(DL_USR, ( "Ext2QueryParameters: Wrong HidingSuffix ...\n"));
+            DEBUG(DL_ERR, ( "Ext2QueryParameters: Wrong HidingSuffix ...\n"));
         }
     } else {
-        DEBUG(DL_USR, ( "Ext2QueryParameters: HidingSuffix not specified.\n"));
+        DEBUG(DL_ERR, ( "Ext2QueryParameters: HidingSuffix not specified.\n"));
     }
     Ext2Global->sHidingPrefix[HIDINGPAT_LEN - 1] = 0;
 
@@ -435,7 +436,7 @@ DriverEntry (
     journal_module_inited = TRUE;
 
     /* allocate memory for Ext2Global */
-    Ext2Global = ExAllocatePoolWithTag(NonPagedPool, sizeof(EXT2_GLOBAL), 'LG2E');
+    Ext2Global = Ext2AllocatePool(NonPagedPool, sizeof(EXT2_GLOBAL), 'LG2E');
     if (!Ext2Global) {
         Status = STATUS_INSUFFICIENT_RESOURCES;
         goto errorout;
@@ -665,6 +666,14 @@ DriverEntry (
                                     'STXE',
                                     0 );
 
+    ExInitializePagedLookasideList( &(Ext2Global->Ext2DentryLookasideList),
+                                    NULL,
+                                    NULL,
+                                    0,
+                                    sizeof(struct dentry),
+                                    'TNED',
+                                    0 );
+
     RtlInitUnicodeString(&DosDeviceName, DOS_DEVICE_NAME);
     IoCreateSymbolicLink(&DosDeviceName, &DeviceName);
 
@@ -699,7 +708,7 @@ errorout:
 
         if (Ext2Global) {
             ExDeleteResourceLite(&Ext2Global->Resource);
-            ExFreePoolWithTag(Ext2Global, 'LG2E');
+            Ext2FreePool(Ext2Global, 'LG2E');
         }
 
         if (CdromdevObject) {

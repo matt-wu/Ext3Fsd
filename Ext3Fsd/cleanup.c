@@ -158,7 +158,11 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
             Fcb->Mcb->FileAttr |= FILE_ATTRIBUTE_ARCHIVE;
         }
 
-        if (!IsDirectory(Fcb)) {
+        if (IsDirectory(Fcb)) {
+
+            ext3_release_dir(Fcb->Inode, &Ccb->filp);
+
+        } else {
 
             if ( IsFlagOn(FileObject->Flags, FO_FILE_MODIFIED) &&
                     !IsFlagOn(Ccb->Flags, CCB_LAST_WRITE_UPDATED)) {
@@ -171,9 +175,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                 Fcb->Mcb->LastAccessTime =
                     Fcb->Mcb->LastWriteTime = Ext2NtTime(Fcb->Inode->i_atime);
 
-                Ext2SaveInode( IrpContext, Vcb,
-                               Fcb->Mcb->iNo,
-                               Fcb->Inode );
+                Ext2SaveInode(IrpContext, Vcb, Fcb->Inode);
 
                 Ext2NotifyReportChange(
                     IrpContext,

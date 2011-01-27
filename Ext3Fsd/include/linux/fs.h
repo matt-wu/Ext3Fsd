@@ -60,7 +60,6 @@ static inline kdev_t to_kdev_t(int dev)
  * error and pointer decisions.
  */
 
-
 struct super_block {
     unsigned long       s_magic;
     unsigned long       s_flags;
@@ -76,16 +75,25 @@ struct super_block {
 };
 
 struct inode {
-    __u32           i_ino;      /* inode number */
-    umode_t			i_mode;     /* mode */
-    loff_t			i_size;     /* size */
-    atomic_t        i_count;    /* ref count */
-    __u32           i_nlink;
-    __u32           i_generation;
-    __u32           i_version;
-    __u32           i_flags;
-    struct super_block	*i_sb;  /* super_block */
-    void *          i_priv;     /* EXT2_MCB */
+    __u32               i_ino;              /* inode number */
+    loff_t			    i_size;             /* size */
+    __u32               i_atime;	        /* Access time */
+    __u32               i_ctime;	        /* Creation time */
+    __u32               i_mtime;	        /* Modification time */
+    __u32               i_dtime;	        /* Deletion Time */
+    __u32               i_blocks;
+    __u32               i_block[15];
+    umode_t			    i_mode;             /* mode */
+    uid_t               i_uid;
+    gid_t               i_gid;
+    atomic_t            i_count;            /* ref count */
+    __u16               i_nlink;
+    __u32               i_generation;
+    __u32               i_version;
+    __u32               i_flags;
+
+    struct super_block *i_sb;               /* super_block */
+    void               *i_priv;             /* EXT2_MCB */
 };
 
 //
@@ -118,15 +126,31 @@ struct file {
 
     unsigned int    f_flags;
     umode_t         f_mode;
+    __u32           f_version;
     __int64         f_size;
     loff_t          f_pos;
     struct dentry  *f_dentry;
     void           *private_data;
 };
 
-unsigned long bmap(struct inode *, unsigned long);
-void iput(struct inode *inode);
-void iget(struct inode *inode);
+/*
+ * File types
+ *
+ * NOTE! These match bits 12..15 of stat.st_mode
+ * (ie "(i_mode >> 12) & 15").
+ */
+#define DT_UNKNOWN	0
+#define DT_FIFO		1
+#define DT_CHR		2
+#define DT_DIR		4
+#define DT_BLK		6
+#define DT_REG		8
+#define DT_LNK		10
+#define DT_SOCK		12
+#define DT_WHT		14
 
+void iget(struct inode *inode);
+void iput(struct inode *inode);
+unsigned long bmap(struct inode *i, unsigned long b);
 
 #endif /*_LINUX_FS_INCLUDE_*/

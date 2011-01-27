@@ -93,19 +93,19 @@ Ext2FollowLink (
         }
 
         /* read the symlink target path */
-        if (Mcb->Inode->i_size < EXT2_LINKLEN_IN_INODE) {
+        if (Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
 
-            OemName.Buffer = (PUCHAR) (&Mcb->Inode->i_block[0]);
-            OemName.Length = (USHORT)Mcb->Inode->i_size;
+            OemName.Buffer = (PUCHAR) (&Mcb->Inode.i_block[0]);
+            OemName.Length = (USHORT)Mcb->Inode.i_size;
             OemName.MaximumLength = OemName.Length + 1;
 
         } else {
 
-            OemName.Length = (USHORT)Mcb->Inode->i_size;
+            OemName.Length = (USHORT)Mcb->Inode.i_size;
             OemName.MaximumLength = OemName.Length + 1;
-            OemName.Buffer = ExAllocatePoolWithTag(PagedPool,
-                                                   OemName.MaximumLength,
-                                                   'NL2E');
+            OemName.Buffer = Ext2AllocatePool(PagedPool,
+                                              OemName.MaximumLength,
+                                              'NL2E');
             if (OemName.Buffer == NULL) {
                 Status = STATUS_INSUFFICIENT_RESOURCES;
                 __leave;
@@ -119,7 +119,7 @@ Ext2FollowLink (
                          Mcb,
                          (ULONGLONG)0,
                          OemName.Buffer,
-                         Mcb->Inode->i_size,
+                         (ULONG)(Mcb->Inode.i_size),
                          FALSE,
                          NULL);
             if (!NT_SUCCESS(Status)) {
@@ -142,9 +142,9 @@ Ext2FollowLink (
         }
 
         UniName.MaximumLength += 2;
-        UniName.Buffer = ExAllocatePoolWithTag(PagedPool,
-                                               UniName.MaximumLength,
-                                               'NL2E');
+        UniName.Buffer = Ext2AllocatePool(PagedPool,
+                                          UniName.MaximumLength,
+                                          'NL2E');
         if (UniName.Buffer == NULL) {
             Status = STATUS_INSUFFICIENT_RESOURCES;
             __leave;
@@ -171,7 +171,7 @@ Ext2FollowLink (
         }
 
         /* we get the link target */
-        if (IsMcbSymlink(Target)) {
+        if (IsMcbSymLink(Target)) {
             ASSERT(Target->Refercount > 0);
             Ext2ReferMcb(Target->Target);
             Mcb->Target = Target->Target;
@@ -189,11 +189,11 @@ Ext2FollowLink (
     } __finally {
 
         if (bOemBuffer) {
-            ExFreePoolWithTag(OemName.Buffer, 'NL2E');
+            Ext2FreePool(OemName.Buffer, 'NL2E');
         }
 
         if (UniName.Buffer) {
-            ExFreePoolWithTag(UniName.Buffer, 'NL2E');
+            Ext2FreePool(UniName.Buffer, 'NL2E');
         }
     }
 
@@ -259,10 +259,10 @@ Ext2LookupFile (
     NTSTATUS        Status = STATUS_OBJECT_NAME_NOT_FOUND;
     UNICODE_STRING  FileName;
     PEXT2_MCB       Mcb = NULL;
+    struct dentry  *de = NULL;
 
     USHORT          i = 0, End;
     ULONG           Inode;
-    ULONG           EntryOffset = 0;
 
     BOOLEAN         bParent = FALSE;
     BOOLEAN         bDirectory = FALSE;
@@ -284,6 +284,14 @@ Ext2LookupFile (
             bParent = TRUE;
         } else {
             Parent = Vcb->McbTree;
+        }
+
+        /* use symlink's target as parent directory */
+        if (IsMcbSymLink(Parent))
+            Parent = Parent->Target;
+        if (NULL == Parent) {
+            Status =  STATUS_NOT_A_DIRECTORY;
+            __leave;
         }
 
         /* default is the parent Mcb*/
@@ -350,20 +358,21 @@ Ext2LookupFile (
                     }
 
                     /* seach the disk */
+                    de = NULL;
                     Status = Ext2ScanDir (
                                  IrpContext,
                                  Vcb,
                                  Parent,
                                  &FileName,
-                                 &EntryOffset,
-                                 &Inode);
+                                 &Inode,
+                                 &de);
 
                     if (NT_SUCCESS(Status)) {
 
                         PEXT2_MCB  Target = NULL;
 
                         /* check it's real parent */
-                        if (IsMcbSymlink(Parent)) {
+                        if (IsMcbSymLink(Parent)) {
                             Target = Parent->Target;
                         } else {
                             Target = Parent;
@@ -376,9 +385,13 @@ Ext2LookupFile (
                             Ext2DerefMcb(Parent);
                             break;
                         }
+                        Mcb->de = de;
+                        Mcb->de->d_inode = &Mcb->Inode;
+                        Mcb->Inode.i_ino = Inode;
+                        de = NULL;
 
                         /* load inode information */
-                        if (!Ext2LoadInode(Vcb, Inode, Mcb->Inode)) {
+                        if (!Ext2LoadInode(Vcb, &Mcb->Inode)) {
                             Status = STATUS_CANT_WAIT;
                             Ext2DerefMcb(Parent);
                             Ext2FreeMcb(Vcb, Mcb);
@@ -386,11 +399,11 @@ Ext2LookupFile (
                         }
 
                         /* set inode attribute */
-                        if (Ext2IsReadOnly(Mcb->Inode->i_mode)) {
+                        if (Ext2IsReadOnly(Mcb->Inode.i_mode)) {
                             SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_READONLY);
                         }
 
-                        if (S_ISDIR(Mcb->Inode->i_mode)) {
+                        if (S_ISDIR(Mcb->Inode.i_mode)) {
                             SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY);
                         } else {
                             SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_NORMAL);
@@ -407,21 +420,15 @@ Ext2LookupFile (
                             }
                         }
 
-                        Mcb->CreationTime = Ext2NtTime(Mcb->Inode->i_ctime);
-                        Mcb->LastAccessTime = Ext2NtTime(Mcb->Inode->i_atime);
-                        Mcb->LastWriteTime = Ext2NtTime(Mcb->Inode->i_mtime);
-                        Mcb->ChangeTime = Ext2NtTime(Mcb->Inode->i_mtime);
-                        Mcb->iNo = Inode;
-                        Mcb->EntryOffset = EntryOffset;
-                        Mcb->FileSize.LowPart = Mcb->Inode->i_size;
-                        if (S_ISREG(Mcb->Inode->i_mode)) {
-                            Mcb->FileSize.HighPart = (LONG) (Mcb->Inode->i_size_high);
-                        } else {
-                            Mcb->FileSize.HighPart = 0;
-                        }
+                        Mcb->CreationTime = Ext2NtTime(Mcb->Inode.i_ctime);
+                        Mcb->LastAccessTime = Ext2NtTime(Mcb->Inode.i_atime);
+                        Mcb->LastWriteTime = Ext2NtTime(Mcb->Inode.i_mtime);
+                        Mcb->ChangeTime = Ext2NtTime(Mcb->Inode.i_mtime);
+                        Mcb->Inode.i_ino = Inode;
+                        Mcb->FileSize.QuadPart = Mcb->Inode.i_size;
 
                         /* process symlink */
-                        if (S_ISLNK(Mcb->Inode->i_mode)) {
+                        if (S_ISLNK(Mcb->Inode.i_mode)) {
                             Status = Ext2FollowLink(
                                          IrpContext,
                                          Vcb,
@@ -473,6 +480,10 @@ Ext2LookupFile (
 
     } __finally {
 
+        if (de) {
+            Ext2FreeEntry(de);
+        }
+
         if (NT_SUCCESS(Status)) {
             if (bDirectory) {
                 if (IsMcbDirectory(Mcb)) {
@@ -501,28 +512,17 @@ Ext2ScanDir (
     IN PEXT2_VCB            Vcb,
     IN PEXT2_MCB            Parent,
     IN PUNICODE_STRING      FileName,
-    IN OUT PULONG           Index,
-    IN OUT PULONG           Inode
+    OUT PULONG              Inode,
+    OUT struct dentry     **dentry
 )
 {
-    NTSTATUS                Status = STATUS_UNSUCCESSFUL;
+    struct ext3_dir_entry_2 *dir_entry = NULL;
+    struct buffer_head     *bh = NULL;
+    struct dentry          *de = NULL;
 
-    ULONG                   ByteOffset = 0;
-    ULONG                   inode = Parent->iNo;
-    ULONG                   dwRet;
-    ULONG                   RecLen;
-
-    PEXT2_DIR_ENTRY2        pDir = NULL;
-
-    OEM_STRING              OemName;
-    UNICODE_STRING          InodeFileName;
-    USHORT                  InodeFileNameLength;
-    BOOLEAN                 bFound = FALSE;
+    NTSTATUS                Status = STATUS_NO_SUCH_FILE;
 
     DEBUG(DL_RES, ("Ext2ScanDir: %wZ\\%wZ\n", &Parent->FullName, FileName));
-
-    /* initialize InodeFileName */
-    InodeFileName.Buffer = NULL;
 
     __try {
 
@@ -536,7 +536,7 @@ Ext2ScanDir (
         }
 
         /* parent is a symlink ? */
-        if IsMcbSymlink(Parent) {
+        if IsMcbSymLink(Parent) {
             if (Parent->Target) {
                 Ext2ReferMcb(Parent->Target);
                 Ext2DerefMcb(Parent);
@@ -548,138 +548,71 @@ Ext2ScanDir (
             }
         }
 
-        /* allocate buffer for unicode inode name */
-        InodeFileName.Buffer = ExAllocatePoolWithTag(
-                                   PagedPool,
-                                   (EXT2_NAME_LEN + 1) * 2,
-                                   EXT2_INAME_MAGIC
-                               );
-
-        if (!InodeFileName.Buffer) {
-            DEBUG(DL_ERR, ( "Ex2ScanDir: failed to allocate InodeFileName.\n"));
+        de = Ext2BuildEntry(Vcb, Parent, FileName);
+        if (!de) {
+            DEBUG(DL_ERR, ( "Ex2ScanDir: failed to allocate dentry.\n"));
             Status = STATUS_INSUFFICIENT_RESOURCES;
             __leave;
         }
-        INC_MEM_COUNT(PS_INODE_NAME, InodeFileName.Buffer, (EXT2_NAME_LEN + 1) * 2);
 
-        /* again allocate entry buffer */
-        pDir = (PEXT2_DIR_ENTRY2) ExAllocatePoolWithTag(
-                   PagedPool,
-                   sizeof(EXT2_DIR_ENTRY2),
-                   EXT2_DENTRY_MAGIC
-               );
-        if (!pDir) {
-            DEBUG(DL_ERR, ( "Ex2ScanDir: failed to allocate pDir.\n"));
-            Status = STATUS_INSUFFICIENT_RESOURCES;
-            __leave;
-        }
-        INC_MEM_COUNT(PS_DIR_ENTRY, pDir, sizeof(EXT2_DIR_ENTRY2));
-
-        ByteOffset = 0;
-
-        while (!bFound && ByteOffset < Parent->Inode->i_size) {
-
-            RtlZeroMemory(pDir, sizeof(EXT2_DIR_ENTRY2));
-
-            //
-            // reading dir entries from Dcb
-            //
-
-            Status = Ext2ReadInode(
-                         IrpContext,
-                         Vcb,
-                         Parent,
-                         (ULONGLONG)ByteOffset,
-                         (PVOID)pDir,
-                         min(sizeof(EXT2_DIR_ENTRY2),
-                             Parent->Inode->i_size - ByteOffset),
-                         FALSE,
-                         &dwRet);
-
-
-            if (!NT_SUCCESS(Status)) {
-                DEBUG(DL_ERR, ( "Ext2ScanDir: failed to read directory.\n"));
-                __leave;
-            }
-
-            if (pDir->rec_len == 0) {
-                RecLen = BLOCK_SIZE - (ByteOffset & (BLOCK_SIZE - 1));
-            } else {
-                RecLen = pDir->rec_len;
-            }
-
-            if (pDir->inode) {
-
-                if ((pDir->inode >= INODES_COUNT)) {
-                    Status = STATUS_FILE_CORRUPT_ERROR;
-                    __leave;
-                }
-
-                OemName.Buffer = pDir->name;
-                OemName.Length = (pDir->name_len & 0xff);
-                OemName.MaximumLength = OemName.Length;
-
-                InodeFileNameLength = (USHORT)
-                                      Ext2OEMToUnicodeSize(Vcb, &OemName);
-                if (InodeFileNameLength <= 0) {
-                    DEBUG(DL_CP, ("Ext2ScanDir: failed to count unicode length of %s.\n", OemName.Buffer));
-                    Status = STATUS_INSUFFICIENT_RESOURCES;
-                    __leave;
-                }
-
-                InodeFileName.Length = 0;
-                InodeFileName.MaximumLength = (EXT2_NAME_LEN + 1) * 2;
-
-                RtlZeroMemory( InodeFileName.Buffer,
-                               InodeFileNameLength + 2);
-
-                Status = Ext2OEMToUnicode(Vcb, &InodeFileName, &OemName);
-                if (!NT_SUCCESS(Status)) {
-                    DEBUG(DL_CP, ("Ext2ScanDir: failed to convert %s to unicode.\n", OemName.Buffer));
-                    Status = STATUS_INSUFFICIENT_RESOURCES;
-                    __leave;
-                }
-
-                if (!RtlCompareUnicodeString(
-                            FileName,
-                            &InodeFileName,
-                            TRUE ))  {
-
-                    bFound = TRUE;
-                    *Index = ByteOffset;
-                    *Inode = pDir->inode;
-                    Status = STATUS_SUCCESS;
-
-                    DEBUG(DL_INF, ("Ext2ScanDir: Found: Name=%S Inode=%xh\n",
-                                   InodeFileName.Buffer, pDir->inode ));
-                }
-            }
-
-            ByteOffset += RecLen;
-
-        }
-
-        if (!bFound) {
-            Status = STATUS_NO_SUCH_FILE;
+        bh = ext3_find_entry(IrpContext, de, &dir_entry);
+        if (dir_entry) {
+            Status = STATUS_SUCCESS;
+            *Inode = dir_entry->inode;
+            *dentry = de;
         }
 
     } __finally {
 
-        if (InodeFileName.Buffer != NULL) {
-            ExFreePoolWithTag(InodeFileName.Buffer, EXT2_INAME_MAGIC);
-            DEC_MEM_COUNT(PS_INODE_NAME, InodeFileName.Buffer,
-                          (EXT2_NAME_LEN + 1) * 2);
-        }
-
-        if (pDir) {
-            ExFreePoolWithTag(pDir, EXT2_DENTRY_MAGIC);
-            DEC_MEM_COUNT(PS_DIR_ENTRY, pDir, sizeof(EXT2_DIR_ENTRY2));
-        }
-
         Ext2DerefMcb(Parent);
+
+        if (bh)
+            brelse(bh);
+
+        if (!NT_SUCCESS(Status)) {
+            if (de)
+                Ext2FreeEntry(de);
+        }
     }
 
     return Status;
+}
+
+NTSTATUS Ext2AddDotEntries(struct ext2_icb *icb, struct inode *dir,
+                           struct inode *inode)
+{
+    struct ext3_dir_entry_2 * de;
+    struct buffer_head * bh;
+    ext3_lblk_t block = 0;
+    int rc = 0;
+
+    bh = ext3_append(icb, inode, &block, &rc);
+    if (!bh) {
+        goto errorout;
+    }
+
+    de = (struct ext3_dir_entry_2 *) bh->b_data;
+    de->inode = cpu_to_le32(inode->i_ino);
+    de->name_len = 1;
+    de->rec_len = cpu_to_le16(EXT3_DIR_REC_LEN(de->name_len));
+    strcpy (de->name, ".");
+    ext3_set_de_type(inode->i_sb, de, S_IFDIR);
+    de = (struct ext3_dir_entry_2 *)
+         ((char *) de + le16_to_cpu(de->rec_len));
+    de->inode = cpu_to_le32(dir->i_ino);
+    de->rec_len = cpu_to_le16(inode->i_sb->s_blocksize-EXT3_DIR_REC_LEN(1));
+    de->name_len = 2;
+    strcpy (de->name, "..");
+    ext3_set_de_type(inode->i_sb, de, S_IFDIR);
+    inode->i_nlink = 2;
+    set_buffer_dirty(bh);
+    ext3_mark_inode_dirty(icb, inode);
+
+errorout:
+    if (bh)
+        brelse (bh);
+
+    return Ext2WinntError(rc);
 }
 
 NTSTATUS
@@ -794,7 +727,7 @@ Ext2CreateFile(
             }
         }
 
-        FileName.Buffer = ExAllocatePoolWithTag(
+        FileName.Buffer = Ext2AllocatePool(
                               PagedPool,
                               FileName.MaximumLength,
                               EXT2_FNAME_MAGIC
@@ -968,7 +901,7 @@ Dissecting:
             }
 
             /* symlink must use it's target */
-            if (IsMcbSymlink(ParentMcb)) {
+            if (IsMcbSymLink(ParentMcb)) {
                 Ext2ReferMcb(ParentMcb->Target);
                 Ext2DerefMcb(ParentMcb);
                 ParentMcb = ParentMcb->Target;
@@ -1079,6 +1012,8 @@ Dissecting:
                                RealName.Length );
 
                 Fcb = ParentFcb;
+                Mcb = Fcb->Mcb;
+                Ext2ReferMcb(Mcb);
 
                 Irp->IoStatus.Information = FILE_DOES_NOT_EXIST;
                 Status = STATUS_SUCCESS;
@@ -1144,7 +1079,7 @@ Dissecting:
                     __leave;
                 }
 
-                if (Mcb->iNo == EXT2_ROOT_INO) {
+                if (Mcb->Inode.i_ino == EXT2_ROOT_INO) {
 
                     if (DeleteOnClose) {
                         Status = STATUS_CANNOT_DELETE;
@@ -1179,11 +1114,11 @@ Openit:
             ASSERT(Mcb->Refercount > 0);
 
             /* refer it's target if it's a symlink, so both refered */
-            if (IsMcbSymlink(Mcb)) {
+            if (IsMcbSymLink(Mcb)) {
                 Ext2ReferMcb(Mcb->Target);
                 SymLink = Mcb;
                 Mcb = Mcb->Target;
-                ASSERT (!IsMcbSymlink(Mcb));
+                ASSERT (!IsMcbSymLink(Mcb));
             }
 
             Fcb = Mcb->Fcb;
@@ -1215,6 +1150,12 @@ Openit:
 
             ExAcquireResourceExclusiveLite(&Fcb->MainResource, TRUE);
             bMainResourceAcquired = TRUE;
+
+            /* Open target directory ? */
+            if (NULL == Mcb) {
+                DbgBreak();
+                Mcb = Fcb->Mcb;
+            }
 
             /* check Mcb reference */
             ASSERT(Fcb->Mcb->Refercount > 0);
@@ -1255,46 +1196,11 @@ Openit:
                 //
 
                 if (DirectoryFile) {
-
-                    UNICODE_STRING EntryName;
-                    USHORT  NameBuf[6];
-
-                    RtlZeroMemory(NameBuf, 6 * sizeof(USHORT));
-
-                    EntryName.Length = EntryName.MaximumLength = 2;
-                    EntryName.Buffer = &NameBuf[0];
-                    NameBuf[0] = (USHORT)'.';
-
-                    Ext2AddEntry( IrpContext,
-                                  Vcb, Fcb,
-                                  EXT2_FT_DIR,
-                                  Fcb->Mcb->iNo,
-                                  &EntryName,
-                                  NULL
-                                );
-
-                    Ext2SaveInode( IrpContext,
-                                   Vcb,
-                                   Fcb->Mcb->iNo,
-                                   Fcb->Inode
-                                 );
-
-                    EntryName.Length = EntryName.MaximumLength = 4;
-                    EntryName.Buffer = &NameBuf[0];
-                    NameBuf[0] = NameBuf[1] = (USHORT)'.';
-
-                    Ext2AddEntry( IrpContext,
-                                  Vcb, Fcb,
-                                  EXT2_FT_DIR,
-                                  Fcb->Mcb->Parent->iNo,
-                                  &EntryName,
-                                  NULL
-                                );
-
-                    Ext2SaveInode( IrpContext, Vcb,
-                                   Fcb->Mcb->Parent->iNo,
-                                   ParentFcb->Inode
-                                 );
+                    Status = Ext2AddDotEntries(IrpContext, &ParentMcb->Inode, &Mcb->Inode);
+                    if (!NT_SUCCESS(Status)) {
+                        Ext2DeleteFile(IrpContext, Vcb, Mcb);
+                        __leave;
+                    }
                 } else {
 
                     Fcb->Header.AllocationSize.QuadPart =
@@ -1425,7 +1331,12 @@ Openit:
                 DbgBreak();
                 __leave;
             }
+            if (SymLink)
+                Ccb->filp.f_dentry = SymLink->de;
+            else
+                Ccb->filp.f_dentry = Fcb->Mcb->de;
 
+            Ccb->filp.f_version = Fcb->Mcb->Inode.i_version;
             Ext2ReferXcb(&Fcb->OpenHandleCount);
             Ext2ReferXcb(&Fcb->ReferenceCount);
 
@@ -1440,7 +1351,7 @@ Openit:
             Ext2ReferXcb(&Vcb->OpenHandleCount);
             Ext2ReferXcb(&Vcb->ReferenceCount);
 
-            IrpSp->FileObject->FsContext = (void*)Fcb;
+            IrpSp->FileObject->FsContext = (void*) Fcb;
             IrpSp->FileObject->FsContext2 = (void*) Ccb;
             IrpSp->FileObject->PrivateCacheMap = NULL;
             IrpSp->FileObject->SectionObjectPointer = &(Fcb->SectionObject);
@@ -1595,8 +1506,8 @@ Openit:
                 ExAcquireResourceExclusiveLite(&Fcb->PagingIoResource, TRUE);
                 __try {
                     Size.QuadPart = 0;
-                    Mcb->FileSize = Fcb->RealSize;
-                    Ext2TruncateFile(IrpContext, Vcb, Mcb, &Size);
+                    Fcb->Mcb->FileSize = Fcb->RealSize;
+                    Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &Size);
                 } __finally {
                     ExReleaseResourceLite(&Fcb->PagingIoResource);
                 }
@@ -1618,7 +1529,7 @@ Openit:
         /* free file name buffer */
         if (FileName.Buffer) {
             DEC_MEM_COUNT(PS_FILE_NAME, FileName.Buffer, FileName.MaximumLength);
-            ExFreePoolWithTag(FileName.Buffer, EXT2_FNAME_MAGIC);
+            Ext2FreePool(FileName.Buffer, EXT2_FNAME_MAGIC);
         }
 
         /* dereference parent Fcb, free it if it goes to zero */
@@ -1826,7 +1737,6 @@ Ext2Create (IN PEXT2_IRP_CONTEXT IrpContext)
     return Status;
 }
 
-
 NTSTATUS
 Ext2CreateInode(
     PEXT2_IRP_CONTEXT   IrpContext,
@@ -1839,37 +1749,51 @@ Ext2CreateInode(
     NTSTATUS    Status;
     ULONG       iGrp;
     ULONG       iNo;
-    PEXT2_INODE Inode = NULL;
+    struct inode Inode = { 0 };
+    struct dentry *Dentry = NULL;
 
     LARGE_INTEGER   SysTime;
 
-    Inode = Ext2AllocateInode(Vcb);
-    if (Inode == NULL) {
-        Status = STATUS_INSUFFICIENT_RESOURCES;
-        goto errorout;
-    }
-
-    iGrp = (Parent->Mcb->iNo - 1) / BLOCKS_PER_GROUP;
+    iGrp = (Parent->Inode->i_ino - 1) / BLOCKS_PER_GROUP;
 
     DEBUG(DL_INF, ("Ext2CreateInode: %S in %S(Inode=%xh)\n",
                    FileName->Buffer,
                    Parent->Mcb->ShortName.Buffer,
-                   Parent->Mcb->iNo ));
+                   Parent->Inode->i_ino));
 
     Status = Ext2NewInode(IrpContext, Vcb, iGrp, Type, &iNo);
-
     if (!NT_SUCCESS(Status)) {
         goto errorout;
     }
 
+    KeQuerySystemTime(&SysTime);
+    Ext2ClearInode(IrpContext, Vcb, iNo);
+    Inode.i_sb = &Vcb->sb;
+    Inode.i_ino = iNo;
+    Inode.i_ctime = Inode.i_mtime =
+                        Inode.i_atime = Ext2LinuxTime(SysTime);
+    Inode.i_uid = Parent->Inode->i_uid;
+    Inode.i_gid = Parent->Inode->i_gid;
+    Inode.i_generation = Parent->Inode->i_generation;
+    Inode.i_mode = S_IPERMISSION_MASK &
+                   Parent->Inode->i_mode;
+    if (Type == EXT2_FT_DIR)  {
+        Inode.i_mode |= S_IFDIR;
+    } else if (Type == EXT2_FT_REG_FILE) {
+        Inode.i_mode &= S_IFATTR;
+        Inode.i_mode |= S_IFREG;
+    } else {
+        DbgBreak();
+    }
+
+    /* add new entry to its parent */
     Status = Ext2AddEntry(
                  IrpContext,
                  Vcb,
                  Parent,
-                 Type,
-                 iNo,
+                 &Inode,
                  FileName,
-                 NULL
+                 &Dentry
              );
 
     if (!NT_SUCCESS(Status)) {
@@ -1878,41 +1802,13 @@ Ext2CreateInode(
         goto errorout;
     }
 
-    KeQuerySystemTime(&SysTime);
-    Inode->i_ctime = Inode->i_mtime =
-                         Inode->i_atime = Ext2LinuxTime(SysTime);
-
-    Inode->i_uid = Parent->Inode->i_uid;
-    Inode->i_gid = Parent->Inode->i_gid;
-
-    Inode->i_dir_acl = Parent->Inode->i_dir_acl;
-    Inode->i_file_acl = Parent->Inode->i_file_acl;
-    Inode->i_generation = Parent->Inode->i_generation;
-
-    Inode->osd2 = Parent->Inode->osd2;
-
-    Inode->i_mode = S_IPERMISSION_MASK &
-                    Parent->Inode->i_mode;
-    if (Type == EXT2_FT_DIR)  {
-        Inode->i_mode |= S_IFDIR;
-        Inode->i_links_count = 2;
-    } else if (Type == EXT2_FT_REG_FILE) {
-        Inode->i_mode &= S_IFATTR;
-        Inode->i_mode |= S_IFREG;
-        Inode->i_links_count = 1;
-    } else {
-        DbgBreak();
-        Inode->i_links_count = 1;
-    }
-
-    Ext2SaveInode(IrpContext, Vcb, iNo, Inode);
-    DEBUG(DL_INF, ( "Ext2CreateInode: New Inode = %xh (Type=%xh)\n", iNo, Type));
+    DEBUG(DL_INF, ("Ext2CreateInode: New Inode = %xh (Type=%xh)\n",
+                   Inode.i_ino, Type));
 
 errorout:
 
-    if (Inode) {
-        Ext2DestroyInode(Vcb, Inode);
-    }
+    if (Dentry)
+        Ext2FreeEntry(Dentry);
 
     return Status;
 }
@@ -1972,16 +1868,13 @@ Ext2SupersedeOrOverWriteFile(
 
     Fcb->Mcb->FileSize.QuadPart = 0;
     Fcb->Inode->i_size = 0;
-    if (S_ISREG(Fcb->Inode->i_mode)) {
-        Fcb->Inode->i_size_high = 0;
-    }
 
     if (Disposition == FILE_SUPERSEDE) {
         Fcb->Inode->i_ctime = Ext2LinuxTime(CurrentTime);
     }
     Fcb->Inode->i_atime =
         Fcb->Inode->i_mtime = Ext2LinuxTime(CurrentTime);
-    Ext2SaveInode(IrpContext, Vcb, Fcb->Mcb->iNo, Fcb->Inode);
+    Ext2SaveInode(IrpContext, Vcb, Fcb->Inode);
 
     return STATUS_SUCCESS;
 }

@@ -17,6 +17,8 @@
 #include "stdio.h"
 #include <string.h>
 #include <linux/ext2_fs.h>
+#include <linux/ext3_fs.h>
+#include <linux/ext3_fs_i.h>
 
 /* DEBUG ****************************************************************/
 
@@ -78,11 +80,11 @@
 
 #define EXT2_FIRST_DATA_BLOCK           (SUPER_BLOCK->s_first_data_block)
 
-typedef struct ext2_super_block EXT2_SUPER_BLOCK, *PEXT2_SUPER_BLOCK;
-typedef struct ext2_inode EXT2_INODE, *PEXT2_INODE;
-typedef struct ext2_group_desc EXT2_GROUP_DESC, *PEXT2_GROUP_DESC;
-typedef struct ext2_dir_entry EXT2_DIR_ENTRY, *PEXT2_DIR_ENTRY;
-typedef struct ext2_dir_entry_2 EXT2_DIR_ENTRY2, *PEXT2_DIR_ENTRY2;
+typedef struct ext3_super_block EXT2_SUPER_BLOCK, *PEXT2_SUPER_BLOCK;
+typedef struct ext3_inode EXT2_INODE, *PEXT2_INODE;
+typedef struct ext3_group_desc EXT2_GROUP_DESC, *PEXT2_GROUP_DESC;
+typedef struct ext3_dir_entry EXT2_DIR_ENTRY, *PEXT2_DIR_ENTRY;
+typedef struct ext3_dir_entry_2 EXT2_DIR_ENTRY2, *PEXT2_DIR_ENTRY2;
 
 #define CEILING_ALIGNED(T, A, B) (((A) + (B) - 1) & (~((T)(B) - 1)))
 #define COCKLOFT_ALIGNED(T, A, B) (((A) + (B)) & (~((T)(B) - 1)))
@@ -224,10 +226,10 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 #define IsMcbReadonly(Mcb)  IsFlagOn(Mcb->FileAttr, FILE_ATTRIBUTE_READONLY)
 #define IsMcbDirectory(Mcb) IsFlagOn(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY)
 #define IsDirectory(Fcb)    IsMcbDirectory(Fcb->Mcb)
-#define IsSymlink(Fcb)      IsMcbSymlink(Fcb->Mcb)
+#define IsSymLink(Fcb)      IsMcbSymLink(Fcb->Mcb)
 #define IsInodeSymlink(I)   S_ISLNK((I)->i_mode)
 #define IsRoot(Fcb)         IsMcbRoot(Fcb->Mcb)
-#define IsMcbRoot(Mcb)      (Mcb->iNo == EXT2_ROOT_INO)
+#define IsMcbRoot(Mcb)      (Mcb->Inode.i_ino == EXT2_ROOT_INO)
 
 //
 // Pool Tags
@@ -460,6 +462,7 @@ typedef struct _EXT2_GLOBAL {
     PAGED_LOOKASIDE_LIST        Ext2CcbLookasideList;
     PAGED_LOOKASIDE_LIST        Ext2McbLookasideList;
     PAGED_LOOKASIDE_LIST        Ext2ExtLookasideList;
+    PAGED_LOOKASIDE_LIST        Ext2DentryLookasideList;
     USHORT                      MaxDepth;
 
     /* User specified global codepage name */
@@ -668,6 +671,10 @@ typedef struct _EXT2_VCB {
     /* mountpoint: symlink to DesDevices */
     UCHAR                       DrvLetter;
 
+    struct block_device         bd;
+    struct super_block          sb;
+    struct ext3_sb_info         sbi;
+
 } EXT2_VCB, *PEXT2_VCB;
 
 //
@@ -735,7 +742,7 @@ typedef struct _EXT2_FCB {
     ULONG                           Flags;
 
     // Pointer to the inode
-    PEXT2_INODE                     Inode;
+    struct inode                   *Inode;
 
     // Vcb
     PEXT2_VCB                       Vcb;
@@ -793,15 +800,6 @@ struct _EXT2_MCB {
     // Full name with path
     UNICODE_STRING                  FullName;
 
-    // Inode number
-    ULONG                           iNo;
-
-    // Inode content
-    PEXT2_INODE                     Inode;
-
-    // Dir entry offset in parent
-    ULONG                           EntryOffset;
-
     // File attribute
     ULONG                           FileAttr;
 
@@ -822,6 +820,9 @@ struct _EXT2_MCB {
 
     // List Link to Vcb->McbList
     LIST_ENTRY                      Link;
+
+    struct inode                    Inode;
+    struct dentry                  *de;
 };
 
 //
@@ -835,7 +836,7 @@ struct _EXT2_MCB {
 #define MCB_IS_SYMLINK              0x80000000
 
 #define IsMcbUsed(Mcb)      (Mcb->Refercount > 0)
-#define IsMcbSymlink(Mcb)   IsFlagOn(Mcb->Flags, MCB_IS_SYMLINK)
+#define IsMcbSymLink(Mcb)   IsFlagOn(Mcb->Flags, MCB_IS_SYMLINK)
 #define IsZoneInited(Mcb)   IsFlagOn(Mcb->Flags, MCB_ZONE_INIT)
 
 /*
@@ -885,7 +886,7 @@ typedef struct _EXT2_CCB {
     UNICODE_STRING      DirectorySearchPattern;
 
     /* Open handle control block */
-    struct file         Ocb;
+    struct file         filp;
 
 } EXT2_CCB, *PEXT2_CCB;
 
@@ -904,7 +905,7 @@ typedef struct _EXT2_CCB {
 //
 // Used to pass information about a request between the drivers functions
 //
-typedef struct _EXT2_IRP_CONTEXT {
+typedef struct ext2_icb {
 
     // Identifier for this structure
     EXT2_IDENTIFIER     Identifier;
@@ -988,123 +989,6 @@ typedef struct _EXT2_EXTENT {
 } EXT2_EXTENT, *PEXT2_EXTENT;
 
 
-
-/*
- *  HTree index sturctures
- */
-
-
-struct fake_dirent
-{
-    __le32 inode;
-    __le16 rec_len;
-    __u8 name_len;
-    __u8 file_type;
-};
-
-struct dx_countlimit
-{
-    __le16 limit;
-    __le16 count;
-};
-
-struct dx_entry
-{
-    __le32 hash;
-    __le32 block;
-};
-
-/*
- * dx_root_info is laid out so that if it should somehow get overlaid by a
- * dirent the two low bits of the hash version will be zero.  Therefore, the
- * hash version mod 4 should never be 0.  Sincerely, the paranoia department.
- */
-
-struct dx_root
-{
-    struct fake_dirent dot;
-    char dot_name[4];
-    struct fake_dirent dotdot;
-    char dotdot_name[4];
-    struct dx_root_info
-    {
-        __le32 reserved_zero;
-        __u8 hash_version;
-        __u8 info_length; /* 8 */
-        __u8 indirect_levels;
-        __u8 unused_flags;
-    }
-    info;
-    struct dx_entry	entries[0];
-};
-
-struct dx_node
-{
-    struct fake_dirent fake;
-    struct dx_entry	entries[0];
-};
-
-struct dx_map_entry
-{
-    __u32 hash;
-    __u32 offs;
-};
-
-typedef struct dx_entry EXT3_DX_ENTRY, *PEXT3_DX_ENTRY;
-typedef struct dx_node  EXT3_DX_NODE,  *PEXT3_DX_NODE;
-typedef struct dx_root  EXT3_DX_ROOT,  *PEXT3_DX_ROOT;
-
-/**/
-typedef struct dx_firset_entry {
-    struct dx_countlimit countlmt;
-    __le32 firstblock;
-} EXT3_DX_FENTRY,  *PEXT3_DX_FENTRY;
-
-/*
- * Hash Tree Directory indexing
- * (c) Daniel Phillips, 2001
- */
-
-#ifdef EXT2_HTREE_INDEX
-#define is_dx(dir) (EXT2_HAS_COMPAT_FEATURE(dir->i_sb, \
-					      EXT2_FEATURE_COMPAT_DIR_INDEX) && \
-		      ((dir)->i_flags & LDISKFS_INDEX_FL))
-#define EXT2_DIR_LINK_MAX(dir) (!is_dx(dir) && (dir)->i_nlink >= EXT2_LINK_MAX)
-#define EXT2_DIR_LINK_EMPTY(dir) ((dir)->i_nlink == 2 || (dir)->i_nlink == 1)
-#else
-#define is_dx(dir) 0
-#define EXT2_DIR_LINK_MAX(dir) ((dir)->i_nlink >= EXT2_LINK_MAX)
-#define EXT2_DIR_LINK_EMPTY(dir) ((dir)->i_nlink == 2)
-#endif
-
-/* Legal values for the dx_root hash_version field: */
-
-#define EXT2_DX_HASH_LEGACY      0
-#define EXT2_DX_HASH_HALF_MD4    1
-#define EXT2_DX_HASH_TEA         2
-
-/* hash info structure used by the directory hash */
-struct ext2_dx_hash_info {
-    __u32       hash;
-    __u32       minor_hash;
-    __u32       hash_version;
-    __u32      *seed;
-};
-
-#define EXT2_HTREE_EOF	0x7fffffff
-
-/*
- * Special error return code only used by dx_probe() and its callers.
- */
-#define EX_ERR_BAD_DX_DIR	-75000
-
-
-/*
- * Control parameters used by ext2_htree_next_block
- */
-#define EX_HASH_NB_ALWAYS		1
-
-
 /* FUNCTIONS DECLARATION *****************************************************/
 
 // Include this so we don't need the latest WDK to build the driver.
@@ -1152,6 +1036,17 @@ Ext2TraceIrpContext(BOOLEAN _n, PEXT2_IRP_CONTEXT IrpContext)
         InterlockedDecrement(&Ext2Global->PerfStat.Irps[IrpContext->MajorFunction].Current);
     }
 }
+
+typedef struct _EXT2_FILLDIR_CONTEXT {
+    PEXT2_IRP_CONTEXT       efc_irp;
+    PUCHAR                  efc_buf;
+    ULONG                   efc_size;
+    ULONG                   efc_start;
+    ULONG                   efc_prev;
+    NTSTATUS                efc_status;
+    FILE_INFORMATION_CLASS  efc_fi;
+    BOOLEAN                 efc_single;
+} EXT2_FILLDIR_CONTEXT, *PEXT2_FILLDIR_CONTEXT;
 
 //
 // Block.c
@@ -1328,8 +1223,8 @@ Ext2ScanDir (
     IN PEXT2_VCB            Vcb,
     IN PEXT2_MCB            Parent,
     IN PUNICODE_STRING      FileName,
-    IN OUT PULONG           Index,
-    IN OUT PULONG           Inode
+    OUT PULONG              Inode,
+    struct dentry         **dentry
 );
 
 BOOLEAN
@@ -1388,27 +1283,29 @@ Ext2SupersedeOrOverWriteFile(
 //
 
 /* debug levels */
-#define DL_VIT 0
-#define DL_ERR 1
-#define DL_USR 2
-#define DL_DBG 3
-#define DL_INF 4
-#define DL_FUN 5
-#define DL_LOW 6
-#define DL_NVR 100
+#define DL_NVR 0
+#define DL_VIT 0x00000001
+#define DL_ERR 0x00000003
+#define DL_DBG 0x00000004
+#define DL_INF 0x00000008
+#define DL_FUN 0x00000010
+#define DL_LOW 0x00000020
+#define DL_REN 0x00000040   /* renaming operation */
+#define DL_RES 0x00000080   /* entry reference managment */
+#define DL_BLK 0x00000100   /* data block allocation / free */
+#define DL_CP  0x00000200   /* code pages (create, querydir) */
+#define DL_EXT 0x00000400   /* extents */
+#define DL_MAP 0x00000800   /* retrieval points */
+#define DL_JNL 0x00001000   /* dump journal operations */
+#define DL_HTI 0x00002000   /* htree index */
+#define DL_WRN 0x00004000   /* warning */
+#define DL_BH  0x00008000   /* buffer head */
+#define DL_PNP 0x00010000   /* pnp */
 
-
-#define DL_DEFAULT DL_USR
-#define DL_REN     DL_ERR       /* renaming operation */
-#define DL_RES     DL_DBG       /* entry reference managment */
-#define DL_BLK     DL_LOW       /* data block allocation / free */
-#define DL_CP      DL_LOW       /* code pages (create, querydir) */
-#define DL_EXT     DL_LOW + 1   /* extents */
-#define DL_MAP     DL_EXT       /* retrieval points */
-#define DL_JNL     DL_USR       /* dump journal operations */
+#define DL_DEFAULT (DL_ERR)
 
 #if EXT2_DEBUG
-extern  ULONG DebugLevel;
+extern  ULONG DebugFilter;
 
 VOID
 __cdecl
@@ -1417,8 +1314,8 @@ Ext2NiPrintf(
     ...
 );
 
-#define DEBUG(_DL, arg)    do {if (_DL <= DebugLevel) Ext2Printf arg;} while(0)
-#define DEBUGNI(_DL, arg)  do {if (_DL <= DebugLevel) Ext2NiPrintf arg;} while(0)
+#define DEBUG(_DL, arg)    do {if ((_DL) & DebugFilter) Ext2Printf arg;} while(0)
+#define DEBUGNI(_DL, arg)  do {if ((_DL) & DebugFilter) Ext2NiPrintf arg;} while(0)
 
 #define Ext2CompleteRequest(Irp, bPrint, PriorityBoost) \
         Ext2DbgPrintComplete(Irp, bPrint); \
@@ -1426,7 +1323,7 @@ Ext2NiPrintf(
 
 #else
 
-#define DEBUG(_DL, arg) do {if (_DL <= DL_ERR) DbgPrint arg;} while(0)
+#define DEBUG(_DL, arg) do {if ((_DL) & DL_ERR) DbgPrint arg;} while(0)
 
 #define Ext2CompleteRequest(Irp, bPrint, PriorityBoost) \
         IoCompleteRequest(Irp, PriorityBoost)
@@ -1517,7 +1414,7 @@ ULONG
 Ext2GetInfoLength(IN FILE_INFORMATION_CLASS  FileInformationClass);
 
 NTSTATUS
-Ext2ProcessDirEntry(
+Ext2ProcessEntry(
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
     IN PEXT2_FCB            Dcb,
@@ -1538,8 +1435,7 @@ Ext2IsWearingCloak(
     IN  POEM_STRING     OeName
 );
 
-NTSTATUS
-Ext2QueryDirectory (IN PEXT2_IRP_CONTEXT IrpContext);
+NTSTATUS Ext2QueryDirectory (IN PEXT2_IRP_CONTEXT IrpContext);
 
 NTSTATUS
 Ext2NotifyChangeDirectory (
@@ -1660,16 +1556,21 @@ Ext2GetInodeLba (
 BOOLEAN
 Ext2LoadInode (
     IN PEXT2_VCB Vcb,
-    IN ULONG inode,
-    IN PEXT2_INODE Inode
+    IN struct inode *Inode
+);
+
+BOOLEAN
+Ext2ClearInode (
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB Vcb,
+    IN ULONG inode
 );
 
 BOOLEAN
 Ext2SaveInode (
     IN PEXT2_IRP_CONTEXT IrpContext,
     IN PEXT2_VCB Vcb,
-    IN ULONG inode,
-    IN PEXT2_INODE Inode
+    IN struct inode *Inode
 );
 
 BOOLEAN
@@ -1685,6 +1586,14 @@ Ext2SaveBlock (
     IN PEXT2_VCB            Vcb,
     IN ULONG                dwBlk,
     IN PVOID                Buf
+);
+
+BOOLEAN
+Ext2ZeroBuffer(
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN LONGLONG             Offset,
+    IN ULONG                Size
 );
 
 BOOLEAN
@@ -1747,7 +1656,6 @@ Ext2ExtentSearch(
     OUT PULONG              Block,
     OUT PULONG              Number
 );
-
 
 VOID
 Ext2UpdateVcbStat(
@@ -1822,20 +1730,17 @@ Ext2AddEntry (
     IN PEXT2_IRP_CONTEXT   IrpContext,
     IN PEXT2_VCB           Vcb,
     IN PEXT2_FCB           Dcb,
-    IN ULONG               FileType,
-    IN ULONG               Inode,
+    IN struct inode       *Inode,
     IN PUNICODE_STRING     FileName,
-    OUT PULONG             EntryOffset
+    OUT struct dentry    **dentry
 );
 
 NTSTATUS
 Ext2RemoveEntry (
-    IN PEXT2_IRP_CONTEXT   IrpContext,
-    IN PEXT2_VCB           Vcb,
-    IN PEXT2_FCB           Dcb,
-    IN ULONG               EntryOffset,
-    IN ULONG               FileType,
-    IN ULONG               Inode
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_FCB            Dcb,
+    IN PEXT2_MCB            Mcb
 );
 
 NTSTATUS
@@ -1860,7 +1765,12 @@ Ext2TruncateBlock(
     IN PULONG            Extra
 );
 
+struct ext3_dir_entry_2 *ext3_next_entry(struct ext3_dir_entry_2 *p);
 
+int ext3_check_dir_entry (const char * function, struct inode * dir,
+                          struct ext3_dir_entry_2 * de,
+                          struct buffer_head * bh,
+                          unsigned long offset);
 //
 // Fastio.c
 //
@@ -2167,6 +2077,54 @@ Ext2DismountVolume (IN PEXT2_IRP_CONTEXT IrpContext);
 NTSTATUS
 Ext2FileSystemControl (IN PEXT2_IRP_CONTEXT IrpContext);
 
+//
+// HTree.c
+//
+
+struct buffer_head *ext3_append(struct ext2_icb *icb, struct inode *inode,
+                                            ext3_lblk_t *block, int *err);
+
+void ext3_set_de_type(struct super_block *sb,
+                      struct ext3_dir_entry_2 *de,
+                      umode_t mode);
+
+__u32 ext3_current_time(struct inode *in);
+void ext3_warning (struct super_block * sb, const char * function,
+                   char * fmt, ...);
+#define ext3_error ext3_warning
+
+void ext3_update_dx_flag(struct inode *inode);
+int ext3_mark_inode_dirty(struct ext2_icb *icb, struct inode *in);
+
+void ext3_inc_count(struct inode *inode);
+void ext3_dec_count(struct inode *inode);
+
+struct buffer_head *
+            ext3_find_entry (struct ext2_icb *icb, struct dentry *dentry,
+                             struct ext3_dir_entry_2 ** res_dir);
+struct buffer_head *
+            ext3_dx_find_entry(struct ext2_icb *, struct dentry *dentry,
+                               struct ext3_dir_entry_2 **res_dir, int *err);
+
+typedef int (*filldir_t)(void *, const char *, int, unsigned long, __u32, unsigned);
+int ext3_dx_readdir(struct file *filp, filldir_t filldir, void * context);
+
+struct buffer_head *ext3_bread(struct ext2_icb *icb, struct inode *inode,
+                                           unsigned long block, int *err);
+int add_dirent_to_buf(struct ext2_icb *icb, struct dentry *dentry,
+                      struct inode *inode, struct ext3_dir_entry_2 *de,
+                      struct buffer_head *bh);
+struct ext3_dir_entry_2 *
+            do_split(struct ext2_icb *icb, struct inode *dir,
+                     struct buffer_head **bh,struct dx_frame *frame,
+                     struct dx_hash_info *hinfo, int *error);
+
+int ext3_add_entry(struct ext2_icb *icb, struct dentry *dentry, struct inode *inode);
+
+int ext3_delete_entry(struct ext2_icb *icb, struct inode *dir,
+                      struct ext3_dir_entry_2 *de_del,
+                      struct buffer_head *bh);
+int ext3_is_dir_empty(struct ext2_icb *icb, struct inode *inode);
 
 //
 // Init.c
@@ -2244,8 +2202,12 @@ Ext2AllocateInode (PEXT2_VCB  Vcb);
 VOID
 Ext2DestroyInode (IN PEXT2_VCB Vcb, IN PEXT2_INODE inode);
 
+struct dentry * Ext2AllocateEntry();
+VOID Ext2FreeEntry (IN struct dentry *de);
+struct dentry *Ext2BuildEntry(PEXT2_VCB Vcb, PEXT2_MCB Dcb, PUNICODE_STRING FileName);
+
 PEXT2_EXTENT
-Ext2AllocateExtent ();
+Ext2AllocateExtent();
 
 VOID
 Ext2FreeExtent (IN PEXT2_EXTENT Extent);
@@ -2531,6 +2493,11 @@ Ext2UnicodeToOEM (
 VOID
 Ext2Sleep(ULONG ms);
 
+int Ext2LinuxError (NTSTATUS Status);
+NTSTATUS Ext2WinntError(int rc);
+
+BOOLEAN Ext2IsDot(PUNICODE_STRING name);
+BOOLEAN Ext2IsDotDot(PUNICODE_STRING name);
 //
 // nls/nls_rtl.c
 //

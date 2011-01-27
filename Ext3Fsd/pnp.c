@@ -19,8 +19,6 @@ extern PEXT2_GLOBAL Ext2Global;
 
 /* DEFINITIONS *************************************************************/
 
-#define DL_PNP DL_USR
-
 NTSTATUS
 Ext2PnpCompletionRoutine (
     IN PDEVICE_OBJECT DeviceObject,

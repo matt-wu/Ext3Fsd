@@ -425,7 +425,7 @@ Ext2FastIoQueryStandardInfo (
             } FILE_STANDARD_INFORMATION, *PFILE_STANDARD_INFORMATION;
             */
 
-            Buffer->NumberOfLinks = Fcb->Inode->i_links_count;
+            Buffer->NumberOfLinks = Fcb->Inode->i_nlink;
 
             if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY)) {
                 Buffer->DeletePending = FALSE;

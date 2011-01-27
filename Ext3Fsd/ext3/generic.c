@@ -73,7 +73,7 @@ Ext2LoadSuper(IN PEXT2_VCB      Vcb,
     PEXT2_SUPER_BLOCK Ext2Sb = NULL;
 
     Ext2Sb = (PEXT2_SUPER_BLOCK)
-             ExAllocatePoolWithTag(
+             Ext2AllocatePool(
                  PagedPool,
                  SUPER_BLOCK_SIZE,
                  EXT2_SB_MAGIC
@@ -94,7 +94,7 @@ Ext2LoadSuper(IN PEXT2_VCB      Vcb,
 
         DEBUG(DL_ERR, ( "Ext2ReadDisk: disk device error.\n"));
 
-        ExFreePoolWithTag(Ext2Sb, EXT2_SB_MAGIC);
+        Ext2FreePool(Ext2Sb, EXT2_SB_MAGIC);
         Ext2Sb = NULL;
     }
 
@@ -179,7 +179,7 @@ Ext2LoadGroup(IN PEXT2_VCB Vcb)
         return FALSE;
     }
 
-    Buffer = ExAllocatePoolWithTag(PagedPool, Size, EXT2_GD_MAGIC);
+    Buffer = Ext2AllocatePool(PagedPool, Size, EXT2_GD_MAGIC);
     if (!Buffer) {
         DEBUG(DL_ERR, ( "Ext2LoadSuper: no enough memory.\n"));
         return FALSE;
@@ -194,7 +194,7 @@ Ext2LoadGroup(IN PEXT2_VCB Vcb)
                             FALSE );
 
     if (!NT_SUCCESS(Status)) {
-        ExFreePoolWithTag(Buffer, EXT2_GD_MAGIC);
+        Ext2FreePool(Buffer, EXT2_GD_MAGIC);
         Buffer = NULL;
 
         return FALSE;
@@ -289,34 +289,76 @@ Ext2GetInodeLba (
         return FALSE;
     }
 
-    loc = (Vcb->GroupDesc[(inode - 1) / INODES_PER_GROUP ].bg_inode_table);
+    loc = (Vcb->GroupDesc[(inode - 1) / INODES_PER_GROUP].bg_inode_table);
     loc = loc * Vcb->BlockSize;
-    loc = loc + ((inode - 1) % INODES_PER_GROUP) * INODE_SIZE;
+    loc = loc + ((inode - 1) % INODES_PER_GROUP) * Vcb->InodeSize;
 
     *offset = loc;
 
     return TRUE;
 }
 
+void Ext2DecodeInode(struct inode *dst, struct ext3_inode *src)
+{
+    dst->i_mode = src->i_mode;
+    dst->i_flags = src->i_flags;
+    dst->i_uid = src->i_uid;
+    dst->i_gid = src->i_gid;
+    dst->i_nlink = src->i_links_count;
+    dst->i_generation = src->i_generation;
+    dst->i_size = src->i_size;
+    if (S_ISREG(src->i_mode)) {
+        dst->i_size |= (loff_t)src->i_size_high << 32;
+    }
+    dst->i_atime = src->i_atime;
+    dst->i_ctime = src->i_ctime;
+    dst->i_mtime = src->i_mtime;
+    dst->i_dtime = src->i_dtime;
+    dst->i_blocks = src->i_blocks;
+    memcpy(&dst->i_block[0], &src->i_block[0], sizeof(__u32) * 15);
+}
+
+void Ext2EncodeInode(struct ext3_inode *dst,  struct inode *src)
+{
+    dst->i_mode = src->i_mode;
+    dst->i_flags = src->i_flags;
+    dst->i_uid = src->i_uid;
+    dst->i_gid = src->i_gid;
+    dst->i_links_count = src->i_nlink;
+    dst->i_generation = src->i_generation;
+    dst->i_size = (__u32)src->i_size;
+    if (S_ISREG(src->i_mode)) {
+        dst->i_size_high = (__u32)(src->i_size >> 32);
+    }
+    dst->i_atime = src->i_atime;
+    dst->i_ctime = src->i_ctime;
+    dst->i_mtime = src->i_mtime;
+    dst->i_dtime = src->i_dtime;
+    dst->i_blocks = src->i_blocks;
+    memcpy(&dst->i_block[0], &src->i_block[0], sizeof(__u32) * 15);
+}
+
+
 BOOLEAN
 Ext2LoadInode (IN PEXT2_VCB Vcb,
-               IN ULONG       inode,
-               IN PEXT2_INODE Inode)
+               IN struct inode *Inode)
 {
+    struct ext3_inode   ext3i;
+
     IO_STATUS_BLOCK     IoStatus;
     LONGLONG            Offset;
 
-    if (!Ext2GetInodeLba(Vcb, inode, &Offset))  {
-        DEBUG(DL_ERR, ( "Ext2LoadInode: error get inode(%xh)'s addr.\n", inode));
+    if (!Ext2GetInodeLba(Vcb, Inode->i_ino, &Offset))  {
+        DEBUG(DL_ERR, ( "Ext2LoadInode: error get inode(%xh)'s addr.\n", Inode->i_ino));
         return FALSE;
     }
 
     if (!CcCopyRead(
                 Vcb->Volume,
                 (PLARGE_INTEGER)&Offset,
-                INODE_SIZE,
+                sizeof(struct ext3_inode),
                 PIN_WAIT,
-                (PVOID)Inode,
+                (PVOID)&ext3i,
                 &IoStatus )) {
         return FALSE;
     }
@@ -325,28 +367,71 @@ Ext2LoadInode (IN PEXT2_VCB Vcb,
         return FALSE;
     }
 
+    Ext2DecodeInode(Inode, &ext3i);
+
     return TRUE;
 }
 
 
 BOOLEAN
-Ext2SaveInode ( IN PEXT2_IRP_CONTEXT IrpContext,
-                IN PEXT2_VCB Vcb,
-                IN ULONG Inode,
-                IN PEXT2_INODE Ext2Inode)
+Ext2ClearInode (
+    IN PEXT2_IRP_CONTEXT IrpContext,
+    IN PEXT2_VCB Vcb,
+    IN ULONG Inode)
 {
-    LONGLONG        Offset = 0;
-    BOOLEAN         rc;
+    LONGLONG            Offset = 0;
+    BOOLEAN             rc;
 
-    DEBUG(DL_INF, ( "Ext2SaveInode: Saving Inode %xh: Mode=%xh Size=%xh\n",
-                    Inode, Ext2Inode->i_mode, Ext2Inode->i_size));
     rc = Ext2GetInodeLba(Vcb, Inode, &Offset);
     if (!rc)  {
         DEBUG(DL_ERR, ( "Ext2SaveInode: error get inode(%xh)'s addr.\n", Inode));
         goto errorout;
     }
 
-    rc = Ext2SaveBuffer(IrpContext, Vcb, Offset, INODE_SIZE, Ext2Inode);
+    rc = Ext2ZeroBuffer(IrpContext, Vcb, Offset, Vcb->InodeSize);
+
+errorout:
+
+    return rc;
+}
+
+BOOLEAN
+Ext2SaveInode ( IN PEXT2_IRP_CONTEXT IrpContext,
+                IN PEXT2_VCB Vcb,
+                IN struct inode *Inode)
+{
+    struct ext3_inode   ext3i;
+
+    IO_STATUS_BLOCK     IoStatus;
+    LONGLONG            Offset = 0;
+    BOOLEAN             rc = 0;
+
+    DEBUG(DL_INF, ( "Ext2SaveInode: Saving Inode %xh: Mode=%xh Size=%xh\n",
+                    Inode->i_ino, Inode->i_mode, Inode->i_size));
+    rc = Ext2GetInodeLba(Vcb,  Inode->i_ino, &Offset);
+    if (!rc)  {
+        DEBUG(DL_ERR, ( "Ext2SaveInode: error get inode(%xh)'s addr.\n", Inode->i_ino));
+        goto errorout;
+    }
+
+    if (!CcCopyRead(
+                Vcb->Volume,
+                (PLARGE_INTEGER)&Offset,
+                sizeof(struct ext3_inode),
+                PIN_WAIT,
+                (PVOID)&ext3i,
+                &IoStatus )) {
+        rc = FALSE;
+        goto errorout;
+    }
+
+    if (!NT_SUCCESS(IoStatus.Status)) {
+        rc = FALSE;
+        goto errorout;
+    }
+
+    Ext2EncodeInode(&ext3i, Inode);
+    rc = Ext2SaveBuffer(IrpContext, Vcb, Offset, sizeof(struct ext3_inode), &ext3i);
 
     if (rc && IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK)) {
         Ext2StartFloppyFlushDpc(Vcb, NULL, NULL);
@@ -401,6 +486,50 @@ Ext2SaveBlock ( IN PEXT2_IRP_CONTEXT    IrpContext,
     if (IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK)) {
         Ext2StartFloppyFlushDpc(Vcb, NULL, NULL);
     }
+
+    return rc;
+}
+
+BOOLEAN
+Ext2ZeroBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
+                IN PEXT2_VCB            Vcb,
+                IN LONGLONG             Offset,
+                IN ULONG                Size )
+{
+    PBCB        Bcb;
+    PVOID       Buffer;
+    BOOLEAN     rc;
+
+    if ( !CcPreparePinWrite(
+                Vcb->Volume,
+                (PLARGE_INTEGER) (&Offset),
+                Size,
+                FALSE,
+                Ext2CanIWait(),
+                &Bcb,
+                &Buffer )) {
+
+        DEBUG(DL_ERR, ( "Ext2SaveBuffer: failed to PinLock offset %I64xh ...\n", Offset));
+        return FALSE;
+    }
+
+    __try {
+
+        RtlZeroMemory(Buffer, Size);
+        CcSetDirtyPinnedData(Bcb, NULL );
+        SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
+
+        rc = Ext2AddVcbExtent(Vcb, Offset, (LONGLONG)Size);
+        if (!rc) {
+            DbgBreak();
+            Ext2Sleep(100);
+            rc = Ext2AddVcbExtent(Vcb, Offset, (LONGLONG)Size);
+        }
+
+    } __finally {
+        CcUnpinData(Bcb);
+    }
+
 
     return rc;
 }
@@ -512,7 +641,8 @@ Ext2GetBlock(
         /* check the block is valid or not */
         if (BlockArray[0] >= TOTAL_BLOCKS) {
             DbgBreak();
-            return STATUS_DISK_CORRUPT_ERROR;
+            Status = STATUS_DISK_CORRUPT_ERROR;
+            goto errorout;
         }
 
         /* map memory in cache for the index block */
@@ -520,7 +650,7 @@ Ext2GetBlock(
         if ( !CcPinRead( Vcb->Volume,
                          (PLARGE_INTEGER) (&Offset),
                          BLOCK_SIZE,
-                         Ext2CanIWait(),
+                         PIN_WAIT,
                          &Bcb,
                          &pData )) {
 
@@ -581,7 +711,7 @@ Ext2GetBlock(
                 }
 
                 /* save inode information here */
-                Ext2SaveInode(IrpContext, Vcb, Mcb->iNo,  Mcb->Inode);
+                Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
 
             } else {
 
@@ -670,7 +800,7 @@ Ext2BlockMap(
             ULONG   dwHint = 0;
 
             Slot = (Layer==0) ? (Index):(Layer + EXT2_NDIR_BLOCKS - 1);
-            dwBlk = Mcb->Inode->i_block[Slot];
+            dwBlk = Mcb->Inode.i_block[Slot];
 
             if (dwBlk == 0) {
 
@@ -682,7 +812,7 @@ Ext2BlockMap(
                 } else {
 
                     if (Slot) {
-                        dwHint = Mcb->Inode->i_block[Slot - 1];
+                        dwHint = Mcb->Inode.i_block[Slot - 1];
                     }
 
                     /* allocate and zero block if necessary */
@@ -704,13 +834,10 @@ Ext2BlockMap(
                     }
 
                     /* save the it into inode*/
-                    Mcb->Inode->i_block[Slot] = dwBlk;
+                    Mcb->Inode.i_block[Slot] = dwBlk;
 
                     /* save the inode */
-                    if (!Ext2SaveInode( IrpContext,
-                                        Vcb,
-                                        Mcb->iNo,
-                                        Mcb->Inode)) {
+                    if (!Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode)) {
 
                         Status = STATUS_UNSUCCESSFUL;
                         Ext2FreeBlock(IrpContext, Vcb, dwBlk, 1);
@@ -729,7 +856,7 @@ Ext2BlockMap(
                          Layer,
                          Index,
                          (Layer == 0) ? (Vcb->NumBlocks[Layer] - Index) : 1,
-                         &Mcb->Inode->i_block[Slot],
+                         &Mcb->Inode.i_block[Slot],
                          bAlloc,
                          &dwHint,
                          &dwRet,
@@ -764,7 +891,7 @@ Ext2ExtentMap(
 {
     EXT4_EXTENT_HEADER *eh;
 
-    eh = get_ext4_header(Mcb->Inode);
+    eh = get_ext4_header(&Mcb->Inode);
 
     return Ext2ExtentSearch(
                IrpContext,
@@ -843,7 +970,7 @@ Ext2ExtentSearch(
                             Vcb->Volume,
                             &offset,
                             Vcb->BlockSize,
-                            Ext2CanIWait(),
+                            PIN_WAIT,
                             &bcb,
                             &ib )) {
                             status = STATUS_CANT_WAIT;
@@ -971,7 +1098,7 @@ Again:
         if (!CcPinRead( Vcb->Volume,
                         &Offset,
                         Vcb->BlockSize,
-                        Ext2CanIWait(),
+                        PIN_WAIT,
                         &BitmapBcb,
                         &BitmapCache ) ) {
 
@@ -1153,7 +1280,7 @@ Again:
         if (!CcPinRead( Vcb->Volume,
                         &Offset,
                         Vcb->BlockSize,
-                        Ext2CanIWait(),
+                        PIN_WAIT,
                         &BitmapBcb,
                         &BitmapCache ) ) {
 
@@ -1228,7 +1355,7 @@ Ext2ExpandLast(
     if (Layer > 0 || IsMcbDirectory(Mcb)) {
 
         /* allocate buffer for new block */
-        pData = (ULONG *) ExAllocatePoolWithTag(
+        pData = (ULONG *) Ext2AllocatePool(
                     PagedPool,
                     BLOCK_SIZE,
                     EXT2_DATA_MAGIC
@@ -1246,7 +1373,7 @@ Ext2ExpandLast(
     Status = Ext2NewBlock(
                  IrpContext,
                  Vcb,
-                 (Mcb->iNo - 1) / BLOCKS_PER_GROUP,
+                 (Mcb->Inode.i_ino - 1) / BLOCKS_PER_GROUP,
                  *Hint,
                  Block,
                  Number
@@ -1257,7 +1384,7 @@ Ext2ExpandLast(
     }
 
     /* increase inode i_blocks */
-    Mcb->Inode->i_blocks += (*Number * (BLOCK_SIZE >> 9));
+    Mcb->Inode.i_blocks += (*Number * (BLOCK_SIZE >> 9));
 
     if (Layer == 0) {
 
@@ -1304,13 +1431,13 @@ errorout:
             ASSERT(*Number == 1);
         } else {
             if (pData) {
-                ExFreePoolWithTag(pData, EXT2_DATA_MAGIC);
+                Ext2FreePool(pData, EXT2_DATA_MAGIC);
                 DEC_MEM_COUNT(PS_BLOCK_DATA, pData, BLOCK_SIZE);
             }
         }
     } else {
         if (pData) {
-            ExFreePoolWithTag(pData, EXT2_DATA_MAGIC);
+            Ext2FreePool(pData, EXT2_DATA_MAGIC);
             DEC_MEM_COUNT(PS_BLOCK_DATA, pData, BLOCK_SIZE);
         }
         if (*Block) {
@@ -1494,7 +1621,7 @@ Ext2ExpandBlock(
                             Vcb->Volume,
                             &Offset,
                             BLOCK_SIZE,
-                            Ext2CanIWait(),
+                            PIN_WAIT,
                             &Bcb,
                             &pData )) {
 
@@ -1559,7 +1686,7 @@ Ext2ExpandBlock(
                     CcUnpinData(Bcb);
                     Bcb = NULL;
                 } else {
-                    ExFreePoolWithTag(pData, EXT2_DATA_MAGIC);
+                    Ext2FreePool(pData, EXT2_DATA_MAGIC);
                     DEC_MEM_COUNT(PS_BLOCK_DATA, pData, BLOCK_SIZE);
                 }
                 pData = NULL;
@@ -1642,12 +1769,12 @@ Ext2TruncateBlock(
                                        Base + SizeArray - 1 - i, BlockArray[SizeArray - i - 1], Number));
                     }
 #endif
-                    ASSERT(Mcb->Inode->i_blocks >= Number * (BLOCK_SIZE >> 9));
-                    if (Mcb->Inode->i_blocks < Number * (BLOCK_SIZE >> 9)) {
-                        Mcb->Inode->i_blocks = 0;
+                    ASSERT(Mcb->Inode.i_blocks >= Number * (BLOCK_SIZE >> 9));
+                    if (Mcb->Inode.i_blocks < Number * (BLOCK_SIZE >> 9)) {
+                        Mcb->Inode.i_blocks = 0;
                         DbgBreak();
                     } else {
-                        Mcb->Inode->i_blocks -= Number * (BLOCK_SIZE >> 9);
+                        Mcb->Inode.i_blocks -= Number * (BLOCK_SIZE >> 9);
                     }
                     BlockArray[SizeArray - i - 1] = 0;
                 }
@@ -1698,7 +1825,7 @@ Ext2TruncateBlock(
                 if (!CcPinRead( Vcb->Volume,
                                 (PLARGE_INTEGER) (&Offset),
                                 BLOCK_SIZE,
-                                Ext2CanIWait(),
+                                PIN_WAIT,
                                 &Bcb,
                                 &pData )) {
 
@@ -1937,7 +2064,7 @@ repeat:
     if (!CcPinRead( Vcb->Volume,
                     &Offset,
                     Vcb->BlockSize,
-                    Ext2CanIWait(),
+                    PIN_WAIT,
                     &BitmapBcb,
                     &BitmapCache ) ) {
 
@@ -2110,28 +2237,16 @@ Ext2AddEntry (
     IN PEXT2_IRP_CONTEXT   IrpContext,
     IN PEXT2_VCB           Vcb,
     IN PEXT2_FCB           Dcb,
-    IN ULONG               FileType,
-    IN ULONG               Inode,
+    IN struct inode       *Inode,
     IN PUNICODE_STRING     FileName,
-    OUT PULONG             EntryOffset
+    struct dentry        **Dentry
 )
 {
-    NTSTATUS                Status = STATUS_UNSUCCESSFUL;
+    struct dentry          *de = NULL;
 
-    OEM_STRING              OemName;
-
-    PEXT2_DIR_ENTRY2        pDir = NULL;
-    PEXT2_DIR_ENTRY2        pNewDir = NULL;
-    PEXT2_DIR_ENTRY2        pTarget = NULL;
-
-    ULONG                   Length = 0;
-    ULONG                   ByteOffset = 0;
-
-    ULONG                   dwRet = 0;
-    ULONG                   RecLen = 0;
-
-    BOOLEAN                 bFound = FALSE;
-    BOOLEAN                 bAdding = FALSE;
+    NTSTATUS                status = STATUS_UNSUCCESSFUL;
+    OEM_STRING              oem;
+    int                     rc;
 
     BOOLEAN                 MainResourceAcquired = FALSE;
 
@@ -2146,204 +2261,29 @@ Ext2AddEntry (
     __try {
 
         Ext2ReferXcb(&Dcb->ReferenceCount);
-
-        pDir = (PEXT2_DIR_ENTRY2)
-               ExAllocatePoolWithTag(
-                   PagedPool,
-                   EXT2_DIR_REC_LEN(EXT2_NAME_LEN),
-                   EXT2_DENTRY_MAGIC
-               );
-        if (!pDir) {
-            DEBUG(DL_ERR, ( "Ex2AddEntry: failed to allocate pDir.\n"));
-            Status = STATUS_INSUFFICIENT_RESOURCES;
+        de = Ext2BuildEntry(Vcb, Dcb->Mcb, FileName);
+        if (!de) {
+            status = STATUS_INSUFFICIENT_RESOURCES;
             __leave;
         }
+        de->d_inode = Inode;
 
-        pTarget = (PEXT2_DIR_ENTRY2)
-                  ExAllocatePoolWithTag(
-                      PagedPool,
-                      2 * EXT2_DIR_REC_LEN(EXT2_NAME_LEN),
-                      EXT2_DENTRY_MAGIC
-                  );
-        if (!pTarget) {
-            DEBUG(DL_ERR, ( "Ex2AddEntry: failed to allocate pTarget.\n"));
-            Status = STATUS_INSUFFICIENT_RESOURCES;
-            __leave;
-        }
+        rc = ext3_add_entry(IrpContext, de, Inode);
+        status = Ext2WinntError(rc);
+        if (NT_SUCCESS(status)) {
 
-        if (IsFlagOn( SUPER_BLOCK->s_feature_incompat,
-                      EXT2_FEATURE_INCOMPAT_FILETYPE)) {
-            pDir->file_type = (UCHAR) FileType;
-        } else {
-            pDir->file_type = 0;
-        }
-
-        OemName.Buffer = pDir->name;
-        OemName.MaximumLength = EXT2_NAME_LEN;
-        OemName.Length  = 0;
-
-        Status = Ext2UnicodeToOEM(Vcb, &OemName, FileName);
-
-        if (!NT_SUCCESS(Status)) {
-            __leave;
-        }
-
-        pDir->name_len = (CCHAR) OemName.Length;
-        pDir->inode  = Inode;
-        pDir->rec_len = (USHORT) (EXT2_DIR_REC_LEN(pDir->name_len));
-
-        ByteOffset = 0;
-
-Repeat:
-
-        while ((LONGLONG)ByteOffset < Dcb->Header.AllocationSize.QuadPart) {
-
-            RtlZeroMemory(pTarget, EXT2_DIR_REC_LEN(EXT2_NAME_LEN));
-
-            // Reading the DCB contents
-            Status = Ext2ReadInode(
-                         IrpContext,
-                         Vcb,
-                         Dcb->Mcb,
-                         (ULONGLONG)ByteOffset,
-                         (PVOID)pTarget,
-                         EXT2_DIR_REC_LEN(EXT2_NAME_LEN),
-                         FALSE,
-                         &dwRet);
-
-            if (!NT_SUCCESS(Status)) {
-                DEBUG(DL_ERR, ( "Ext2AddDirectory: failed to read directory.\n"));
-                __leave;
+            /* increase dir inode's nlink for .. */
+            if (S_ISDIR(Inode->i_mode)) {
+                ext3_inc_count(Dcb->Inode);
+                ext3_mark_inode_dirty(IrpContext, Dcb->Inode);
             }
 
-            if (pTarget->rec_len == 0) {
-                RecLen = BLOCK_SIZE - (ByteOffset & (BLOCK_SIZE - 1));
-            } else {
-                RecLen = pTarget->rec_len;
-            }
+            /* increase inode nlink reference */
+            ext3_inc_count(Inode);
+            ext3_mark_inode_dirty(IrpContext, Inode);
 
-            if (((pTarget->inode == 0) && RecLen >= pDir->rec_len) ||
-                    (RecLen >= (ULONG)EXT2_DIR_REC_LEN(pTarget->name_len) + pDir->rec_len)) {
-
-                /* we get emply slot for this entry */
-
-                if (pTarget->inode) {
-
-                    RtlZeroMemory(pTarget, 2 * EXT2_DIR_REC_LEN(EXT2_NAME_LEN));
-
-                    /* read enough data from directory content */
-                    Status = Ext2ReadInode(
-                                 IrpContext,
-                                 Vcb,
-                                 Dcb->Mcb,
-                                 (ULONGLONG)ByteOffset,
-                                 (PVOID)pTarget,
-                                 2 * EXT2_DIR_REC_LEN(EXT2_NAME_LEN),
-                                 FALSE,
-                                 &dwRet);
-
-                    if (!NT_SUCCESS(Status)) {
-                        DEBUG(DL_ERR, ( "Ext2AddDirectory: Reading Directory Content error.\n"));
-                        __leave;
-                    }
-
-                    Length = EXT2_DIR_REC_LEN(pTarget->name_len);
-                    pNewDir = (PEXT2_DIR_ENTRY2) ((PUCHAR)pTarget + EXT2_DIR_REC_LEN(pTarget->name_len));
-                    pNewDir->rec_len = (USHORT)(RecLen - EXT2_DIR_REC_LEN(pTarget->name_len));
-                    pTarget->rec_len = EXT2_DIR_REC_LEN(pTarget->name_len);
-
-                } else {
-
-                    Length  = 0;
-                    pNewDir = pTarget;
-                }
-
-                /* update it's entry offset in parent directory */
-                if (EntryOffset) {
-                    *EntryOffset = ByteOffset + Length;
-                }
-
-                /* set dir entry */
-                pNewDir->file_type = pDir->file_type;
-                pNewDir->inode = pDir->inode;
-                pNewDir->name_len = pDir->name_len;
-                memcpy(pNewDir->name, pDir->name, pDir->name_len);
-
-                /* update Length to be written to dir content */
-                Length += EXT2_DIR_REC_LEN(pDir->name_len);
-
-                bFound = TRUE;
-                break;
-            }
-
-            ByteOffset += RecLen;
-        }
-
-        if (bFound) {
-
-            /* update the reference link count */
-            if (FileType==EXT2_FT_DIR ) {
-
-                if (((pDir->name_len == 1) && (pDir->name[0] == '.')) ||
-                        ((pDir->name_len == 2) && (pDir->name[0] == '.') && (pDir->name[1] == '.')) ) {
-                } else {
-                    Dcb->Inode->i_links_count++;
-                }
-            }
-
-            /* save the new entry */
-            Status = Ext2WriteInode(
-                         IrpContext,
-                         Vcb,
-                         Dcb->Mcb,
-                         (ULONGLONG)ByteOffset,
-                         pTarget,
-                         Length,
-                         FALSE,
-                         &dwRet );
-        } else {
-
-            // We should expand the size of the dir inode
-            if (!bAdding) {
-
-                /* allocate new block since there's no space for us */
-                ByteOffset = Dcb->Header.AllocationSize.LowPart;
-                Dcb->Header.AllocationSize.LowPart += BLOCK_SIZE;
-                Status = Ext2ExpandFile(
-                             IrpContext,
-                             Vcb,
-                             Dcb->Mcb,
-                             &(Dcb->Header.AllocationSize)
-                         );
-
-                if (NT_SUCCESS(Status)) {
-
-                    /* update Dcb */
-                    Dcb->Inode->i_size = Dcb->Header.AllocationSize.LowPart;
-                    Ext2SaveInode(IrpContext, Vcb, Dcb->Mcb->iNo, Dcb->Inode);
-
-                    Dcb->Header.ValidDataLength = Dcb->Header.FileSize =
-                                                      Dcb->Mcb->FileSize = Dcb->Header.AllocationSize;
-
-                    /* save parent directory's inode */
-                    Ext2SaveInode(
-                        IrpContext,
-                        Vcb,
-                        Dcb->Mcb->iNo,
-                        Dcb->Inode
-                    );
-
-                    bAdding = TRUE;
-                    goto Repeat;
-                }
-
-                /* failed to allocate new block for this directory */
-                __leave;
-
-            } else {
-                /* Something must be error, since we already allocated new block ! */
-                __leave;
-            }
+            *Dentry = de;
+            de = NULL;
         }
 
     } __finally {
@@ -2354,43 +2294,29 @@ Repeat:
             ExReleaseResourceLite(&Dcb->MainResource);
         }
 
-        if (pTarget != NULL) {
-            ExFreePoolWithTag(pTarget, EXT2_DENTRY_MAGIC);
-        }
-
-        if (pDir) {
-            ExFreePoolWithTag(pDir, EXT2_DENTRY_MAGIC);
-        }
+        if (de)
+            Ext2FreeEntry(de);
     }
 
-    return Status;
+    return status;
 }
 
 
 NTSTATUS
 Ext2RemoveEntry (
-    IN PEXT2_IRP_CONTEXT   IrpContext,
-    IN PEXT2_VCB           Vcb,
-    IN PEXT2_FCB           Dcb,
-    IN ULONG               EntryOffset,
-    IN ULONG               FileType,
-    IN ULONG               Inode
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_FCB            Dcb,
+    IN PEXT2_MCB            Mcb
 )
 {
-    NTSTATUS                Status = STATUS_UNSUCCESSFUL;
-
-    PEXT2_DIR_ENTRY2        pTarget = NULL;
-    PEXT2_DIR_ENTRY2        pPrevDir = NULL;
-
-    ULONG                   Length = 0;
-    ULONG                   ByteOffset = 0;
-    ULONG                   dwRet;
-    ULONG                   RecLen;
-
-    USHORT                  PrevRecLen = 0;
-
-    BOOLEAN                 MainResourceAcquired = FALSE;
-
+    struct inode *dir = Dcb->Inode;
+    struct buffer_head *bh = NULL;
+    struct ext3_dir_entry_2 *de;
+    struct inode *inode;
+    int rc = -ENOENT;
+    NTSTATUS Status = STATUS_UNSUCCESSFUL;
+    BOOLEAN  MainResourceAcquired = FALSE;
 
     if (!IsDirectory(Dcb)) {
         return STATUS_NOT_A_DIRECTORY;
@@ -2403,160 +2329,41 @@ Ext2RemoveEntry (
 
         Ext2ReferXcb(&Dcb->ReferenceCount);
 
-        pTarget = (PEXT2_DIR_ENTRY2)
-                  ExAllocatePoolWithTag( PagedPool,
-                                         EXT2_DIR_REC_LEN(EXT2_NAME_LEN),
-                                         EXT2_DENTRY_MAGIC
-                                       );
-        if (!pTarget) {
-            DEBUG(DL_ERR, ( "Ex2RemoveEntry: failed to allocate pTarget.\n"));
-            Status = STATUS_INSUFFICIENT_RESOURCES;
+        bh = ext3_find_entry(IrpContext, Mcb->de, &de);
+        if (!bh)
+            __leave;
+
+        inode = &Mcb->Inode;
+        if (le32_to_cpu(de->inode) != inode->i_ino)
+            __leave;
+
+        if (!inode->i_nlink) {
+            ext3_warning (inode->i_sb, "ext3_unlink",
+                          "Deleting nonexistent file (%lu), %d",
+                          inode->i_ino, inode->i_nlink);
+            inode->i_nlink = 1;
+        }
+        rc = ext3_delete_entry(IrpContext, dir, de, bh);
+        if (rc) {
+            Status = Ext2WinntError(rc);
             __leave;
         }
+        /*
+        	    if (!inode->i_nlink)
+        		    ext3_orphan_add(handle, inode);
+        */
+        inode->i_ctime = dir->i_ctime = dir->i_mtime = ext3_current_time(dir);
+        ext3_dec_count(inode);
+        ext3_mark_inode_dirty(IrpContext, inode);
 
-        pPrevDir = (PEXT2_DIR_ENTRY2)
-                   ExAllocatePoolWithTag(
-                       PagedPool,
-                       EXT2_DIR_REC_LEN(EXT2_NAME_LEN),
-                       EXT2_DENTRY_MAGIC
-                   );
-        if (!pPrevDir) {
-            DEBUG(DL_ERR, ( "Ex2RemoveEntry: failed to allocate pPrevDir.\n"));
-            Status = STATUS_INSUFFICIENT_RESOURCES;
-            __leave;
+        /* decrease dir inode's nlink for .. */
+        if (S_ISDIR(inode->i_mode)) {
+            ext3_update_dx_flag(dir);
+            ext3_dec_count(dir);
+            ext3_mark_inode_dirty(IrpContext, dir);
         }
 
-        /* we only need search the block where the entry is stored */
-        ByteOffset = EntryOffset & (~(BLOCK_SIZE -1));
-
-        while ((LONGLONG)ByteOffset < Dcb->Header.AllocationSize.QuadPart) {
-
-            RtlZeroMemory(pTarget, EXT2_DIR_REC_LEN(EXT2_NAME_LEN));
-
-            Status = Ext2ReadInode(
-                         IrpContext,
-                         Vcb,
-                         Dcb->Mcb,
-                         (ULONGLONG)ByteOffset,
-                         (PVOID)pTarget,
-                         EXT2_DIR_REC_LEN(EXT2_NAME_LEN),
-                         FALSE,
-                         &dwRet);
-
-            if (!NT_SUCCESS(Status)) {
-                DEBUG(DL_ERR, ( "Ext2RemoveEntry: failed to read directory.\n"));
-                __leave;
-            }
-
-            if (pTarget->rec_len == 0) {
-                DbgBreak();
-                RecLen = BLOCK_SIZE - (ByteOffset & (BLOCK_SIZE - 1));
-            } else {
-                RecLen = pTarget->rec_len;
-            }
-
-            /* Find it ! Then remove the entry from Dcb ... */
-
-            if (pTarget->inode == Inode && ByteOffset == EntryOffset) {
-
-                if (ByteOffset & (BLOCK_SIZE - 1)) {
-
-                    /* it doesn't start from a block */
-
-                    ASSERT(pTarget->rec_len != 0);
-
-                    pPrevDir->rec_len += pTarget->rec_len;
-                    RecLen = EXT2_DIR_REC_LEN(pTarget->name_len);
-
-                    RtlZeroMemory(pTarget, RecLen);
-                    Status = Ext2WriteInode(
-                                 IrpContext,
-                                 Vcb,
-                                 Dcb->Mcb,
-                                 (ULONGLONG)(ByteOffset - PrevRecLen),
-                                 pPrevDir,
-                                 8,
-                                 FALSE,
-                                 &dwRet
-                             );
-
-                    ASSERT(NT_SUCCESS(Status));
-
-                    Status = Ext2WriteInode(
-                                 IrpContext,
-                                 Vcb,
-                                 Dcb->Mcb,
-                                 (ULONGLONG)ByteOffset,
-                                 pTarget,
-                                 RecLen,
-                                 FALSE,
-                                 &dwRet
-                             );
-
-                    ASSERT(NT_SUCCESS(Status));
-
-                } else {
-
-                    /* this entry just starts at the block beginning */
-
-                    RecLen = EXT2_DIR_REC_LEN(pTarget->name_len);
-                    pTarget->file_type = 0;
-                    pTarget->inode = 0;
-                    pTarget->name_len = 0;
-                    RtlZeroMemory(&pTarget->name[0], EXT2_NAME_LEN);
-
-                    Status = Ext2WriteInode(
-                                 IrpContext,
-                                 Vcb,
-                                 Dcb->Mcb,
-                                 (ULONGLONG)ByteOffset,
-                                 pTarget,
-                                 RecLen,
-                                 FALSE,
-                                 &dwRet
-                             );
-
-                    ASSERT(NT_SUCCESS(Status));
-                }
-
-                //
-                // Error if it's the entry of dot or dot-dot or drop the parent's refer link
-                //
-
-                if (FileType == EXT2_FT_DIR) {
-
-                    if (((pTarget->name_len == 1) && (pTarget->name[0] == '.')) ||
-                            ((pTarget->name_len == 2) && (pTarget->name[0] == '.') && (pTarget->name[1] == '.')) ) {
-
-                        DbgBreak();
-                    } else {
-                        Dcb->Inode->i_links_count--;
-                    }
-                }
-
-                //
-                // Update at least mtime/atime if !EXT2_FT_DIR.
-                //
-
-                if ( !Ext2SaveInode(
-                            IrpContext,
-                            Vcb,
-                            Dcb->Mcb->iNo,
-                            Dcb->Inode
-                        ) ) {
-                    Status = STATUS_UNSUCCESSFUL;
-                }
-
-                break;
-
-            } else {
-
-                RtlCopyMemory(pPrevDir, pTarget, EXT2_DIR_REC_LEN(EXT2_NAME_LEN));
-                PrevRecLen = pTarget->rec_len;
-            }
-
-            ByteOffset += RecLen;
-        }
+        Status = STATUS_SUCCESS;
 
     } __finally {
 
@@ -2565,13 +2372,8 @@ Ext2RemoveEntry (
         if (MainResourceAcquired)
             ExReleaseResourceLite(&Dcb->MainResource);
 
-        if (pTarget != NULL) {
-            ExFreePoolWithTag(pTarget, EXT2_DENTRY_MAGIC);
-        }
-
-        if (pPrevDir != NULL) {
-            ExFreePoolWithTag(pPrevDir, EXT2_DENTRY_MAGIC);
-        }
+        if (bh)
+            brelse(bh);
     }
 
     return Status;
@@ -2608,7 +2410,7 @@ Ext2SetParentEntry (
         Ext2ReferXcb(&Dcb->ReferenceCount);
 
         pSelf = (PEXT2_DIR_ENTRY2)
-                ExAllocatePoolWithTag(
+                Ext2AllocatePool(
                     PagedPool,
                     EXT2_DIR_REC_LEN(1) + EXT2_DIR_REC_LEN(2),
                     EXT2_DENTRY_MAGIC
@@ -2678,9 +2480,51 @@ Ext2SetParentEntry (
         }
 
         if (pSelf) {
-            ExFreePoolWithTag(pSelf, EXT2_DENTRY_MAGIC);
+            Ext2FreePool(pSelf, EXT2_DENTRY_MAGIC);
         }
     }
 
     return Status;
 }
+
+int ext3_check_dir_entry (const char * function, struct inode * dir,
+                          struct ext3_dir_entry_2 * de,
+                          struct buffer_head * bh,
+                          unsigned long offset)
+{
+    const char * error_msg = NULL;
+    const int rlen = ext3_rec_len_from_disk(de->rec_len);
+
+    if (rlen < EXT3_DIR_REC_LEN(1))
+        error_msg = "rec_len is smaller than minimal";
+    else if (rlen % 4 != 0)
+        error_msg = "rec_len % 4 != 0";
+    else if (rlen < EXT3_DIR_REC_LEN(de->name_len))
+        error_msg = "rec_len is too small for name_len";
+    else if ((char *) de + rlen > bh->b_data + dir->i_sb->s_blocksize)
+        error_msg = "directory entry across blocks";
+    else if (le32_to_cpu(de->inode) >
+             le32_to_cpu(EXT3_SB(dir->i_sb)->s_es->s_inodes_count))
+        error_msg = "inode out of bounds";
+
+    if (error_msg != NULL) {
+        DEBUG(DL_ERR, ("%s: bad entry in directory %u: %s - "
+                       "offset=%u, inode=%u, rec_len=%d, name_len=%d\n",
+                       function, dir->i_ino, error_msg, offset,
+                       (unsigned long) le32_to_cpu(de->inode),
+                       rlen, de->name_len));
+    }
+    return error_msg == NULL ? 1 : 0;
+}
+
+
+/*
+ * p is at least 6 bytes before the end of page
+ */
+struct ext3_dir_entry_2 *
+            ext3_next_entry(struct ext3_dir_entry_2 *p)
+{
+    return (struct ext3_dir_entry_2 *)((char *)p +
+                                       ext3_rec_len_from_disk(p->rec_len));
+}
+

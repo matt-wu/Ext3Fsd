@@ -16,16 +16,19 @@
 #ifndef _LINUX_EXT3_FS_I
 #define _LINUX_EXT3_FS_I
 
-#include <linux/rwsem.h>
 #include <linux/rbtree.h>
-#include <linux/seqlock.h>
-#include <linux/mutex.h>
 
 /* data type for block offset of block group */
 typedef int ext3_grpblk_t;
 
 /* data type for filesystem-wide blocks number */
-typedef unsigned long ext3_fsblk_t;
+typedef unsigned long long ext3_fsblk_t;
+
+/* data type for file logical block number */
+typedef __u32 ext3_lblk_t;
+
+/* data type for block group number */
+typedef unsigned int ext3_group_t;
 
 #define E3FSBLK "%lu"
 
@@ -130,6 +133,7 @@ struct ext3_inode_info {
     /* on-disk additional length */
     __u16 i_extra_isize;
 
+#if 0
     /*
      * truncate_mutex is for serialising ext3_truncate() against
      * ext3_getblock().  In the 2.4 ext2 design, great chunks of inode's
@@ -141,6 +145,7 @@ struct ext3_inode_info {
      * by other means, so we have truncate_mutex.
      */
     struct mutex truncate_mutex;
+#endif
     struct inode vfs_inode;
 };
 

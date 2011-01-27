@@ -38,16 +38,13 @@ Ext2LoadInternalJournal(
         goto errorout;
     }
 
-    Jcb->iNo = jNo;
-
-    if (!Ext2LoadInode(Vcb, Jcb->iNo, Jcb->Inode)) {
+    Jcb->Inode.i_ino = jNo;
+    if (!Ext2LoadInode(Vcb, &Jcb->Inode)) {
         DbgBreak();
         Ext2FreeMcb(Vcb, Jcb);
         goto errorout;
     }
-
-    Jcb->FileSize.LowPart = Jcb->Inode->i_size;
-    Jcb->FileSize.HighPart = Jcb->Inode->i_size_high;
+    Jcb->FileSize.QuadPart = Jcb->Inode.i_size;
 
 errorout:
 
@@ -103,9 +100,9 @@ Ext2RecoverJournal(
     INT rc = 0;
     ULONG                   jNo = 0;
     PEXT2_MCB               jcb = NULL;
-    struct block_device *   bd = NULL;
+    struct block_device *   bd = &Vcb->bd;
+    struct super_block *    sb = &Vcb->sb;
     struct inode *          ji = NULL;
-    struct super_block *    sb = NULL;
     journal_t *             journal = NULL;
     struct ext3_super_block *esb;
 
@@ -113,38 +110,6 @@ Ext2RecoverJournal(
     if (!Ext2CheckJournal(Vcb, &jNo)) {
         return -1;
     }
-
-    /* allocate  block device */
-    bd = kzalloc(sizeof(struct block_device), GFP_KERNEL);
-    if (!bd) {
-        rc = -4;
-        goto errorout;
-    }
-
-    /* set block device */
-    bd->bd_dev = Vcb->RealDevice;
-    bd->bd_geo = Vcb->DiskGeometry;
-    bd->bd_part = Vcb->PartitionInformation;
-    bd->bd_volume = Vcb->Volume;
-    bd->bd_priv = (void *) Vcb;
-    INIT_LIST_HEAD(&bd->bd_bh_list);
-    spin_lock_init(&bd->bd_bh_lock);
-    bd->bd_bh_cache = kmem_cache_create("bd_bh_buffer",
-                                        Vcb->BlockSize, 0, 0, NULL);
-    if (!bd->bd_bh_cache) {
-        goto errorout;
-    }
-
-    /* allocate fs super block */
-    sb = kzalloc(sizeof(struct super_block), GFP_KERNEL);
-    if (!sb) {
-        rc = -5;
-        goto errorout;
-    }
-    sb->s_bdev = bd;
-    sb->s_blocksize = BLOCK_SIZE;
-    sb->s_blocksize_bits = BLOCK_BITS;
-    sb->s_priv = (void *) Vcb;
 
     /* allocate journal Mcb */
     jcb =  Ext2LoadInternalJournal(Vcb, jNo);
@@ -154,19 +119,7 @@ Ext2RecoverJournal(
     }
 
     /* allocate journal inode */
-    ji = kzalloc(sizeof(struct inode), GFP_KERNEL);
-    if (!ji) {
-        rc = -7;
-        goto errorout;
-    }
-
-    /* initialize vfs inode */
-    ji->i_count.counter = 2;
-    ji->i_ino  = jcb->iNo;
-    ji->i_mode = jcb->Inode->i_mode;
-    ji->i_size = jcb->FileSize.QuadPart;
-    ji->i_sb   = sb;
-    ji->i_priv = (void *) jcb;
+    ji = &jcb->Inode;
 
     /* initialize journal file from inode */
     journal = journal_init_inode(ji);
@@ -208,28 +161,9 @@ errorout:
         journal_destroy(journal);
     }
 
-    /* destory vfs inode */
-    if (ji) {
-        ASSERT(1 == atomic_read(&ji->i_count));
-        iput(ji);
-    }
-
     /* destory journal Mcb */
     if (jcb) {
         Ext2FreeMcb(Vcb, jcb);
-    }
-
-    /* destory vfs super_block */
-    if (sb) {
-        kfree(sb);
-    }
-
-    /* destory block device object */
-    if (bd) {
-        if (bd->bd_bh_cache) {
-            kmem_cache_destroy(bd->bd_bh_cache);
-        }
-        kfree(bd);
     }
 
     return rc;

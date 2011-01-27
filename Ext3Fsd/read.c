@@ -250,10 +250,6 @@ Ext2ReadVolume (IN PEXT2_IRP_CONTEXT IrpContext)
                                          Length,
                                          FALSE   );
 
-            if (NT_SUCCESS(Status)) {
-                Irp->IoStatus.Information = Length;
-            }
-
             Irp = IrpContext->Irp;
             if (!Irp) {
                 __leave;
