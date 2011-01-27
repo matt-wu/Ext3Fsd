@@ -356,21 +356,6 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 #define Ext2SetReadOnly(m) (m) = ((m) & (~(S_IWUSR | S_IWGRP | S_IWOTH)))
 #define Ext2IsReadOnly(m)  (!((m) & (S_IWUSR | S_IWGRP | S_IWOTH)))
 
-//
-//  Inode state bits
-//
-
-#define I_DIRTY_SYNC		1 /* Not dirty enough for O_DATASYNC */
-#define I_DIRTY_DATASYNC	2 /* Data-related inode changes pending */
-#define I_DIRTY_PAGES		4 /* Data-related inode changes pending */
-#define I_LOCK			8
-#define I_FREEING		16
-#define I_CLEAR			32
-
-#define I_DIRTY (I_DIRTY_SYNC | I_DIRTY_DATASYNC | I_DIRTY_PAGES)
-
-
-
 /*
  * We need 8-bytes aligned for all the sturctures
  * It's a must for all ERESOURCE allocations
@@ -888,17 +873,19 @@ Ext2TraceMcb(PCHAR fn, USHORT lc, USHORT add, PEXT2_MCB Mcb);
 typedef struct _EXT2_CCB {
 
     // Identifier for this structure
-    EXT2_IDENTIFIER  Identifier;
+    EXT2_IDENTIFIER     Identifier;
 
     // Flags
-    ULONG             Flags;
+    ULONG               Flags;
 
     // Mcb of it's symbol link
-    PEXT2_MCB         SymLink;
+    PEXT2_MCB           SymLink;
 
     // State that may need to be maintained
-    ULONG             CurrentByteOffset;
-    UNICODE_STRING    DirectorySearchPattern;
+    UNICODE_STRING      DirectorySearchPattern;
+
+    /* Open handle control block */
+    struct file         Ocb;
 
 } EXT2_CCB, *PEXT2_CCB;
 
@@ -1000,7 +987,130 @@ typedef struct _EXT2_EXTENT {
     struct _EXT2_EXTENT * Next;
 } EXT2_EXTENT, *PEXT2_EXTENT;
 
+
+
+/*
+ *  HTree index sturctures
+ */
+
+
+struct fake_dirent
+{
+    __le32 inode;
+    __le16 rec_len;
+    __u8 name_len;
+    __u8 file_type;
+};
+
+struct dx_countlimit
+{
+    __le16 limit;
+    __le16 count;
+};
+
+struct dx_entry
+{
+    __le32 hash;
+    __le32 block;
+};
+
+/*
+ * dx_root_info is laid out so that if it should somehow get overlaid by a
+ * dirent the two low bits of the hash version will be zero.  Therefore, the
+ * hash version mod 4 should never be 0.  Sincerely, the paranoia department.
+ */
+
+struct dx_root
+{
+    struct fake_dirent dot;
+    char dot_name[4];
+    struct fake_dirent dotdot;
+    char dotdot_name[4];
+    struct dx_root_info
+    {
+        __le32 reserved_zero;
+        __u8 hash_version;
+        __u8 info_length; /* 8 */
+        __u8 indirect_levels;
+        __u8 unused_flags;
+    }
+    info;
+    struct dx_entry	entries[0];
+};
+
+struct dx_node
+{
+    struct fake_dirent fake;
+    struct dx_entry	entries[0];
+};
+
+struct dx_map_entry
+{
+    __u32 hash;
+    __u32 offs;
+};
+
+typedef struct dx_entry EXT3_DX_ENTRY, *PEXT3_DX_ENTRY;
+typedef struct dx_node  EXT3_DX_NODE,  *PEXT3_DX_NODE;
+typedef struct dx_root  EXT3_DX_ROOT,  *PEXT3_DX_ROOT;
+
+/**/
+typedef struct dx_firset_entry {
+    struct dx_countlimit countlmt;
+    __le32 firstblock;
+} EXT3_DX_FENTRY,  *PEXT3_DX_FENTRY;
+
+/*
+ * Hash Tree Directory indexing
+ * (c) Daniel Phillips, 2001
+ */
+
+#ifdef EXT2_HTREE_INDEX
+#define is_dx(dir) (EXT2_HAS_COMPAT_FEATURE(dir->i_sb, \
+					      EXT2_FEATURE_COMPAT_DIR_INDEX) && \
+		      ((dir)->i_flags & LDISKFS_INDEX_FL))
+#define EXT2_DIR_LINK_MAX(dir) (!is_dx(dir) && (dir)->i_nlink >= EXT2_LINK_MAX)
+#define EXT2_DIR_LINK_EMPTY(dir) ((dir)->i_nlink == 2 || (dir)->i_nlink == 1)
+#else
+#define is_dx(dir) 0
+#define EXT2_DIR_LINK_MAX(dir) ((dir)->i_nlink >= EXT2_LINK_MAX)
+#define EXT2_DIR_LINK_EMPTY(dir) ((dir)->i_nlink == 2)
+#endif
+
+/* Legal values for the dx_root hash_version field: */
+
+#define EXT2_DX_HASH_LEGACY      0
+#define EXT2_DX_HASH_HALF_MD4    1
+#define EXT2_DX_HASH_TEA         2
+
+/* hash info structure used by the directory hash */
+struct ext2_dx_hash_info {
+    __u32       hash;
+    __u32       minor_hash;
+    __u32       hash_version;
+    __u32      *seed;
+};
+
+#define EXT2_HTREE_EOF	0x7fffffff
+
+/*
+ * Special error return code only used by dx_probe() and its callers.
+ */
+#define EX_ERR_BAD_DX_DIR	-75000
+
+
+/*
+ * Control parameters used by ext2_htree_next_block
+ */
+#define EX_HASH_NB_ALWAYS		1
+
+
 /* FUNCTIONS DECLARATION *****************************************************/
+
+// Include this so we don't need the latest WDK to build the driver.
+#ifndef FSCTL_GET_RETRIEVAL_POINTER_BASE
+#define FSCTL_GET_RETRIEVAL_POINTER_BASE    CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 141, METHOD_BUFFERED, FILE_ANY_ACCESS) // RETRIEVAL_POINTER_BASE
+#endif
 
 //
 //  The following macro is used to determine if an FSD thread can block
@@ -1010,7 +1120,6 @@ typedef struct _EXT2_EXTENT {
 //
 
 #define CanExt2Wait(IRP) IoIsOperationSynchronous(Irp)
-
 
 //
 // memory allocation statistics
@@ -1614,6 +1723,32 @@ Ext2BlockMap(
     OUT PULONG              Number
 );
 
+NTSTATUS
+Ext2ExtentMap(
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_MCB            Mcb,
+    IN ULONG                Index,
+    IN BOOLEAN              Alloc,
+    OUT PULONG              Block,
+    OUT PULONG              Number
+);
+
+NTSTATUS
+Ext2ExtentSearch(
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_MCB            Mcb,
+    IN ULONG                Index,
+    IN BOOLEAN              Alloc,
+    IN PVOID                ExtentHeader,
+    IN BOOLEAN              UnpinBcb,
+    IN PBCB                 BcbToUnpin,
+    OUT PULONG              Block,
+    OUT PULONG              Number
+);
+
+
 VOID
 Ext2UpdateVcbStat(
     IN PEXT2_IRP_CONTEXT    IrpContext,
@@ -2001,6 +2136,9 @@ Ext2QueryRetrievalPointers(IN PEXT2_IRP_CONTEXT IrpContext);
 
 NTSTATUS
 Ext2GetRetrievalPointers(IN PEXT2_IRP_CONTEXT IrpContext);
+
+NTSTATUS
+Ext2GetRetrievalPointerBase(IN PEXT2_IRP_CONTEXT IrpContext);
 
 NTSTATUS
 Ext2UserFsRequest (IN PEXT2_IRP_CONTEXT IrpContext);

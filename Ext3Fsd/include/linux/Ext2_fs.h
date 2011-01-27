@@ -197,8 +197,15 @@ struct ext2_group_desc
 #define EXT2_NOCOMP_FL			0x00000400 /* Don't compress */
 #define EXT2_ECOMPR_FL			0x00000800 /* Compression error */
 /* End compression flags --- maybe not all used */
-#define EXT2_BTREE_FL			0x00001000 /* btree format dir */
-#define EXT2_RESERVED_FL		0x80000000 /* reserved for ext2 lib */
+#define EXT2_BTREE_FL           0x00001000 /* btree format dir */
+#define EXT2_IMAGIC_FL          0x00002000 /* AFS directory */
+#define EXT2_JOURNAL_DATA_FL    0x00004000 /* file data should be journaled */
+#define EXT2_NOTAIL_FL          0x00008000 /* file tail should not be merged */
+#define EXT2_DIRSYNC_FL         0x00010000 /* dirsync behaviour (directories only) */
+#define EXT2_TOPDIR_FL          0x00020000 /* Top of directory hierarchies*/
+#define EXT2_HUGE_FILE_FL       0x00040000 /* Set to each huge file */
+#define EXT2_EXTENTS_FL         0x00080000 /* Inode uses extents */
+#define EXT2_RESERVED_FL        0x80000000 /* reserved for ext2 lib */
 
 #define EXT2_FL_USER_VISIBLE		0x00001FFF /* User visible flags */
 #define EXT2_FL_USER_MODIFIABLE		0x000000FF /* User modifiable flags */

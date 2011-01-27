@@ -3,7 +3,7 @@
  * PROJECT:          Ext2 File System Driver for WinNT/2K/XP
  * FILE:             cleanup.c
  * PROGRAMMER:       Matt Wu <mattwu@163.com>
- * HOMEPAGE:         http://ext2.yeah.net
+ * HOMEPAGE:         http://www.ext2fsd.com
  * UPDATE HISTORY:
  */
 
@@ -95,9 +95,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                 Ext2DerefXcb(&Vcb->OpenVolumeCount);
             }
 
-            if (!Vcb->OpenVolumeCount) {
-                IoRemoveShareAccess(FileObject, &Vcb->ShareAccess);
-            }
+            IoRemoveShareAccess(FileObject, &Vcb->ShareAccess);
 
             Status = STATUS_SUCCESS;
             __leave;
@@ -220,11 +218,13 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
             //
             if (!FsRtlGetNextFileLock(&Fcb->FileLockAnchor, TRUE)) {
                 if (Fcb->Header.IsFastIoPossible != FastIoIsPossible) {
+#if EXT2_DEBUG
                     DEBUG(DL_INF, (": %-16.16s %-31s %wZ\n",
                                    Ext2GetCurrentProcessName(),
                                    "FastIoIsPossible",
                                    &Fcb->Mcb->FullName
                                   ));
+#endif
 
                     Fcb->Header.IsFastIoPossible = FastIoIsPossible;
                 }
@@ -350,9 +350,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
             CcUninitializeCacheMap(FileObject, NULL, NULL);
         }
 
-        if (!Fcb->OpenHandleCount) {
-            IoRemoveShareAccess(FileObject, &Fcb->ShareAccess);
-        }
+        IoRemoveShareAccess(FileObject, &Fcb->ShareAccess);
 
         DEBUG(DL_INF, ( "Ext2Cleanup: OpenCount=%u ReferCount=%u NonCahcedCount=%xh %wZ\n",
                         Fcb->OpenHandleCount, Fcb->ReferenceCount, Fcb->NonCachedOpenCount, &Fcb->Mcb->FullName));

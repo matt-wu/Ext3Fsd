@@ -1,6 +1,19 @@
 #ifndef _LINUX_TYPES_H
 #define _LINUX_TYPES_H
 
+#if _NT_TARGET_VERSION <= 0x500
+#define _WIN2K_COMPAT_SLIST_USAGE
+#endif
+
+#include <linux/config.h>
+#include <ntifs.h>
+#include <ntdddisk.h>
+#include <windef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <wchar.h>
+
 typedef unsigned __int8     __u8;
 typedef signed   __int8     __s8;
 
@@ -29,9 +42,6 @@ typedef __u64       u64;
 
 #define bool        BOOLEAN
 
-typedef unsigned long       sector_t;
-typedef unsigned __int64    loff_t;
-
 //
 // gcc special keyworks
 //
@@ -53,6 +63,18 @@ typedef unsigned __bitwise gfp_t;
 
 typedef unsigned short umode_t; /* inode mode */
 
+/*
+ * The type used for indexing onto a disc or disc partition.
+ * If required, asm/types.h can override it and define
+ * HAVE_SECTOR_T
+ */
+typedef unsigned long sector_t;
+typedef unsigned long blkcnt_t;
+typedef unsigned __int64 loff_t;
+
+#define BITS_PER_LONG  (32)
+#define ORDER_PER_LONG (05)
+
 //
 // bit spin lock
 //
@@ -71,5 +93,6 @@ typedef unsigned short umode_t; /* inode mode */
 #define __FUNCTION__ ("jbd")
 #endif
 
+#define BUG() do {DbgBreakPoint();} while(0)
 
 #endif /* LINUX_TYPES_H */

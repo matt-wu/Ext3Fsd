@@ -3,7 +3,7 @@
  * PROJECT:          Ext2 File System Driver for WinNT/2K/XP
  * FILE:             create.c
  * PROGRAMMER:       Matt Wu <mattwu@163.com>
- * HOMEPAGE:         http://ext2.yeah.net
+ * HOMEPAGE:         http://www.ext2fsd.com
  * UPDATE HISTORY:
  */
 
@@ -998,6 +998,7 @@ Dissecting:
 
             // We need to create a new one ?
             if ((CreateDisposition == FILE_CREATE ) ||
+                    (CreateDisposition == FILE_SUPERSEDE) ||
                     (CreateDisposition == FILE_OPEN_IF) ||
                     (CreateDisposition == FILE_OVERWRITE_IF)) {
 

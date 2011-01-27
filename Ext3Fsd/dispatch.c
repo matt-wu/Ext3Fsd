@@ -3,7 +3,7 @@
  * PROJECT:          Ext2 File System Driver for WinNT/2K/XP
  * FILE:             dispatch.c
  * PROGRAMMER:       Matt Wu <mattwu@163.com>
- * HOMEPAGE:         http://ext2.yeah.net
+ * HOMEPAGE:         http://www.ext2fsd.com
  * UPDATE HISTORY:
  */
 
@@ -134,7 +134,8 @@ Ext2LockIrp (
                 (IrpContext->MinorFunction == IRP_MN_USER_FS_REQUEST) ) {
         PEXTENDED_IO_STACK_LOCATION EIrpSp = (PEXTENDED_IO_STACK_LOCATION)IrpSp;
         if ( (EIrpSp->Parameters.FileSystemControl.FsControlCode == FSCTL_GET_VOLUME_BITMAP) ||
-                (EIrpSp->Parameters.FileSystemControl.FsControlCode == FSCTL_GET_RETRIEVAL_POINTERS) ) {
+                (EIrpSp->Parameters.FileSystemControl.FsControlCode == FSCTL_GET_RETRIEVAL_POINTERS) ||
+                (EIrpSp->Parameters.FileSystemControl.FsControlCode == FSCTL_GET_RETRIEVAL_POINTER_BASE) ) {
             ULONG Length = EIrpSp->Parameters.FileSystemControl.OutputBufferLength;
             Ext2LockUserBuffer(Irp, Length, IoWriteAccess);
         }

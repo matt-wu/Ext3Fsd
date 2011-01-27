@@ -3,7 +3,7 @@
  * PROJECT:          Ext2 File System Driver for WinNT/2K/XP
  * FILE:             fastio.c
  * PROGRAMMER:       Matt Wu <mattwu@163.com>
- * HOMEPAGE:         http://ext2.yeah.net
+ * HOMEPAGE:         http://www.ext2fsd.com
  * UPDATE HISTORY:
  */
 
@@ -177,6 +177,7 @@ Ext2FastIoRead (IN PFILE_OBJECT         FileObject,
     ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
+#if EXT2_DEBUG
     DEBUG(DL_INF, ( "Ext2FastIoRead: %s %s %wZ\n",
                     Ext2GetCurrentProcessName(),
                     "FASTIO_READ",
@@ -186,6 +187,7 @@ Ext2FastIoRead (IN PFILE_OBJECT         FileObject,
                     FileOffset->QuadPart,
                     Length,
                     LockKey       ));
+#endif
 
     Status = FsRtlCopyRead (
                  FileObject, FileOffset, Length, Wait,
@@ -216,18 +218,18 @@ Ext2FastIoWrite (
 
     ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
-
+#if EXT2_DEBUG
     DEBUG(DL_INF, (
               "Ext2FastIoWrite: %s %s %wZ\n",
               Ext2GetCurrentProcessName(),
               "FASTIO_WRITE",
               &Fcb->Mcb->FullName     ));
-
     DEBUG(DL_INF, (
               "Ext2FastIoWrite: Offset: %I64xh Length: %xh Key: %xh\n",
               FileOffset->QuadPart,
               Length,
               LockKey       ));
+#endif
 
     if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY)) {
         return FALSE;

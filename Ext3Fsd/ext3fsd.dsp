@@ -283,18 +283,6 @@ SOURCE=.\ext3\Sources
 # Begin Group "jbd"
 
 # PROP Default_Filter ""
-# Begin Source File
-
-SOURCE=.\jbd\recovery.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\jbd\replay.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\jbd\revoke.c
-# End Source File
 # End Group
 # Begin Source File
 

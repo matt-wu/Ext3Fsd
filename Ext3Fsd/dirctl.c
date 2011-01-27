@@ -3,7 +3,7 @@
  * PROJECT:          Ext2 File System Driver for WinNT/2K/XP
  * FILE:             dirctl.c
  * PROGRAMMER:       Matt Wu <mattwu@163.com>
- * HOMEPAGE:         http://ext2.yeah.net
+ * HOMEPAGE:         http://www.ext2fsd.com
  * UPDATE HISTORY:
  */
 
@@ -733,7 +733,7 @@ Ext2QueryDirectory (IN PEXT2_IRP_CONTEXT IrpContext)
             if (RestartScan || FirstQuery) {
                 FileIndex = 0;
             } else {
-                FileIndex = Ccb->CurrentByteOffset;
+                FileIndex = (ULONG)Ccb->Ocb.f_pos;
             }
         }
 
@@ -898,7 +898,7 @@ Ext2QueryDirectory (IN PEXT2_IRP_CONTEXT IrpContext)
 ProcessNextEntry:
 
             ByteOffset += RecLen;
-            Ccb->CurrentByteOffset = ByteOffset;
+            Ccb->Ocb.f_pos = ByteOffset;
 
             if (UsedLength && ReturnSingleEntry) {
                 Status = STATUS_SUCCESS;

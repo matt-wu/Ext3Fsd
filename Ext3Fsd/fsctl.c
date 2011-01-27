@@ -3,7 +3,7 @@
  * PROJECT:          Ext2 File System Driver for WinNT/2K/XP
  * FILE:             fsctl.c
  * PROGRAMMER:       Matt Wu <mattwu@163.com>
- * HOMEPAGE:         http://ext2.yeah.net
+ * HOMEPAGE:         http://www.ext2fsd.com
  * UPDATE HISTORY:
  */
 
@@ -24,6 +24,7 @@ extern PEXT2_GLOBAL Ext2Global;
 #pragma alloc_text(PAGE, Ext2UnlockVcb)
 #pragma alloc_text(PAGE, Ext2UnlockVolume)
 #pragma alloc_text(PAGE, Ext2AllowExtendedDasdIo)
+#pragma alloc_text(PAGE, Ext2GetRetrievalPointerBase)
 #pragma alloc_text(PAGE, Ext2QueryExtentMappings)
 #pragma alloc_text(PAGE, Ext2QueryRetrievalPointers)
 #pragma alloc_text(PAGE, Ext2GetRetrievalPointers)
@@ -353,8 +354,8 @@ Ext2InvalidateVolumes ( IN PEXT2_IRP_CONTEXT IrpContext )
         if (!NT_SUCCESS(Status)) {
             __leave;
         } else {
-            ObDereferenceObject(FileObject);
             DeviceObject = FileObject->DeviceObject;
+            ObDereferenceObject(FileObject);
         }
 
         ExAcquireResourceExclusiveLite(&Ext2Global->Resource,  TRUE);
@@ -1008,11 +1009,11 @@ Ext2GetRetrievalPointers (
         /* probe user buffer */
 
         __try {
-            ProbeForRead (SVIB, InputSize,  sizeof(UCHAR));
-            ProbeForWrite(RPSB, OutputSize, sizeof(UCHAR));
-
+            if (Irp->RequestorMode != KernelMode) {
+                ProbeForRead (SVIB, InputSize,  sizeof(UCHAR));
+                ProbeForWrite(RPSB, OutputSize, sizeof(UCHAR));
+            }
         } __except(EXCEPTION_EXECUTE_HANDLER) {
-
             Status = STATUS_INVALID_USER_BUFFER;
         }
 
@@ -1147,6 +1148,139 @@ exit_to_get_rps:
     return Status;
 }
 
+NTSTATUS
+Ext2GetRetrievalPointerBase (
+    IN PEXT2_IRP_CONTEXT IrpContext
+)
+{
+    PIRP                Irp = NULL;
+    PIO_STACK_LOCATION  IrpSp;
+    PEXTENDED_IO_STACK_LOCATION EIrpSp;
+
+    PDEVICE_OBJECT      DeviceObject;
+    PFILE_OBJECT        FileObject;
+
+    PEXT2_VCB           Vcb = NULL;
+    PEXT2_FCB           Fcb = NULL;
+    PEXT2_CCB           Ccb = NULL;
+
+    PLARGE_INTEGER      FileAreaOffset;
+
+    ULONG               OutputSize;
+
+    NTSTATUS            Status = STATUS_SUCCESS;
+
+    BOOLEAN FcbResourceAcquired = FALSE;
+
+    __try {
+
+        ASSERT(IrpContext);
+        Irp = IrpContext->Irp;
+        ASSERT(Irp);
+
+        IrpSp = IoGetCurrentIrpStackLocation(Irp);
+        EIrpSp = (PEXTENDED_IO_STACK_LOCATION)IrpSp;
+        ASSERT(IrpSp);
+
+        OutputSize = EIrpSp->Parameters.FileSystemControl.OutputBufferLength;
+
+        ASSERT((IrpContext->Identifier.Type == EXT2ICX) &&
+               (IrpContext->Identifier.Size == sizeof(EXT2_IRP_CONTEXT)));
+
+        DeviceObject = IrpContext->DeviceObject;
+
+        /* This request is not allowed on the main device object */
+        if (IsExt2FsDevice(DeviceObject)) {
+            Status = STATUS_INVALID_DEVICE_REQUEST;
+            __leave;
+        }
+
+        Vcb = (PEXT2_VCB) DeviceObject->DeviceExtension;
+        ASSERT(Vcb != NULL);
+        ASSERT((Vcb->Identifier.Type == EXT2VCB) &&
+               (Vcb->Identifier.Size == sizeof(EXT2_VCB)));
+        ASSERT(IsMounted(Vcb));
+
+        FileObject = IrpContext->FileObject;
+        Fcb = (PEXT2_FCB) FileObject->FsContext;
+
+        /* check Fcb is valid or not */
+        if (Fcb == NULL || Fcb->Identifier.Type == EXT2VCB) {
+            Status = STATUS_INVALID_PARAMETER;
+            __leave;
+        }
+
+        ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
+               (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
+
+        if (IsFlagOn(Fcb->Flags, FCB_FILE_DELETED)) {
+            Status = STATUS_FILE_DELETED;
+            __leave;
+        }
+
+        Ccb = (PEXT2_CCB) FileObject->FsContext2;
+        if (Ccb == NULL) {
+            Status = STATUS_INVALID_PARAMETER;
+            __leave;
+        }
+
+        ASSERT((Ccb->Identifier.Type == EXT2CCB) &&
+               (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
+
+        if (OutputSize < sizeof(LARGE_INTEGER)) {
+            Status = STATUS_BUFFER_TOO_SMALL;
+            __leave;
+        }
+
+        if (!ExAcquireResourceExclusiveLite (
+                    &Fcb->MainResource, Ext2CanIWait())) {
+            Status = STATUS_PENDING;
+            __leave;
+        }
+        FcbResourceAcquired = TRUE;
+
+        FileAreaOffset = (PLARGE_INTEGER) Ext2GetUserBuffer(Irp);
+
+        /* probe user buffer */
+
+        __try {
+            if (Irp->RequestorMode != KernelMode) {
+                ProbeForWrite(FileAreaOffset, OutputSize, sizeof(UCHAR));
+            }
+
+        } __except(EXCEPTION_EXECUTE_HANDLER) {
+
+            Status = STATUS_INVALID_USER_BUFFER;
+        }
+
+        if (!NT_SUCCESS(Status)) {
+            __leave;
+        }
+
+        DEBUG(DL_DBG, ("Ext2GetRetrievalPointerBase: FileAreaOffset is 0.\n"));
+
+        FileAreaOffset->QuadPart = 0; // sector offset to the first allocatable unit on the filesystem
+
+        Irp->IoStatus.Information = sizeof(LARGE_INTEGER);
+
+    } __finally {
+
+        if (FcbResourceAcquired) {
+            ExReleaseResourceLite(&Fcb->MainResource);
+        }
+
+        if (!AbnormalTermination()) {
+            if (Status == STATUS_PENDING || Status == STATUS_CANT_WAIT) {
+                Status = Ext2QueueRequest(IrpContext);
+            } else {
+                Ext2CompleteIrpContext(IrpContext, Status);
+            }
+        }
+    }
+
+    return Status;
+}
+
 
 NTSTATUS
 Ext2UserFsRequest (IN PEXT2_IRP_CONTEXT IrpContext)
@@ -1222,6 +1356,10 @@ Ext2UserFsRequest (IN PEXT2_IRP_CONTEXT IrpContext)
 
     case FSCTL_GET_RETRIEVAL_POINTERS:
         Status = Ext2GetRetrievalPointers(IrpContext);
+        break;
+
+    case FSCTL_GET_RETRIEVAL_POINTER_BASE:
+        Status = Ext2GetRetrievalPointerBase(IrpContext);
         break;
 
     default:

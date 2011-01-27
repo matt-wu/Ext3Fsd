@@ -12,7 +12,7 @@ GNU GPL.
 ======================
 
 Matt<mattwu@163.com>
-http://ext2.yeah.net
+http://www.ext2fsd.com
 
 
 ======================
@@ -428,7 +428,7 @@ Modifications from V0.37
       1, Add large ext2 partition support. 
 
  3, V0.01: 2002-01-26
-      1, Make it public at http://ext2.yeah.net.
+      1, Make it public at http://www.ext2fsd.com.
 
  2, 2001-10
       1, Non-public pre-release of ext2fsd was born.

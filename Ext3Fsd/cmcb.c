@@ -3,7 +3,7 @@
  * PROJECT:          Ext2 File System Driver for WinNT/2K/XP
  * FILE:             cmcb.c
  * PROGRAMMER:       Matt Wu <mattwu@163.com>
- * HOMEPAGE:         http://ext2.yeah.net
+ * HOMEPAGE:         http://www.ext2fsd.com
  * UPDATE HISTORY:
  */
 
@@ -49,10 +49,10 @@ Ext2AcquireForLazyWrite (
     ASSERT(Fcb != NULL);
     ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
-
+#if EXT2_DEBUG
     DEBUG(CMCB_DEBUG_LEVEL, ("Ext2AcquireForLazyWrite: %s %s Fcb=%p\n",
                              Ext2GetCurrentProcessName(), "ACQUIRE_FOR_LAZY_WRITE", Fcb));
-
+#endif
     if (!ExAcquireResourceSharedLite(
                 &Fcb->PagingIoResource, Wait)) {
         return FALSE;
@@ -82,10 +82,10 @@ Ext2ReleaseFromLazyWrite (IN PVOID Context)
 
     ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
-
+#if EXT2_DEBUG
     DEBUG(CMCB_DEBUG_LEVEL, ( "Ext2ReleaseFromLazyWrite: %s %s Fcb=%p\n",
                               Ext2GetCurrentProcessName(), "RELEASE_FROM_LAZY_WRITE", Fcb));
-
+#endif
     ASSERT(Fcb->LazyWriterThread == PsGetCurrentThread());
     Fcb->LazyWriterThread = NULL;
 

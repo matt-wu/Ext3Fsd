@@ -3,7 +3,7 @@
  * PROJECT:          Ext2 File System Driver for WinNT/2K/XP
  * FILE:             memory.c
  * PROGRAMMER:       Matt Wu <mattwu@163.com>
- * HOMEPAGE:         http://ext2.yeah.net
+ * HOMEPAGE:         http://www.ext2fsd.com
  * UPDATE HISTORY:
  */
 
@@ -316,7 +316,6 @@ Ext2AllocateCcb (PEXT2_MCB  SymLink)
     Ccb->Identifier.Type = EXT2CCB;
     Ccb->Identifier.Size = sizeof(EXT2_CCB);
 
-    Ccb->CurrentByteOffset = 0;
     Ccb->SymLink = SymLink;
     if (SymLink) {
         ASSERT(SymLink->Refercount > 0);
@@ -970,15 +969,27 @@ Ext2InitializeZone(
         Block = Mapped = 0;
 
         /* mapping file offset to ext2 block */
-        Status = Ext2BlockMap(
-                     IrpContext,
-                     Vcb,
-                     Mcb,
-                     Start,
-                     FALSE,
-                     &Block,
-                     &Mapped
-                 );
+        if (Mcb->Inode->i_flags & EXT2_EXTENTS_FL) {
+            Status = Ext2ExtentMap(
+                         IrpContext,
+                         Vcb,
+                         Mcb,
+                         Start,
+                         FALSE,
+                         &Block,
+                         &Mapped
+                     );
+        } else {
+            Status = Ext2BlockMap(
+                         IrpContext,
+                         Vcb,
+                         Mcb,
+                         Start,
+                         FALSE,
+                         &Block,
+                         &Mapped
+                     );
+        }
 
         if (!NT_SUCCESS(Status)) {
             goto errorout;
@@ -1084,15 +1095,28 @@ Ext2BuildExtents(
 
         /* try to BlockMap in case failed to access Extents cache */
         if (!IsZoneInited(Mcb) || (bAlloc && Block == 0)) {
-            Status = Ext2BlockMap(
-                         IrpContext,
-                         Vcb,
-                         Mcb,
-                         Start,
-                         bAlloc,
-                         &Block,
-                         &Mapped
-                     );
+
+            if (Mcb->Inode->i_flags & EXT2_EXTENTS_FL) {
+                Status = Ext2ExtentMap(
+                             IrpContext,
+                             Vcb,
+                             Mcb,
+                             Start,
+                             bAlloc,
+                             &Block,
+                             &Mapped
+                         );
+            } else {
+                Status = Ext2BlockMap(
+                             IrpContext,
+                             Vcb,
+                             Mcb,
+                             Start,
+                             bAlloc,
+                             &Block,
+                             &Mapped
+                         );
+            }
 
             if (!NT_SUCCESS(Status)) {
                 goto errorout;
@@ -2343,6 +2367,11 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
                     IsFlagOn(sb->s_feature_incompat, EXT3_FEATURE_INCOMPAT_META_BG)) {
                 SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
             }
+        }
+
+        /* mount ext4 read-only to be safe */
+        if (IsFlagOn(sb->s_feature_ro_compat, 0x0010)) {
+            SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
         }
 
         /* Now allocating the mcb for root ... */

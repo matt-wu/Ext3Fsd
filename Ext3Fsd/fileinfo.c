@@ -3,7 +3,7 @@
  * PROJECT:          Ext2 File System Driver for WinNT/2K/XP
  * FILE:             fileinfo.c
  * PROGRAMMER:       Matt Wu <mattwu@163.com>
- * HOMEPAGE:         http://ext2.yeah.net
+ * HOMEPAGE:         http://www.ext2fsd.com
  * UPDATE HISTORY:
  */
 
@@ -350,6 +350,12 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             Irp->IoStatus.Information = sizeof(FILE_ALL_INFORMATION) +
                                         Fcb->Mcb->ShortName.Length - sizeof(WCHAR);
+#if 0
+            sizeof(FILE_ACCESS_INFORMATION) -
+            sizeof(FILE_MODE_INFORMATION) -
+            sizeof(FILE_ALIGNMENT_INFORMATION);
+#endif
+
             Status = STATUS_SUCCESS;
         }
         break;

@@ -21,12 +21,22 @@
 #include <stdarg.h>
 #include <wchar.h>
 #include <linux/types.h>
+#include <linux/fs.h>
 
 #if _WIN32_WINNT <= 0x500
 #define _WIN2K_TARGET_ 1
 #endif
 
 /* STRUCTS ******************************************************/
+
+#ifndef offsetof
+# define offsetof(type,member) ((ULONG_PTR)&(((type *)0)->member))
+#endif
+
+#ifndef container_of
+#define container_of(ptr, type, member) (                  \
+                ((char *)ptr - (char *)offset(type, member))
+#endif
 
 //
 // Byte order swapping routines
@@ -276,155 +286,6 @@ static inline int spin_needbreak(spinlock_t *lock)
 }
 
 //
-// atomic
-//
-
-typedef struct {
-    volatile int counter;
-} atomic_t;
-
-#define ATOMIC_INIT(i)	(i)
-
-/**
- * atomic_read - read atomic variable
- * @v: pointer of type atomic_t
- *
- * Atomically reads the value of @v.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
- */
-#define atomic_read(v)		((v)->counter)
-
-/**
- * atomic_set - set atomic variable
- * @v: pointer of type atomic_t
- * @i: required value
- *
- * Atomically sets the value of @v to @i.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
- */
-#define atomic_set(v,i) InterlockedExchange((PLONG)(&(v)->counter), (LONG)(i))
-
-/**
- * atomic_add - add integer to atomic variable
- * @i: integer value to add
- * @v: pointer of type atomic_t
- *
- * Atomically adds @i to @v.  Note that the guaranteed useful range
- * of an atomic_t is only 24 bits.
- */
-static inline void atomic_add(int volatile i, atomic_t volatile *v)
-{
-    InterlockedExchangeAdd((PLONG)(&v->counter), (LONG) i);
-}
-
-/**
- * atomic_sub - subtract the atomic variable
- * @i: integer value to subtract
- * @v: pointer of type atomic_t
- *
- * Atomically subtracts @i from @v.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
- */
-static inline void atomic_sub(int volatile i, atomic_t volatile *v)
-{
-    InterlockedExchangeAdd((PLONG)(&v->counter), (LONG) (-1*i));
-}
-
-/**
- * atomic_sub_and_test - subtract value from variable and test result
- * @i: integer value to subtract
- * @v: pointer of type atomic_t
- *
- * Atomically subtracts @i from @v and returns
- * true if the result is zero, or false for all
- * other cases.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
- */
-static inline int atomic_sub_and_test(int volatile i, atomic_t volatile *v)
-{
-    int counter, result;
-
-    do {
-
-        counter = v->counter;
-        result = counter - i;
-
-    } while ( InterlockedCompareExchange(
-                  (PLONG) (&v->counter),
-                  (LONG) result,
-                  (LONG) counter) != counter);
-
-    return (result == 0);
-}
-
-/**
- * atomic_inc - increment atomic variable
- * @v: pointer of type atomic_t
- *
- * Atomically increments @v by 1.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
- */
-static inline void atomic_inc(atomic_t volatile *v)
-{
-    InterlockedIncrement((PLONG)(&v->counter));
-}
-
-/**
- * atomic_dec - decrement atomic variable
- * @v: pointer of type atomic_t
- *
- * Atomically decrements @v by 1.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
- */
-static inline void atomic_dec(atomic_t volatile *v)
-{
-    InterlockedDecrement((PLONG)(&v->counter));
-}
-
-/**
- * atomic_dec_and_test - decrement and test
- * @v: pointer of type atomic_t
- *
- * Atomically decrements @v by 1 and
- * returns true if the result is 0, or false for all other
- * cases.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
- */
-static inline int atomic_dec_and_test(atomic_t volatile *v)
-{
-    return (0 == InterlockedDecrement((PLONG)(&v->counter)));
-}
-
-/**
- * atomic_inc_and_test - increment and test
- * @v: pointer of type atomic_t
- *
- * Atomically increments @v by 1
- * and returns true if the result is zero, or false for all
- * other cases.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
- */
-static inline int atomic_inc_and_test(atomic_t volatile *v)
-{
-    return (0 == InterlockedIncrement((PLONG)(&v->counter)));
-}
-
-/**
- * atomic_add_negative - add and test if negative
- * @v: pointer of type atomic_t
- * @i: integer value to add
- *
- * Atomically adds @i to @v and returns true
- * if the result is negative, or false when
- * result is greater than or equal to zero.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
- */
-static inline int atomic_add_negative(int volatile i, atomic_t volatile *v)
-{
-    return (InterlockedExchangeAdd((PLONG)(&v->counter), (LONG) i) + i);
-}
-
-//
 // bit operations
 //
 
@@ -437,15 +298,12 @@ static inline int atomic_add_negative(int volatile i, atomic_t volatile *v)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static inline void set_bit(int nr, volatile void *addr)
+static inline int set_bit(int nr, volatile unsigned long *addr)
 {
-    volatile  unsigned char *ADDR;
-    unsigned char mask;
+    addr += (nr >> ORDER_PER_LONG);
+    nr &= (BITS_PER_LONG - 1);
 
-    ADDR = (volatile unsigned char *) addr;
-    ADDR += nr >> 3;
-    mask = 1 << (nr & 0x07);
-    *ADDR |= mask;
+    return !!(InterlockedOr(addr, (1 << nr)) & (1 << nr));
 }
 
 
@@ -459,15 +317,12 @@ static inline void set_bit(int nr, volatile void *addr)
  * you should call smp_mb__before_clear_bit() and/or smp_mb__after_clear_bit()
  * in order to ensure changes are visible on other processors.
  */
-static inline void clear_bit(int nr, volatile void *addr)
+static inline int clear_bit(int nr, volatile unsigned long *addr)
 {
-    volatile unsigned char *ADDR;
-    unsigned char mask;
+    addr += (nr >> ORDER_PER_LONG);
+    nr &= (BITS_PER_LONG - 1);
 
-    ADDR = (volatile unsigned char *) addr;
-    ADDR += nr >> 3;
-    mask = 1 << (nr & 0x07);
-    *ADDR &= ~mask;
+    return !!(InterlockedAnd(addr, ~(1 << nr)) & (1 << nr));
 }
 
 /**
@@ -478,32 +333,18 @@ static inline void clear_bit(int nr, volatile void *addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static inline int test_and_clear_bit(int nr, volatile void *addr)
+static inline int test_and_clear_bit(int nr, volatile unsigned long *addr)
 {
-    int rc;
-    unsigned char  mask;
-    unsigned char *ADDR = (unsigned char *) addr;
-
-    ADDR += nr >> 3;
-    mask = 1 << (nr & 0x07);
-    rc = ((mask & *ADDR) != 0);
-    *ADDR &= (~mask);
-
-    return rc;
+    return clear_bit(nr, addr);
 }
 
 /*
  *  test
  */
-static int test_bit(int nr, volatile const void * addr)
+static int test_bit(int nr, volatile const unsigned long *addr)
 {
-    unsigned char mask;
-    unsigned char *ADDR = (unsigned char *) addr;
-
-    ADDR += nr >> 3;
-    mask = 1 << (nr & 0x07);
-
-    return ((mask & *ADDR) != 0);
+    return !!((1 << (nr & (BITS_PER_LONG - 1))) &
+              (addr[nr >> ORDER_PER_LONG]));
 }
 
 /**
@@ -514,20 +355,10 @@ static int test_bit(int nr, volatile const void * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static inline int test_and_set_bit(int nr, volatile void *addr)
+static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
 {
-    int rc;
-    unsigned char  mask;
-    unsigned char *ADDR = (unsigned char *) addr;
-
-    ADDR += nr >> 3;
-    mask = 1 << (nr & 0x07);
-    rc = ((mask & *ADDR) != 0);
-    *ADDR |= mask;
-
-    return rc;
+    return set_bit(nr, addr);
 }
-
 
 //
 // list definition ...
@@ -661,49 +492,6 @@ struct timer_list {
     int start_pid;
 #endif
 };
-
-
-//
-// kdev
-//
-
-#define NODEV           0
-
-typedef struct block_device * kdev_t;
-
-#define MINORBITS   8
-#define MINORMASK   ((1U << MINORBITS) - 1)
-
-#define MAJOR(dev)   ((unsigned int)((int)(dev) >> MINORBITS))
-#define MINOR(dev)   ((unsigned int)((int)(dev) & MINORMASK))
-
-static inline unsigned int kdev_t_to_nr(kdev_t dev) {
-    /*return (unsigned int)(MAJOR(dev)<<8) | MINOR(dev);*/
-    return 0;
-}
-
-#define NODEV		0
-#define MKDEV(ma,mi)	(((ma) << MINORBITS) | (mi))
-
-static inline kdev_t to_kdev_t(int dev)
-{
-#if 0
-    int major, minor;
-#if 0
-    major = (dev >> 16);
-    if (!major) {
-        major = (dev >> 8);
-        minor = (dev & 0xff);
-    } else
-        minor = (dev & 0xffff);
-#else
-    major = (dev >> 8);
-    minor = (dev & 0xff);
-#endif
-    return (kdev_t) MKDEV(major, minor);
-#endif
-    return 0;
-}
 
 
 typedef struct kmem_cache kmem_cache_t;
@@ -1307,43 +1095,6 @@ int   kmem_cache_destroy(kmem_cache_t *kc);
 #define READ_META       (READ | (1 << BIO_RW_META))
 #define WRITE_SYNC      (WRITE | (1 << BIO_RW_SYNC))
 #define WRITE_BARRIER   ((1 << BIO_RW) | (1 << BIO_RW_BARRIER))
-
-
-//
-// file system specific structures
-//
-
-/*
- * Kernel pointers have redundant information, so we can use a
- * scheme where we can return either an error code or a dentry
- * pointer with the same return value.
- *
- * This should be a per-architecture thing, to allow different
- * error and pointer decisions.
- */
-
-
-struct super_block {
-    unsigned long		s_blocksize;        /* blocksize */
-    unsigned char		s_blocksize_bits;   /* bits of blocksize */
-    unsigned char		s_dirt;             /* any thing */
-    char                s_id[30];           /* id string */
-    kdev_t              s_bdev;             /* block_device */
-    void *              s_priv;             /* EXT2_VCB */
-};
-
-struct inode {
-    unsigned long   i_ino;      /* inode number */
-    umode_t			i_mode;     /* mode */
-    loff_t			i_size;     /* size */
-    atomic_t        i_count;    /* ref count */
-    struct super_block	*i_sb;  /* super_block */
-    void *          i_priv;     /* EXT2_MCB */
-};
-
-unsigned long bmap(struct inode *, unsigned long);
-void iput(struct inode *inode);
-void iget(struct inode *inode);
 
 //
 // timer routines
