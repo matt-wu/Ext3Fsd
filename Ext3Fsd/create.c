@@ -171,20 +171,29 @@ Ext2FollowLink (
         }
 
         /* we get the link target */
-        if (IsMcbSymLink(Target)) {
+        if (IsMcbSpecialFile(Target) || IsFileDeleted(Target)) {
+            ClearLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
+            SetLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
+            Mcb->FileAttr = FILE_ATTRIBUTE_NORMAL;
+        } else if (IsMcbSymLink(Target)) {
             ASSERT(Target->Refercount > 0);
             Ext2ReferMcb(Target->Target);
             Mcb->Target = Target->Target;
             Ext2DerefMcb(Target);
+            ASSERT(!IsMcbSymLink(Target->Target));
+            SetLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
+            ClearLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
+            ASSERT(Mcb->Target->Refercount > 0);
+            Mcb->FileSize = Target->FileSize;
+            Mcb->FileAttr = Target->FileAttr;
         } else {
             Mcb->Target = Target;
+            SetLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
+            ClearLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
+            ASSERT(Mcb->Target->Refercount > 0);
+            Mcb->FileSize = Target->FileSize;
+            Mcb->FileAttr = Target->FileAttr;
         }
-
-        ASSERT(Mcb->Target->Refercount > 0);
-
-        SetLongFlag(Mcb->Flags, MCB_IS_SYMLINK);
-        Mcb->FileSize = Target->FileSize;
-        Mcb->FileAttr = Target->FileAttr;
 
     } __finally {
 
@@ -286,9 +295,22 @@ Ext2LookupFile (
             Parent = Vcb->McbTree;
         }
 
+        /* make sure the parent is NULL */
+        if (!IsMcbDirectory(Parent)) {
+            Status =  STATUS_NOT_A_DIRECTORY;
+            __leave;
+        }
+
         /* use symlink's target as parent directory */
-        if (IsMcbSymLink(Parent))
+        if (IsMcbSymLink(Parent)) {
             Parent = Parent->Target;
+            ASSERT(!IsMcbSymLink(Parent));
+            if (IsFileDeleted(Parent)) {
+                Status =  STATUS_NOT_A_DIRECTORY;
+                __leave;
+            }
+        }
+
         if (NULL == Parent) {
             Status =  STATUS_NOT_A_DIRECTORY;
             __leave;
@@ -336,6 +358,12 @@ Ext2LookupFile (
                     break;
                 }
 
+                if (IsMcbSymLink(Parent) && IsFileDeleted(Parent->Target)) {
+                    Status =  STATUS_NOT_A_DIRECTORY;
+                    Ext2DerefMcb(Parent);
+                    break;
+                }
+
                 /* search cached Mcb nodes */
                 Mcb = Ext2SearchMcbWithoutLock(Parent, &FileName);
 
@@ -374,6 +402,7 @@ Ext2LookupFile (
                         /* check it's real parent */
                         if (IsMcbSymLink(Parent)) {
                             Target = Parent->Target;
+                            ASSERT(!IsMcbSymLink(Target));
                         } else {
                             Target = Parent;
                         }
@@ -388,6 +417,7 @@ Ext2LookupFile (
                         Mcb->de = de;
                         Mcb->de->d_inode = &Mcb->Inode;
                         Mcb->Inode.i_ino = Inode;
+                        Mcb->Inode.i_sb = &Vcb->sb;
                         de = NULL;
 
                         /* load inode information */
@@ -407,6 +437,10 @@ Ext2LookupFile (
                             SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY);
                         } else {
                             SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_NORMAL);
+                            if (!S_ISREG(Mcb->Inode.i_mode) &&
+                                    !S_ISLNK(Mcb->Inode.i_mode)) {
+                                SetLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
+                            }
                         }
 
                         /* process special files under root directory */
@@ -424,24 +458,16 @@ Ext2LookupFile (
                         Mcb->LastAccessTime = Ext2NtTime(Mcb->Inode.i_atime);
                         Mcb->LastWriteTime = Ext2NtTime(Mcb->Inode.i_mtime);
                         Mcb->ChangeTime = Ext2NtTime(Mcb->Inode.i_mtime);
-                        Mcb->Inode.i_ino = Inode;
                         Mcb->FileSize.QuadPart = Mcb->Inode.i_size;
 
                         /* process symlink */
                         if (S_ISLNK(Mcb->Inode.i_mode)) {
-                            Status = Ext2FollowLink(
-                                         IrpContext,
-                                         Vcb,
-                                         Parent,
-                                         Mcb,
-                                         Linkdep+1
-                                     );
-                            if (!NT_SUCCESS(Status)) {
-                                Ext2DerefMcb(Parent);
-                                Ext2FreeMcb(Vcb, Mcb);
-                                Mcb = NULL;
-                                break;
-                            }
+                            Ext2FollowLink( IrpContext,
+                                            Vcb,
+                                            Parent,
+                                            Mcb,
+                                            Linkdep+1
+                                          );
                             /* we got the target of this symlink */
                         }
 
@@ -541,6 +567,7 @@ Ext2ScanDir (
                 Ext2ReferMcb(Parent->Target);
                 Ext2DerefMcb(Parent);
                 Parent = Parent->Target;
+                ASSERT(!IsMcbSymLink(Parent));
             } else {
                 DbgBreak();
                 Status = STATUS_NOT_A_DIRECTORY;
@@ -660,6 +687,7 @@ Ext2CreateFile(
 
     ACCESS_MASK         DesiredAccess;
     ULONG               ShareAccess;
+    ULONG               CcbFlags = 0;
 
     RtlZeroMemory(&FileName, sizeof(UNICODE_STRING));
 
@@ -803,7 +831,6 @@ Ext2CreateFile(
                      ParentMcb,
                      &Mcb,
                      0 );
-
 McbExisting:
 
         if (!NT_SUCCESS(Status)) {
@@ -816,17 +843,6 @@ McbExisting:
 
             PathName = FileName;
             Mcb = NULL;
-
-            if (Status == STATUS_LINK_FAILED) {
-                if (CreateDisposition == FILE_CREATE) {
-                    Irp->IoStatus.Information = FILE_EXISTS;
-                    Status = STATUS_OBJECT_NAME_COLLISION;
-                    __leave;
-                } else {
-                    Status = STATUS_OBJECT_NAME_INVALID;
-                    __leave;
-                }
-            }
 
             if (PathName.Buffer[PathName.Length/2 - 1] == L'\\') {
                 if (DirectoryFile) {
@@ -905,6 +921,7 @@ Dissecting:
                 Ext2ReferMcb(ParentMcb->Target);
                 Ext2DerefMcb(ParentMcb);
                 ParentMcb = ParentMcb->Target;
+                ASSERT(!IsMcbSymLink(ParentMcb));
             }
 
             /* clear BUSY bit from original ParentFcb */
@@ -1081,12 +1098,6 @@ Dissecting:
 
                 if (Mcb->Inode.i_ino == EXT2_ROOT_INO) {
 
-                    if (DeleteOnClose) {
-                        Status = STATUS_CANNOT_DELETE;
-                        Ext2DerefMcb(Mcb);
-                        __leave;
-                    }
-
                     if (OpenTargetDirectory) {
                         DbgBreak();
                         Status = STATUS_INVALID_PARAMETER;
@@ -1115,10 +1126,18 @@ Openit:
 
             /* refer it's target if it's a symlink, so both refered */
             if (IsMcbSymLink(Mcb)) {
-                Ext2ReferMcb(Mcb->Target);
-                SymLink = Mcb;
-                Mcb = Mcb->Target;
-                ASSERT (!IsMcbSymLink(Mcb));
+                if (IsFileDeleted(Mcb->Target)) {
+                    DbgBreak();
+                    SetLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
+                    ClearLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
+                    Ext2DerefMcb(Mcb->Target);
+                    Mcb->Target = NULL;
+                } else {
+                    Ext2ReferMcb(Mcb->Target);
+                    SymLink = Mcb;
+                    Mcb = Mcb->Target;
+                    ASSERT (!IsMcbSymLink(Mcb));
+                }
             }
 
             Fcb = Mcb->Fcb;
@@ -1161,9 +1180,16 @@ Openit:
             ASSERT(Fcb->Mcb->Refercount > 0);
 
             /* file delted ? */
-            if (IsFlagOn(Fcb->Flags, FCB_FILE_DELETED)) {
+            if (IsFlagOn(Fcb->Mcb->Flags, MCB_FILE_DELETED)) {
                 Status = STATUS_FILE_DELETED;
                 __leave;
+            }
+
+            if (DeleteOnClose && NULL == SymLink) {
+                Status = Ext2IsFileRemovable(IrpContext, Vcb, Fcb, Ccb);
+                if (!NT_SUCCESS(Status)) {
+                    __leave;
+                }
             }
 
             /* check access and oplock access for opened files */
@@ -1196,24 +1222,38 @@ Openit:
                 //
 
                 if (DirectoryFile) {
+
                     Status = Ext2AddDotEntries(IrpContext, &ParentMcb->Inode, &Mcb->Inode);
                     if (!NT_SUCCESS(Status)) {
-                        Ext2DeleteFile(IrpContext, Vcb, Mcb);
+                        Ext2DeleteFile(IrpContext, Vcb, Fcb, Mcb);
                         __leave;
                     }
+
                 } else {
+
+                    if ((LONGLONG)ext3_free_blocks_count(SUPER_BLOCK) <=
+                            Ext2TotalBlocks(Vcb, &Irp->Overlay.AllocationSize, NULL)) {
+                        DbgBreak();
+                        Status = STATUS_DISK_FULL;
+                        __leave;
+                    }
 
                     Fcb->Header.AllocationSize.QuadPart =
                         Irp->Overlay.AllocationSize.QuadPart;
 
                     if (Fcb->Header.AllocationSize.QuadPart > 0) {
-                        Ext2ExpandFile( IrpContext,
-                                        Vcb,
-                                        Fcb->Mcb,
-                                        &(Fcb->Header.AllocationSize)
-                                      );
-                        Fcb->RealSize = Fcb->Header.AllocationSize;
+                        Status = Ext2ExpandFile(IrpContext,
+                                                Vcb,
+                                                Fcb->Mcb,
+                                                &(Fcb->Header.AllocationSize)
+                                               );
                         SetLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE);
+                        if (!NT_SUCCESS(Status)) {
+                            Fcb->Header.AllocationSize.QuadPart = 0;
+                            Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb,
+                                             &Fcb->Header.AllocationSize);
+                            __leave;
+                        }
                     }
                 }
 
@@ -1241,7 +1281,7 @@ Openit:
                         Ext2RaiseStatus(IrpContext, STATUS_MEDIA_WRITE_PROTECTED);
                     }
 
-                    SetLongFlag(Fcb->Flags, FCB_DELETE_ON_CLOSE);
+                    SetLongFlag(CcbFlags, CCB_DELETE_ON_CLOSE);
 
                 } else {
 
@@ -1331,6 +1371,7 @@ Openit:
                 DbgBreak();
                 __leave;
             }
+            Ccb->Flags |= CcbFlags;
             if (SymLink)
                 Ccb->filp.f_dentry = SymLink->de;
             else
@@ -1506,7 +1547,6 @@ Openit:
                 ExAcquireResourceExclusiveLite(&Fcb->PagingIoResource, TRUE);
                 __try {
                     Size.QuadPart = 0;
-                    Fcb->Mcb->FileSize = Fcb->RealSize;
                     Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &Size);
                 } __finally {
                     ExReleaseResourceLite(&Fcb->PagingIoResource);
@@ -1514,7 +1554,7 @@ Openit:
             }
 
             if (bCreated) {
-                Ext2DeleteFile(IrpContext, Vcb, Mcb);
+                Ext2DeleteFile(IrpContext, Vcb, Fcb, Mcb);
             }
 
             Ext2FreeFcb(Fcb);
@@ -1855,7 +1895,6 @@ Ext2SupersedeOrOverWriteFile(
     Fcb->Header.AllocationSize = Size;
     if (Fcb->Header.AllocationSize.QuadPart > 0) {
         SetLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE);
-        Fcb->RealSize = Fcb->Header.AllocationSize;
         CcSetFileSizes(FileObject,
                        (PCC_FILE_SIZES)&Fcb->Header.AllocationSize );
     }

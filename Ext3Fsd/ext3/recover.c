@@ -39,6 +39,7 @@ Ext2LoadInternalJournal(
     }
 
     Jcb->Inode.i_ino = jNo;
+    Jcb->Inode.i_sb = &Vcb->sb;
     if (!Ext2LoadInode(Vcb, &Jcb->Inode)) {
         DbgBreak();
         Ext2FreeMcb(Vcb, Jcb);

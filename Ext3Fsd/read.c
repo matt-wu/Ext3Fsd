@@ -308,6 +308,15 @@ Ext2ReadVolume (IN PEXT2_IRP_CONTEXT IrpContext)
     return Status;
 }
 
+
+#define SafeZeroMemory(AT,BYTE_COUNT) {                                 \
+    __try {                                                             \
+        RtlZeroMemory((AT), (BYTE_COUNT));                              \
+    } __except(EXCEPTION_EXECUTE_HANDLER) {                             \
+         Ext2RaiseStatus( IrpContext, STATUS_INVALID_USER_BUFFER );     \
+    }                                                                   \
+}
+
 NTSTATUS
 Ext2ReadInode (
     IN PEXT2_IRP_CONTEXT    IrpContext,
@@ -320,8 +329,8 @@ Ext2ReadInode (
     OUT PULONG              dwRet
 )
 {
-    PEXT2_EXTENT   Chain = NULL;
-    PEXT2_EXTENT   Extent = NULL;
+    PEXT2_EXTENT    Chain = NULL;
+    PEXT2_EXTENT    Extent = NULL, Prev = NULL;
 
     IO_STATUS_BLOCK IoStatus;
     NTSTATUS Status = STATUS_UNSUCCESSFUL;
@@ -339,6 +348,32 @@ Ext2ReadInode (
 
         if ((Mcb->Identifier.Type != EXT2MCB) ||
                 (Mcb->Identifier.Size != sizeof(EXT2_MCB))) {
+            __leave;
+        }
+
+        if (Buffer == NULL && IrpContext != NULL)
+            Buffer = Ext2GetUserBuffer(IrpContext->Irp);
+
+
+        /* handle fast symlinks */
+        if (S_ISLNK(Mcb->Inode.i_mode) &&
+                Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
+
+            PUCHAR Data = (PUCHAR) (&Mcb->Inode.i_block[0]);
+
+            if (!Buffer) {
+                Status = STATUS_INSUFFICIENT_RESOURCES;
+                __leave;
+            }
+
+            if (Offset < EXT2_LINKLEN_IN_INODE) {
+                if ((ULONG)Offset + Size >= EXT2_LINKLEN_IN_INODE)
+                    Size = EXT2_LINKLEN_IN_INODE - (ULONG)Offset - 1;
+                RtlCopyMemory(Buffer, Data + (ULONG)Offset, Size);
+                Status = STATUS_SUCCESS;
+            } else {
+                Status = STATUS_END_OF_FILE;
+            }
             __leave;
         }
 
@@ -363,6 +398,25 @@ Ext2ReadInode (
         if (Chain == NULL) {
             Status = STATUS_SUCCESS;
             __leave;
+        }
+
+        /* for sparse file, we need zero the gaps */
+        for (Extent = Chain; Buffer != NULL && Extent != NULL; Extent = Extent->Next) {
+            if (NULL == Prev) {
+                ASSERT(Extent == Chain);
+                if (Extent->Offset) {
+                    SafeZeroMemory((PCHAR)Buffer, Extent->Offset);
+                }
+            } else if (NULL == Extent->Next) {
+                if (Extent->Offset + Extent->Length < Size) {
+                    SafeZeroMemory((PCHAR)Buffer + Extent->Offset + Extent->Length,
+                                   Size - Extent->Offset - Extent->Length);
+                }
+            } else if (Extent->Offset > (Prev->Offset + Prev->Length)) {
+                SafeZeroMemory((PCHAR)Buffer + Prev->Offset + Prev->Length,
+                               Extent->Offset - Prev->Offset - Prev->Length);
+            }
+            Prev = Extent;
         }
 
         if (bDirectIo) {
@@ -414,14 +468,6 @@ Ext2ReadInode (
     }
 
     return Status;
-}
-
-#define SafeZeroMemory(AT,BYTE_COUNT) {                                 \
-    __try {                                                             \
-        RtlZeroMemory((AT), (BYTE_COUNT));                              \
-    } __except(EXCEPTION_EXECUTE_HANDLER) {                             \
-         Ext2RaiseStatus( IrpContext, STATUS_INVALID_USER_BUFFER );     \
-    }                                                                   \
 }
 
 NTSTATUS
@@ -489,6 +535,11 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
         DEBUG(DL_INF, ( "Ext2ReadFile: Off=%I64xh Len=%xh Paging=%xh Nocache=%xh\n",
                         ByteOffset.QuadPart, Length, PagingIo, Nocache));
+
+        if (IsSymLink(Fcb) && IsFileDeleted(Fcb->Mcb->Target)) {
+            Status = STATUS_FILE_DELETED;
+            __leave;
+        }
 
         if (Length == 0) {
             Irp->IoStatus.Information = 0;

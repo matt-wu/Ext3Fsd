@@ -24,7 +24,7 @@ TARGETLIBS= $(TARGETPATH)\*\nlssup.lib \
 !IF "$(DDK_TARGET_OS)"=="Win2K"
 TARGETLIBS= $(TARGETLIBS)              \
             $(DDK_LIB_PATH)\int64.lib
-!ENDIF
+!ENDIF            
 
 # The source code:
 SOURCES=    ..\Ext3fsd.rc   \
@@ -48,9 +48,9 @@ SOURCES=    ..\Ext3fsd.rc   \
             ..\create.c     \
             ..\fsctl.c      \
             ..\pnp.c        \
+            ..\rbtree.c     \
             ..\write.c      \
             ..\flush.c      \
             ..\shutdown.c   \
             ..\nls.c        \
-            ..\linux.c      \
-            ..\rbtree.c
+            ..\linux.c

@@ -24,22 +24,32 @@
  */
 struct ext3_sb_info {
 
+    unsigned long s_desc_size;      /* size of group desc */
+    unsigned long s_gdb_count;	/* Number of group descriptor blocks */
+    unsigned long s_desc_per_block;	/* Number of group descriptors per block */
+    unsigned long s_inodes_per_group;/* Number of inodes in a group */
+    unsigned long s_inodes_per_block;/* Number of inodes per block */
+    unsigned long s_blocks_per_group;/* Number of blocks in a group */
+    unsigned long s_groups_count;	/* Number of groups in the fs */
+    unsigned long s_itb_per_group;	/* Number of inode table blocks per group */
+
+    int s_addr_per_block_bits;
+    int s_desc_per_block_bits;
+
+    struct buffer_head **s_group_desc;
+
 #if 0
     unsigned long s_frag_size;	/* Size of a fragment in bytes */
     unsigned long s_frags_per_block;/* Number of fragments per block */
-    unsigned long s_inodes_per_block;/* Number of inodes per block */
     unsigned long s_frags_per_group;/* Number of fragments in a group */
     unsigned long s_inodes_per_group;/* Number of inodes in a group */
     unsigned long s_itb_per_group;	/* Number of inode table blocks per group */
-    unsigned long s_gdb_count;	/* Number of group descriptor blocks */
     unsigned long s_desc_per_block;	/* Number of group descriptors per block */
-    unsigned long s_groups_count;	/* Number of groups in the fs */
     unsigned long s_overhead_last;  /* Last calculated overhead */
     unsigned long s_blocks_last;    /* Last seen block count */
 #endif
 
     struct ext3_super_block * s_es;	/* Pointer to the super block in the buffer */
-    unsigned long s_blocks_per_group;/* Number of blocks in a group */
 
     __le32 s_first_ino;
 

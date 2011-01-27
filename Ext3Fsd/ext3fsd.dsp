@@ -41,10 +41,10 @@ CFG=Ext3Fsd - Win32 Debug
 # PROP Use_Debug_Libraries 0
 # PROP Output_Dir "fre"
 # PROP Intermediate_Dir "fre"
-# PROP Cmd_Line ".\DDKBuild.bat -WNET chk ."
+# PROP Cmd_Line ".\DDKBuild.bat -WNET chk . -cZ"
 # PROP Rebuild_Opt "-cZ"
 # PROP Target_File "Ext3Fsd.sys"
-# PROP Bsc_Name ".\winnet\chk\i386\Ext2Fsd.bsc"
+# PROP Bsc_Name ".\winnet\chk\i386\Ext3Fsd.bsc"
 # PROP Target_Dir ""
 
 !ELSEIF  "$(CFG)" == "Ext3Fsd - Win32 Debug"
@@ -65,7 +65,7 @@ CFG=Ext3Fsd - Win32 Debug
 # PROP Cmd_Line ".\DDKBuild.bat -WNET chk ."
 # PROP Rebuild_Opt "-ceZ"
 # PROP Target_File "Ext2Fsd.sys"
-# PROP Bsc_Name ".\winnet\chk\i386\Ext2Fsd.bsc"
+# PROP Bsc_Name ".\winnet\chk\i386\Ext3Fsd.bsc"
 # PROP Target_Dir ""
 
 !ENDIF 
@@ -257,7 +257,7 @@ SOURCE=.\nls\nls_utf8.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\nls\Sources
+SOURCE=.\nls\sources
 # End Source File
 # End Group
 # Begin Group "ext3"
@@ -269,6 +269,10 @@ SOURCE=.\ext3\generic.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\ext3\htree.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\ext3\MAKEFILE
 # End Source File
 # Begin Source File
@@ -277,12 +281,24 @@ SOURCE=.\ext3\recover.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\ext3\Sources
+SOURCE=.\ext3\sources
 # End Source File
 # End Group
 # Begin Group "jbd"
 
 # PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=.\jbd\recovery.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\jbd\replay.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\jbd\revoke.c
+# End Source File
 # End Group
 # Begin Source File
 
@@ -370,6 +386,10 @@ SOURCE=.\pnp.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\rbtree.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\read.c
 # End Source File
 # Begin Source File
@@ -393,7 +413,31 @@ SOURCE=.\write.c
 # PROP Default_Filter ""
 # Begin Source File
 
+SOURCE=.\include\linux\atomic.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\bit_spinlock.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\include\linux\bitops.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\buffer_head.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\config.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\debugfs.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\errno.h
 # End Source File
 # Begin Source File
 
@@ -417,7 +461,27 @@ SOURCE=.\include\linux\ext3_jbd.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\include\linux\ext4_ext.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\freezer.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\include\linux\fs.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\group.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\highmem.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\init.h
 # End Source File
 # Begin Source File
 
@@ -425,7 +489,35 @@ SOURCE=.\include\linux\jbd.h
 # End Source File
 # Begin Source File
 
+SOURCE=".\include\linux\journal-head.h"
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\kernel.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\kthread.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\include\linux\list.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\lockdep.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\log2.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\magic.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\mm.h
 # End Source File
 # Begin Source File
 
@@ -433,11 +525,63 @@ SOURCE=.\include\linux\module.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\include\linux\mutex.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\include\linux\nls.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\include\linux\pagemap.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\poison.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\proc_fs.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\rbtree.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\sched.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\slab.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\spinlock.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\stddef.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\string.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\time.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\timer.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\include\linux\types.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\include\linux\version.h
 # End Source File
 # End Group
 # Begin Group "asm"
@@ -486,7 +630,7 @@ SOURCE=.\sys\MAKEFILE
 # End Source File
 # Begin Source File
 
-SOURCE=.\sys\Sources
+SOURCE=.\sys\sources
 # End Source File
 # End Group
 # Begin Group "Douments"

@@ -72,6 +72,15 @@ Ext2ProcessEntry(
     IN BOOLEAN              Single
 )
 {
+    PFILE_DIRECTORY_INFORMATION     FDI = NULL;
+    PFILE_FULL_DIR_INFORMATION      FFI = NULL;
+    PFILE_ID_FULL_DIR_INFORMATION   FIF = NULL;
+
+    PFILE_BOTH_DIR_INFORMATION      FBI = NULL;
+    PFILE_ID_BOTH_DIR_INFORMATION   FIB = NULL;
+
+    PFILE_NAMES_INFORMATION         FNI = NULL;
+
     PEXT2_MCB   Mcb = NULL;
     PEXT2_MCB   Target = NULL;
 
@@ -87,6 +96,7 @@ Ext2ProcessEntry(
 
     *EntrySize = 0;
     NameLength = pName->Length;
+    ASSERT((UsedLength & 7) == 0);
 
     InfoLength = Ext2GetInfoLength(FileInformationClass);
     if (InfoLength == 0) {
@@ -103,9 +113,6 @@ Ext2ProcessEntry(
                           pName, &Dcb->Mcb->FullName ));
             return Status;
         }
-        RtlZeroMemory((PCHAR)Buffer + UsedLength, Length);
-    } else {
-        RtlZeroMemory((PCHAR)Buffer + UsedLength, InfoLength + NameLength);
     }
 
     DEBUG(DL_CP, ("Ext2ProcessDirEntry: %wZ in %wZ\n", pName, &Dcb->Mcb->FullName ));
@@ -114,6 +121,7 @@ Ext2ProcessEntry(
     if (NULL == Mcb) {
 
         Inode.i_ino = in;
+        Inode.i_sb = &Vcb->sb;
         if (!Ext2LoadInode(Vcb, &Inode)) {
             DEBUG(DL_ERR, ("Ext2PricessDirEntry: Loading inode %xh (%wZ) error.\n",
                            in, pName ));
@@ -122,22 +130,37 @@ Ext2ProcessEntry(
             goto errorout;
         }
 
-        if (S_ISLNK(Inode.i_mode)) {
+        if (S_ISDIR(Inode.i_mode) || S_ISREG(Inode.i_mode)) {
+        } else if (S_ISLNK(Inode.i_mode)) {
+            Inode.i_size = 0;
             DEBUG(DL_RES, ("Ext2ProcessDirEntry: SymLink: %wZ\\%wZ\n",
                            &Dcb->Mcb->FullName, pName));
             Ext2LookupFile(IrpContext, Vcb, pName, Dcb->Mcb, &Mcb, 0);
+
+            if (Mcb && IsMcbSpecialFile(Mcb)) {
+                Ext2DerefMcb(Mcb);
+                Mcb = NULL;
+            }
+        } else {
+            Inode.i_size = 0;
         }
     }
 
     if (Mcb != NULL)  {
 
+        FileAttributes = Mcb->FileAttr;
         if (IsMcbSymLink(Mcb)) {
             Target = Mcb->Target;
             ASSERT(Target);
+            ASSERT(!IsMcbSymLink(Target));
             if (IsMcbDirectory(Target)) {
                 FileSize = 0;
             } else {
                 FileSize = Target->FileSize.QuadPart;
+            }
+            if (IsFileDeleted(Target)) {
+                ClearFlag(FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
+                FileSize = 0;
             }
         } else {
             if (IsMcbDirectory(Mcb)) {
@@ -146,8 +169,6 @@ Ext2ProcessEntry(
                 FileSize = Mcb->FileSize.QuadPart;
             }
         }
-
-        FileAttributes = Mcb->FileAttr;
 
     } else {
 
@@ -167,6 +188,9 @@ Ext2ProcessEntry(
             SetFlag(FileAttributes, FILE_ATTRIBUTE_READONLY);
         }
     }
+
+    if (FileAttributes == 0)
+        FileAttributes = FILE_ATTRIBUTE_NORMAL;
 
     AllocationSize = CEILING_ALIGNED(ULONGLONG, FileSize, BLOCK_SIZE);
 
@@ -190,15 +214,15 @@ Ext2ProcessEntry(
 
     switch (FileInformationClass) {
 
+    case FileIdFullDirectoryInformation:
+        FIF = (PFILE_ID_FULL_DIR_INFORMATION) ((PUCHAR)Buffer + UsedLength);
+    case FileFullDirectoryInformation:
+        FFI = (PFILE_FULL_DIR_INFORMATION) ((PUCHAR)Buffer + UsedLength);
     case FileDirectoryInformation:
-
-    {
-        PFILE_DIRECTORY_INFORMATION     FDI;
-
         FDI = (PFILE_DIRECTORY_INFORMATION) ((PUCHAR)Buffer + UsedLength);
+
         if (!Single) {
-            FDI->NextEntryOffset = InfoLength + NameLength;
-            FDI->NextEntryOffset = CEILING_ALIGNED(ULONG, FDI->NextEntryOffset, 8);
+            FDI->NextEntryOffset = CEILING_ALIGNED(ULONG, InfoLength + NameLength, 8);
         }
 
         FDI->FileIndex = FileIndex;
@@ -226,60 +250,27 @@ Ext2ProcessEntry(
         if (InfoLength + NameLength > Length) {
             NameLength = Length - InfoLength;
         }
-        RtlCopyMemory(FDI->FileName, pName->Buffer, NameLength);
 
-        *EntrySize = InfoLength + NameLength;
-        break;
-    }
-
-    case FileFullDirectoryInformation:
-
-    {
-        PFILE_FULL_DIR_INFORMATION      FFI;
-
-        FFI = (PFILE_FULL_DIR_INFORMATION) ((PUCHAR)Buffer + UsedLength);
-        if (!Single) {
-            FFI->NextEntryOffset = InfoLength + NameLength;
-            FFI->NextEntryOffset = CEILING_ALIGNED(ULONG, FFI->NextEntryOffset, 8);
-        }
-
-        FFI->FileIndex = FileIndex;
-
-        if (Mcb) {
-
-            FFI->CreationTime = Mcb->CreationTime;
-            FFI->LastAccessTime = Mcb->LastAccessTime;
-            FFI->LastWriteTime = Mcb->LastWriteTime;
-            FFI->ChangeTime = Mcb->ChangeTime;
-
+        if (FIF) {
+            FIF->FileId.QuadPart = (LONGLONG) in;
+            RtlCopyMemory(&FIF->FileName[0], &pName->Buffer[0], NameLength);
+        } else if (FFI) {
+            RtlCopyMemory(&FFI->FileName[0], &pName->Buffer[0], NameLength);
         } else {
-
-            FFI->CreationTime = Ext2NtTime(Inode.i_ctime);
-            FFI->LastAccessTime = Ext2NtTime(Inode.i_atime);
-            FFI->LastWriteTime = Ext2NtTime(Inode.i_mtime);
-            FFI->ChangeTime = Ext2NtTime(Inode.i_mtime);
+            RtlCopyMemory(&FDI->FileName[0], &pName->Buffer[0], NameLength);
         }
-
-        FFI->FileAttributes = FileAttributes;
-        FFI->FileNameLength = NameLength;
-        if (InfoLength + NameLength > Length) {
-            NameLength = Length - InfoLength;
-        }
-        RtlCopyMemory(FFI->FileName, pName->Buffer, NameLength);
 
         *EntrySize = InfoLength + NameLength;
         break;
-    }
 
+
+    case FileIdBothDirectoryInformation:
+        FIB = (PFILE_ID_BOTH_DIR_INFORMATION)((PUCHAR)Buffer + UsedLength);
     case FileBothDirectoryInformation:
-
-    {
-        PFILE_BOTH_DIR_INFORMATION      FBI;
-
         FBI = (PFILE_BOTH_DIR_INFORMATION) ((PUCHAR)Buffer + UsedLength);
+
         if (!Single) {
-            FBI->NextEntryOffset = InfoLength + NameLength;
-            FBI->NextEntryOffset = CEILING_ALIGNED(ULONG, FBI->NextEntryOffset, 8);
+            FBI->NextEntryOffset = CEILING_ALIGNED(ULONG, InfoLength + NameLength, 8);
         }
 
         FBI->FileIndex = FileIndex;
@@ -303,133 +294,36 @@ Ext2ProcessEntry(
 
         FBI->FileAttributes = FileAttributes;
 
-#ifdef DIR_ENTRY_SHORT_NAME
-        if (NameLength <= 24) {
-            RtlCopyMemory(FBI->ShortName, pName->Buffer, NameLength);
-            FBI->ShortNameLength = (UCHAR)NameLength;
-        }
-#endif
-
         FBI->FileNameLength = NameLength;
         if (InfoLength + NameLength > Length) {
             NameLength = Length - InfoLength;
         }
-        RtlCopyMemory(FBI->FileName, pName->Buffer, NameLength);
+
+        if (FIB) {
+            FIB->FileId.QuadPart = (LONGLONG)in;
+            RtlCopyMemory(&FIB->FileName[0], &pName->Buffer[0], NameLength);
+        } else {
+            RtlCopyMemory(&FBI->FileName[0], &pName->Buffer[0], NameLength);
+        }
 
         *EntrySize = InfoLength + NameLength;
         break;
-    }
 
     case FileNamesInformation:
 
-    {
-        PFILE_NAMES_INFORMATION         FNI;
-
         FNI = (PFILE_NAMES_INFORMATION) ((PUCHAR)Buffer + UsedLength);
         if (!Single) {
-            FNI->NextEntryOffset = InfoLength + NameLength;
-            FNI->NextEntryOffset = CEILING_ALIGNED(ULONG, FNI->NextEntryOffset, 8);
+            FNI->NextEntryOffset = CEILING_ALIGNED(ULONG, InfoLength + NameLength, 8);
         }
 
         FNI->FileNameLength = NameLength;
         if (InfoLength + NameLength > Length) {
             NameLength = Length - InfoLength;
         }
-        RtlCopyMemory(FNI->FileName, pName->Buffer, NameLength);
+        RtlCopyMemory(&FNI->FileName[0], &pName->Buffer[0], NameLength);
 
         *EntrySize = InfoLength + NameLength;
         break;
-    }
-
-    case FileIdFullDirectoryInformation:
-
-    {
-        PFILE_ID_FULL_DIR_INFORMATION   FIF;
-
-        FIF = (PFILE_ID_FULL_DIR_INFORMATION)((PUCHAR)Buffer + UsedLength);
-        if (!Single) {
-            FIF->NextEntryOffset = InfoLength + NameLength;
-            FIF->NextEntryOffset = CEILING_ALIGNED(ULONG, FIF->NextEntryOffset, 8);
-        }
-
-        FIF->FileIndex = FileIndex;
-
-        if (Mcb) {
-
-            FIF->CreationTime = Mcb->CreationTime;
-            FIF->LastAccessTime = Mcb->LastAccessTime;
-            FIF->LastWriteTime = Mcb->LastWriteTime;
-            FIF->ChangeTime = Mcb->ChangeTime;
-
-        } else {
-
-            FIF->CreationTime = Ext2NtTime(Inode.i_ctime);
-            FIF->LastAccessTime = Ext2NtTime(Inode.i_atime);
-            FIF->LastWriteTime = Ext2NtTime(Inode.i_mtime);
-            FIF->ChangeTime = Ext2NtTime(Inode.i_mtime);
-        }
-
-        FIF->FileAttributes = FileAttributes;
-        FIF->FileId.QuadPart = (LONGLONG)in;
-        FIF->FileNameLength = NameLength;
-        if (InfoLength + NameLength > Length) {
-            NameLength = Length - InfoLength;
-        }
-        RtlCopyMemory(FIF->FileName, pName->Buffer, NameLength);
-
-        *EntrySize = InfoLength + NameLength;
-        break;
-    }
-
-    case FileIdBothDirectoryInformation:
-
-    {
-        PFILE_ID_BOTH_DIR_INFORMATION   FIB;
-
-        FIB = (PFILE_ID_BOTH_DIR_INFORMATION)((PUCHAR)Buffer + UsedLength);
-        if (!Single) {
-            FIB->NextEntryOffset = InfoLength + NameLength;
-            FIB->NextEntryOffset = CEILING_ALIGNED(ULONG, FIB->NextEntryOffset, 8);
-        }
-
-        FIB->FileIndex = FileIndex;
-        FIB->EndOfFile.QuadPart = FileSize;
-        FIB->AllocationSize.QuadPart = AllocationSize;
-
-        if (Mcb) {
-
-            FIB->CreationTime = Mcb->CreationTime;
-            FIB->LastAccessTime = Mcb->LastAccessTime;
-            FIB->LastWriteTime = Mcb->LastWriteTime;
-            FIB->ChangeTime = Mcb->ChangeTime;
-
-        } else {
-
-            FIB->CreationTime = Ext2NtTime(Inode.i_ctime);
-            FIB->LastAccessTime = Ext2NtTime(Inode.i_atime);
-            FIB->LastWriteTime = Ext2NtTime(Inode.i_mtime);
-            FIB->ChangeTime = Ext2NtTime(Inode.i_mtime);
-        }
-
-        FIB->FileAttributes = FileAttributes;
-        FIB->FileId.QuadPart = (LONGLONG)in;
-
-#ifdef DIR_ENTRY_SHORT_NAME
-        if (NameLength <= 24) {
-            RtlCopyMemory(FIB->ShortName, pName->Buffer, NameLength);
-            FIB->ShortNameLength = (UCHAR)NameLength;
-        }
-#endif
-
-        FIB->FileNameLength = NameLength;
-        if (InfoLength + NameLength > Length) {
-            NameLength = Length - InfoLength;
-        }
-        RtlCopyMemory(FIB->FileName, pName->Buffer, NameLength);
-
-        *EntrySize = InfoLength + NameLength;
-        break;
-    }
 
     default:
         Status = STATUS_INVALID_INFO_CLASS;
@@ -670,12 +564,11 @@ Ext2QueryDirectory (IN PEXT2_IRP_CONTEXT IrpContext)
             __leave;
         }
         Mcb = Fcb->Mcb;
-        if (IsSymLink(Fcb))
-            Mcb = Mcb->Target;
         if (NULL == Mcb) {
             Status = STATUS_INVALID_PARAMETER;
             __leave;
         }
+        ASSERT (!IsMcbSymLink(Mcb));
 
         //
         // This request is not allowed on volumes
@@ -688,7 +581,12 @@ Ext2QueryDirectory (IN PEXT2_IRP_CONTEXT IrpContext)
         ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
-        if (!IsDirectory(Fcb)) {
+        if (!IsMcbDirectory(Mcb)) {
+            Status = STATUS_NOT_A_DIRECTORY;
+            __leave;
+        }
+
+        if (IsFileDeleted(Mcb)) {
             Status = STATUS_NOT_A_DIRECTORY;
             __leave;
         }
@@ -902,6 +800,7 @@ Ext2QueryDirectory (IN PEXT2_IRP_CONTEXT IrpContext)
                          &EntrySize);
 
             if (!NT_SUCCESS(Status)) {
+                DbgBreak();
                 __leave;
             }
 
@@ -1105,6 +1004,7 @@ Ext2NotifyChangeDirectory (
     PEXT2_VCB           Vcb;
     PFILE_OBJECT        FileObject;
     PEXT2_FCB           Fcb;
+    PEXT2_CCB           Ccb;
     PIRP                Irp;
     PIO_STACK_LOCATION  IrpSp;
     ULONG               CompletionFilter;
@@ -1140,15 +1040,18 @@ Ext2NotifyChangeDirectory (
         FileObject = IrpContext->FileObject;
         Fcb = (PEXT2_FCB) FileObject->FsContext;
         ASSERT(Fcb);
-
         if (Fcb->Identifier.Type == EXT2VCB) {
             DbgBreak();
             Status = STATUS_INVALID_PARAMETER;
             __leave;
         }
-
         ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
+
+        Ccb = (PEXT2_CCB) FileObject->FsContext2;
+        ASSERT(Ccb);
+        ASSERT((Ccb->Identifier.Type == EXT2CCB) &&
+               (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
 
         if (!IsDirectory(Fcb)) {
             DbgBreak();
@@ -1183,7 +1086,7 @@ Ext2NotifyChangeDirectory (
 
         WatchTree = IsFlagOn(IrpSp->Flags, SL_WATCH_TREE);
 
-        if (FlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
+        if (FlagOn(Ccb->Flags, CCB_DELETE_PENDING)) {
             Status = STATUS_DELETE_PENDING;
             __leave;
         }

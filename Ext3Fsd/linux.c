@@ -482,6 +482,10 @@ int submit_bh(int rw, struct buffer_head *bh)
 
     if (rw == WRITE) {
 
+        if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+            goto errorout;
+        }
+
         SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
 
         Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
@@ -504,14 +508,17 @@ int submit_bh(int rw, struct buffer_head *bh)
         }
 
         Ext2AddBlockExtent( Vcb, NULL,
-                            bh->b_blocknr,
-                            bh->b_blocknr,
+                            (ULONG)bh->b_blocknr,
+                            (ULONG)bh->b_blocknr,
                             (bh->b_size >> BLOCK_BITS));
     } else {
 
         DbgBreak();
     }
 
+errorout:
+
+    unlock_buffer(bh);
     put_bh(bh);
     return 0;
 }
@@ -640,9 +647,9 @@ struct buffer_head *
 // inode block mapping
 //
 
-unsigned long bmap(struct inode *i, unsigned long b)
+ULONGLONG bmap(struct inode *i, ULONGLONG b)
 {
-    unsigned long lcn = 0;
+    ULONGLONG lcn = 0;
     struct super_block *s = i->i_sb;
 
     PEXT2_MCB  Mcb = (PEXT2_MCB)i->i_priv;

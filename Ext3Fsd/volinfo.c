@@ -131,9 +131,9 @@ Ext2QueryVolumeInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             FsSizeInfo = (PFILE_FS_SIZE_INFORMATION) Buffer;
             FsSizeInfo->TotalAllocationUnits.QuadPart =
-                Vcb->SuperBlock->s_blocks_count;
+                ext3_blocks_count(SUPER_BLOCK);
             FsSizeInfo->AvailableAllocationUnits.QuadPart =
-                Vcb->SuperBlock->s_free_blocks_count;
+                ext3_free_blocks_count(SUPER_BLOCK);
             FsSizeInfo->SectorsPerAllocationUnit =
                 Vcb->BlockSize / Vcb->DiskGeometry.BytesPerSector;
             FsSizeInfo->BytesPerSector =
@@ -238,15 +238,14 @@ Ext2QueryVolumeInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             {
                 PFFFSI->TotalAllocationUnits.QuadPart =
-                    Vcb->SuperBlock->s_blocks_count;
+                    ext3_blocks_count(SUPER_BLOCK);
 
                 PFFFSI->CallerAvailableAllocationUnits.QuadPart =
-                    Vcb->SuperBlock->s_free_blocks_count;
+                    ext3_free_blocks_count(SUPER_BLOCK);
 
                 /* - Vcb->SuperBlock->s_r_blocks_count; */
-
                 PFFFSI->ActualAvailableAllocationUnits.QuadPart =
-                    Vcb->SuperBlock->s_free_blocks_count;
+                    ext3_free_blocks_count(SUPER_BLOCK);
             }
 
             PFFFSI->SectorsPerAllocationUnit =

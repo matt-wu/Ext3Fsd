@@ -100,68 +100,6 @@ static inline unsigned find_first_bit(const unsigned long *addr, unsigned size)
  * @size: The maximum size to search
  */
 
-#pragma message("WARNINGS: find_next_bit NOT implemented ...")
-
-#if _X86_
-int find_next_bit(const unsigned long *addr, int size, int offset)
-{
-    const unsigned long *p = addr + (offset >> 5);
-    int set = 0, bit = offset & 31, res = 0;
-#if 0
-    if (bit) {
-
-        /*
-         * Look for nonzero in the first 32 bits:
-         */
-        __asm__("bsfl %1,%0\n\t"
-                "jne 1f\n\t"
-                "movl $32, %0\n"
-                "1:"
-        : "=r" (set)
-                        : "r" (*p >> bit));
-
-        if (set < (32 - bit))
-            return set + offset;
-        set = 32 - bit;
-        p++;
-    }
-    /*
-     * No set bit yet, search remaining full words for a bit
-     */
-    res = find_first_bit (p, size - 32 * (p - addr));
-#endif
-    return (offset + set + res);
-}
-#else /* _X64_ */
-long find_next_bit(const unsigned long * addr, long size, long offset)
-{
-    const unsigned long * p = addr + (offset >> 6);
-    unsigned long set = 0, bit = offset & 63, res = 0;
-
-#if 0
-    if (bit) {
-        /*
-         * Look for nonzero in the first 64 bits:
-         */
-        asm("bsfq %1,%0\n\t"
-            "cmoveq %2,%0\n\t"
-    : "=r" (set)
-                    : "r" (*p >> bit), "r" (64L));
-        if (set < (64 - bit))
-            return set + offset;
-        set = 64 - bit;
-        p++;
-    }
-    /*
-     * No set bit yet, search remaining full words for a bit
-     */
-    res = find_first_bit (p, size - 64 * (p - addr));
-#endif
-
-    return (offset + set + res);
-}
-#endif /* _X86_ */
-
 /*
  * ffz - find first zero in word.
  * @word: The word to search

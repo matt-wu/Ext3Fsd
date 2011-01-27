@@ -32,6 +32,8 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
     PEXT2_FCB       Fcb;
     PEXT2_CCB       Ccb;
     PIRP            Irp;
+    PEXT2_MCB       Mcb;
+
 
     BOOLEAN         VcbResourceAcquired = FALSE;
     BOOLEAN         FcbResourceAcquired = FALSE;
@@ -67,6 +69,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
             Status = STATUS_SUCCESS;
             __leave;
         }
+        Mcb = Fcb->Mcb;
         Ccb = (PEXT2_CCB) FileObject->FsContext2;
 
         if (IsFlagOn(FileObject->Flags, FO_CLEANUP_COMPLETE)) {
@@ -119,13 +122,13 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
         }
 
         if (IsDirectory(Fcb)) {
-            if (IsFlagOn(Fcb->Flags, FCB_DELETE_ON_CLOSE))  {
-                SetLongFlag(Fcb->Flags, FCB_DELETE_PENDING);
+            if (IsFlagOn(Ccb->Flags, CCB_DELETE_ON_CLOSE))  {
+                SetLongFlag(Ccb->Flags, CCB_DELETE_PENDING);
 
                 FsRtlNotifyFullChangeDirectory(
                     Vcb->NotifySync,
                     &Vcb->NotifyList,
-                    Fcb,
+                    Ccb,
                     NULL,
                     FALSE,
                     FALSE,
@@ -199,8 +202,8 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                 Fcb->NonCachedOpenCount--;
             }
 
-            if (IsFlagOn(Fcb->Flags, FCB_DELETE_ON_CLOSE))  {
-                SetLongFlag(Fcb->Flags, FCB_DELETE_PENDING);
+            if (IsFlagOn(Ccb->Flags, CCB_DELETE_ON_CLOSE))  {
+                SetLongFlag(Ccb->Flags, CCB_DELETE_PENDING);
             }
 
             //
@@ -244,33 +247,24 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                 Size.QuadPart = CEILING_ALIGNED(ULONGLONG,
                                                 (ULONGLONG)Fcb->Mcb->FileSize.QuadPart,
                                                 (ULONGLONG)BLOCK_SIZE);
-                if (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_WRITE)) {
-                    Fcb->RealSize = Fcb->Header.AllocationSize;
-                }
-                if (Size.QuadPart < Fcb->RealSize.QuadPart) {
-                    Fcb->Mcb->FileSize = Fcb->RealSize;
-                    if (!IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
-                        Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &Size);
-                        Fcb->Mcb->FileSize = Fcb->Header.FileSize;
-                        Fcb->Header.AllocationSize = Size;
-                        if (CcIsFileCached(FileObject)) {
-                            CcSetFileSizes(FileObject,
-                                           (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
-                        }
+                if (!IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING)) {
+                    Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &Size);
+                    Fcb->Mcb->FileSize = Fcb->Header.FileSize;
+                    Fcb->Header.AllocationSize = Size;
+                    if (CcIsFileCached(FileObject)) {
+                        CcSetFileSizes(FileObject,
+                                       (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
                     }
                 }
                 ClearLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE|FCB_ALLOC_IN_WRITE);
-                Fcb->RealSize.QuadPart = 0;
                 ExReleaseResourceLite(&Fcb->PagingIoResource);
                 FcbPagingIoResourceAcquired = FALSE;
             }
         }
 
-        if (IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
+        if (IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING)) {
 
-            if (Fcb->OpenHandleCount == 0 || Ccb->SymLink) {
-
-                PEXT2_MCB   Mcb = Fcb->Mcb;
+            if (Fcb->OpenHandleCount == 0 || (Mcb = Ccb->SymLink)) {
 
                 //
                 // Ext2DeleteFile will acquire these lock inside
@@ -282,14 +276,14 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                 }
 
                 //
-                //  Have to delete this file...
+                //  this file is to be deleted ...
                 //
-
                 if (Ccb->SymLink) {
                     Mcb = Ccb->SymLink;
+                    FileObject->DeletePending = FALSE;
                 }
 
-                Status = Ext2DeleteFile(IrpContext, Vcb, Mcb);
+                Status = Ext2DeleteFile(IrpContext, Vcb, Fcb, Mcb);
 
                 if (NT_SUCCESS(Status)) {
                     if (IsMcbDirectory(Mcb)) {
@@ -301,13 +295,6 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                                                 FILE_NOTIFY_CHANGE_FILE_NAME,
                                                 FILE_ACTION_REMOVED );
                     }
-                }
-
-                if (Ccb->SymLink) {
-                    ClearFlag(Fcb->Flags, FCB_DELETE_PENDING);
-                    ClearFlag(Fcb->Flags, FCB_DELETE_ON_CLOSE);
-                    ClearFlag(Fcb->Flags, FCB_FILE_DELETED);
-                    FileObject->DeletePending = FALSE;
                 }
 
                 //

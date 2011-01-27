@@ -16,6 +16,7 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
+#include <linux/log2.h>
 
 #if _WIN32_WINNT <= 0x500
 #define _WIN2K_TARGET_ 1
@@ -667,7 +668,7 @@ struct buffer_head {
     // kdev_t b_dev;                        /* device (B_FREE = free) */
     struct block_device *b_bdev;            /* block device object */
 
-    unsigned long b_blocknr;		        /* start block number */
+    blkcnt_t b_blocknr;		        /* start block number */
     size_t        b_size;			        /* size of mapping */
     char *        b_data;			        /* pointer to data within the page */
     // bh_end_io_t *b_end_io;		        /* I/O completion */
@@ -897,13 +898,7 @@ static inline struct buffer_head *
 static inline struct buffer_head *
             sb_bread(struct super_block *sb, sector_t block)
 {
-    return __bread(sb->s_bdev, block, sb->s_blocksize);
-}
-
-static inline void
-sb_breadahead(struct super_block *sb, sector_t block)
-{
-    __breadahead(sb->s_bdev, block, sb->s_blocksize);
+    return __getblk(sb->s_bdev, block, sb->s_blocksize);
 }
 
 static inline struct buffer_head *
@@ -1124,5 +1119,18 @@ int   kmem_cache_destroy(kmem_cache_t *kc);
 #define time_in_range(a,b,c) \
         (time_after_eq(a,b) && \
          time_before_eq(a,c))
+
+#define smp_rmb()  do {}while(0)
+
+
+static inline __u32 do_div64 (__u64 * n, __u64 b)
+{
+    __u64 mod;
+
+    mod = *n % b;
+    *n = *n / b;
+    return (__u32) mod;
+}
+#define do_div(n, b) do_div64(&(n), (__u64)b)
 
 #endif // _EXT2_MODULE_HEADER_

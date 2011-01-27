@@ -512,7 +512,7 @@ Ext2OplockRequest (
         ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
-        if (IsFlagOn(Fcb->Flags, FCB_FILE_DELETED)) {
+        if (IsFlagOn(Fcb->Mcb->Flags, MCB_FILE_DELETED)) {
             Status = STATUS_FILE_DELETED;
             __leave;
         }
@@ -831,7 +831,7 @@ Ext2QueryRetrievalPointers (
 
         ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
-        if (IsFlagOn(Fcb->Flags, FCB_FILE_DELETED)) {
+        if (IsFlagOn(Fcb->Mcb->Flags, MCB_FILE_DELETED)) {
             Status = STATUS_FILE_DELETED;
             __leave;
         }
@@ -975,7 +975,7 @@ Ext2GetRetrievalPointers (
         ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
-        if (IsFlagOn(Fcb->Flags, FCB_FILE_DELETED)) {
+        if (IsFlagOn(Fcb->Mcb->Flags, MCB_FILE_DELETED)) {
             Status = STATUS_FILE_DELETED;
             __leave;
         }
@@ -1213,7 +1213,7 @@ Ext2GetRetrievalPointerBase (
         ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
-        if (IsFlagOn(Fcb->Flags, FCB_FILE_DELETED)) {
+        if (IsFlagOn(Fcb->Mcb->Flags, MCB_FILE_DELETED)) {
             Status = STATUS_FILE_DELETED;
             __leave;
         }
@@ -2074,6 +2074,8 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
                 IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED)) {
             FlushBeforePurge = FALSE;
         }
+
+        Ext2PutGroup(Vcb);
 
         FcbListEntry= NULL;
         InitializeListHead(&FcbList);

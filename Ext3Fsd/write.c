@@ -816,6 +816,16 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
         DEBUG(DL_INF, ( "Ext2WriteFile: %wZ Offset=%I64xh Length=%xh Paging=%xh Nocache=%xh\n",
                         &Fcb->Mcb->ShortName, ByteOffset.QuadPart, Length, PagingIo, Nocache));
 
+        if (IsSpecialFile(Fcb)) {
+            Status = STATUS_INVALID_DEVICE_REQUEST;
+            __leave;
+        }
+
+        if (IsFileDeleted(Fcb->Mcb)) {
+            Status = STATUS_FILE_DELETED;
+            __leave;
+        }
+
         if (Length == 0) {
             Irp->IoStatus.Information = 0;
             Status = STATUS_SUCCESS;

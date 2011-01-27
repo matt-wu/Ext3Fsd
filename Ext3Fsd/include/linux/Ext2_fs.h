@@ -277,8 +277,6 @@ struct ext2_inode {
     __le16	i_pad1;
 };
 
-#define i_size_high	i_dir_acl
-
 #if defined(__KERNEL__) || defined(__linux__)
 #define i_reserved1	osd1.linux1.l_i_reserved1
 #define i_frag		osd2.linux2.l_i_frag
@@ -471,10 +469,6 @@ struct ext2_super_block {
 
 #define EXT2_FEATURE_INCOMPAT_COMPRESSION	0x0001
 #define EXT2_FEATURE_INCOMPAT_FILETYPE		0x0002
-#define EXT3_FEATURE_INCOMPAT_RECOVER		0x0004
-#define EXT3_FEATURE_INCOMPAT_JOURNAL_DEV	0x0008
-#define EXT3_FEATURE_INCOMPAT_META_BG		0x0010
-#define EXT2_FEATURE_INCOMPAT_ANY		0xffffffff
 
 #define EXT2_FEATURE_COMPAT_SUPP	0
 #define EXT2_FEATURE_INCOMPAT_SUPP	EXT2_FEATURE_INCOMPAT_FILETYPE

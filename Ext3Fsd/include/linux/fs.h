@@ -81,7 +81,7 @@ struct inode {
     __u32               i_ctime;	        /* Creation time */
     __u32               i_mtime;	        /* Modification time */
     __u32               i_dtime;	        /* Deletion Time */
-    __u32               i_blocks;
+    __u64               i_blocks;
     __u32               i_block[15];
     umode_t			    i_mode;             /* mode */
     uid_t               i_uid;
@@ -151,6 +151,6 @@ struct file {
 
 void iget(struct inode *inode);
 void iput(struct inode *inode);
-unsigned long bmap(struct inode *i, unsigned long b);
+ULONGLONG bmap(struct inode *i, ULONGLONG b);
 
 #endif /*_LINUX_FS_INCLUDE_*/

@@ -426,15 +426,10 @@ Ext2FastIoQueryStandardInfo (
             */
 
             Buffer->NumberOfLinks = Fcb->Inode->i_nlink;
-
-            if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY)) {
-                Buffer->DeletePending = FALSE;
-            } else {
-                Buffer->DeletePending = IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING);
-            }
+            Buffer->DeletePending = FALSE;
 
             if (IsDirectory(Fcb)) {
-                Buffer->Directory = TRUE;
+                Buffer->Directory = IsDirectory(Fcb);
                 Buffer->AllocationSize.QuadPart = 0;
                 Buffer->EndOfFile.QuadPart = 0;
             } else {

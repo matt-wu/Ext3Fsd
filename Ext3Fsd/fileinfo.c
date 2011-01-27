@@ -27,7 +27,6 @@ extern PEXT2_GLOBAL Ext2Global;
 #pragma alloc_text(PAGE, Ext2DeleteFile)
 #endif
 
-
 NTSTATUS
 Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 {
@@ -36,6 +35,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
     PFILE_OBJECT            FileObject;
     PEXT2_VCB               Vcb;
     PEXT2_FCB               Fcb;
+    PEXT2_MCB               Mcb;
     PEXT2_CCB               Ccb;
     PIRP                    Irp;
     PIO_STACK_LOCATION      IoStackLocation;
@@ -62,7 +62,6 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
         FileObject = IrpContext->FileObject;
         Fcb = (PEXT2_FCB) FileObject->FsContext;
-
         if (Fcb == NULL) {
             Status = STATUS_INVALID_PARAMETER;
             __leave;
@@ -101,6 +100,9 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
         ASSERT(Ccb != NULL);
         ASSERT((Ccb->Identifier.Type == EXT2CCB) &&
                (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
+        Mcb = Ccb->SymLink;
+        if (!Mcb)
+            Mcb = Fcb->Mcb;
 
         Irp = IrpContext->Irp;
         IoStackLocation = IoGetCurrentIrpStackLocation(Irp);
@@ -124,12 +126,15 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             FileBasicInformation = (PFILE_BASIC_INFORMATION) Buffer;
 
-            FileBasicInformation->CreationTime = Fcb->Mcb->CreationTime;
-            FileBasicInformation->LastAccessTime = Fcb->Mcb->LastAccessTime;
-            FileBasicInformation->LastWriteTime = Fcb->Mcb->LastWriteTime;
-            FileBasicInformation->ChangeTime = Fcb->Mcb->ChangeTime;
+            FileBasicInformation->CreationTime = Mcb->CreationTime;
+            FileBasicInformation->LastAccessTime = Mcb->LastAccessTime;
+            FileBasicInformation->LastWriteTime = Mcb->LastWriteTime;
+            FileBasicInformation->ChangeTime = Mcb->ChangeTime;
 
-            FileBasicInformation->FileAttributes = Fcb->Mcb->FileAttr;
+            FileBasicInformation->FileAttributes = Mcb->FileAttr;
+            if (IsLinkInvalid(Mcb)) {
+                ClearFlag(FileBasicInformation->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
+            }
             if (FileBasicInformation->FileAttributes == 0) {
                 FileBasicInformation->FileAttributes = FILE_ATTRIBUTE_NORMAL;
             }
@@ -150,14 +155,18 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             FSI = (PFILE_STANDARD_INFORMATION) Buffer;
 
-            FSI->NumberOfLinks = Fcb->Inode->i_nlink;
+            FSI->NumberOfLinks = Mcb->Inode.i_nlink;
 
             if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY))
                 FSI->DeletePending = FALSE;
             else
-                FSI->DeletePending = IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING);
+                FSI->DeletePending = IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING);
 
-            if (IsDirectory(Fcb)) {
+            if (IsLinkInvalid(Mcb)) {
+                FSI->Directory = FALSE;
+                FSI->AllocationSize.QuadPart = 0;
+                FSI->EndOfFile.QuadPart = 0;
+            } else if (IsMcbDirectory(Mcb)) {
                 FSI->Directory = TRUE;
                 FSI->AllocationSize.QuadPart = 0;
                 FSI->EndOfFile.QuadPart = 0;
@@ -184,7 +193,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             FileInternalInformation = (PFILE_INTERNAL_INFORMATION) Buffer;
 
             /* we use the inode number as the internal index */
-            FileInternalInformation->IndexNumber.QuadPart = (LONGLONG)Fcb->Inode->i_ino;
+            FileInternalInformation->IndexNumber.QuadPart = (LONGLONG)Mcb->Inode.i_ino;
 
             Irp->IoStatus.Information = sizeof(FILE_INTERNAL_INFORMATION);
             Status = STATUS_SUCCESS;
@@ -217,20 +226,20 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             ULONG   BytesToCopy = 0;
 
             if (Length < (ULONG)FIELD_OFFSET(FILE_NAME_INFORMATION, FileName) +
-                    Fcb->Mcb->FullName.Length) {
+                    Mcb->FullName.Length) {
                 BytesToCopy = Length - FIELD_OFFSET(FILE_NAME_INFORMATION, FileName);
                 Status = STATUS_BUFFER_OVERFLOW;
             } else {
-                BytesToCopy = Fcb->Mcb->FullName.Length;
+                BytesToCopy = Mcb->FullName.Length;
                 Status = STATUS_SUCCESS;
             }
 
             FileNameInformation = (PFILE_NAME_INFORMATION) Buffer;
-            FileNameInformation->FileNameLength = Fcb->Mcb->FullName.Length;
+            FileNameInformation->FileNameLength = Mcb->FullName.Length;
 
             RtlCopyMemory(
                 FileNameInformation->FileName,
-                Fcb->Mcb->FullName.Buffer,
+                Mcb->FullName.Buffer,
                 BytesToCopy );
 
             Irp->IoStatus.Information = BytesToCopy +
@@ -291,24 +300,31 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             FileNameInformation =
                 &FileAllInformation->NameInformation;
 
-            FileBasicInformation->CreationTime = Fcb->Mcb->CreationTime;
-            FileBasicInformation->LastAccessTime = Fcb->Mcb->LastAccessTime;
-            FileBasicInformation->LastWriteTime = Fcb->Mcb->LastWriteTime;
-            FileBasicInformation->ChangeTime = Fcb->Mcb->ChangeTime;
+            FileBasicInformation->CreationTime = Mcb->CreationTime;
+            FileBasicInformation->LastAccessTime = Mcb->LastAccessTime;
+            FileBasicInformation->LastWriteTime = Mcb->LastWriteTime;
+            FileBasicInformation->ChangeTime = Mcb->ChangeTime;
 
-            FileBasicInformation->FileAttributes = Fcb->Mcb->FileAttr;
+            FileBasicInformation->FileAttributes = Mcb->FileAttr;
+            if (IsMcbSymLink(Mcb) && IsFileDeleted(Mcb->Target)) {
+                ClearFlag(FileBasicInformation->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
+            }
             if (FileBasicInformation->FileAttributes == 0) {
                 FileBasicInformation->FileAttributes = FILE_ATTRIBUTE_NORMAL;
             }
 
-            FSI->NumberOfLinks = Fcb->Inode->i_nlink;
+            FSI->NumberOfLinks = Mcb->Inode.i_nlink;
 
             if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY))
                 FSI->DeletePending = FALSE;
             else
-                FSI->DeletePending = IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING);
+                FSI->DeletePending = IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING);
 
-            if (IsDirectory(Fcb)) {
+            if (IsLinkInvalid(Mcb)) {
+                FSI->Directory = FALSE;
+                FSI->AllocationSize.QuadPart = 0;
+                FSI->EndOfFile.QuadPart = 0;
+            } else if (IsDirectory(Fcb)) {
                 FSI->Directory = TRUE;
                 FSI->AllocationSize.QuadPart = 0;
                 FSI->EndOfFile.QuadPart = 0;
@@ -319,7 +335,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             // The "inode number"
-            FileInternalInformation->IndexNumber.QuadPart = (LONGLONG)Fcb->Inode->i_ino;
+            FileInternalInformation->IndexNumber.QuadPart = (LONGLONG)Mcb->Inode.i_ino;
 
             // Romfs doesn't have any extended attributes
             FileEaInformation->EaSize = 0;
@@ -327,15 +343,15 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             FilePositionInformation->CurrentByteOffset =
                 FileObject->CurrentByteOffset;
 
-            FileNameInformation->FileNameLength = Fcb->Mcb->ShortName.Length;
+            FileNameInformation->FileNameLength = Mcb->ShortName.Length;
 
             if (Length < sizeof(FILE_ALL_INFORMATION) +
-                    Fcb->Mcb->ShortName.Length - sizeof(WCHAR)) {
+                    Mcb->ShortName.Length - sizeof(WCHAR)) {
                 Irp->IoStatus.Information = sizeof(FILE_ALL_INFORMATION);
                 Status = STATUS_BUFFER_OVERFLOW;
                 RtlCopyMemory(
                     FileNameInformation->FileName,
-                    Fcb->Mcb->ShortName.Buffer,
+                    Mcb->ShortName.Buffer,
                     Length - FIELD_OFFSET(FILE_ALL_INFORMATION,
                                           NameInformation.FileName)
                 );
@@ -344,12 +360,12 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             RtlCopyMemory(
                 FileNameInformation->FileName,
-                Fcb->Mcb->ShortName.Buffer,
-                Fcb->Mcb->ShortName.Length
+                Mcb->ShortName.Buffer,
+                Mcb->ShortName.Length
             );
 
             Irp->IoStatus.Information = sizeof(FILE_ALL_INFORMATION) +
-                                        Fcb->Mcb->ShortName.Length - sizeof(WCHAR);
+                                        Mcb->ShortName.Length - sizeof(WCHAR);
 #if 0
             sizeof(FILE_ACCESS_INFORMATION) -
             sizeof(FILE_MODE_INFORMATION) -
@@ -381,23 +397,28 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             PFNOI = (PFILE_NETWORK_OPEN_INFORMATION) Buffer;
 
-            PFNOI->FileAttributes = Fcb->Mcb->FileAttr;
-            if (PFNOI->FileAttributes == 0) {
-                PFNOI->FileAttributes = FILE_ATTRIBUTE_NORMAL;
-            }
-
-            PFNOI->CreationTime   = Fcb->Mcb->CreationTime;
-            PFNOI->LastAccessTime = Fcb->Mcb->LastAccessTime;
-            PFNOI->LastWriteTime  = Fcb->Mcb->LastWriteTime;
-            PFNOI->ChangeTime     = Fcb->Mcb->ChangeTime;
-
-            if (IsDirectory(Fcb)) {
+            PFNOI->FileAttributes = Mcb->FileAttr;
+            if (IsLinkInvalid(Mcb)) {
+                ClearFlag(PFNOI->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
+                PFNOI->AllocationSize.QuadPart = 0;
+                PFNOI->EndOfFile.QuadPart = 0;
+            } else if (IsDirectory(Fcb)) {
                 PFNOI->AllocationSize.QuadPart = 0;
                 PFNOI->EndOfFile.QuadPart = 0;
             } else {
                 PFNOI->AllocationSize = Fcb->Header.AllocationSize;
                 PFNOI->EndOfFile      = Fcb->Header.FileSize;
             }
+
+            if (PFNOI->FileAttributes == 0) {
+                PFNOI->FileAttributes = FILE_ATTRIBUTE_NORMAL;
+            }
+
+            PFNOI->CreationTime   = Mcb->CreationTime;
+            PFNOI->LastAccessTime = Mcb->LastAccessTime;
+            PFNOI->LastWriteTime  = Mcb->LastWriteTime;
+            PFNOI->ChangeTime     = Mcb->ChangeTime;
+
 
             Irp->IoStatus.Information =
                 sizeof(FILE_NETWORK_OPEN_INFORMATION);
@@ -417,7 +438,13 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             FATI = (PFILE_ATTRIBUTE_TAG_INFORMATION) Buffer;
-            FATI->FileAttributes = Fcb->Mcb->FileAttr;
+            FATI->FileAttributes = Mcb->FileAttr;
+            if (IsLinkInvalid(Mcb)) {
+                ClearFlag(FATI->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
+            }
+            if (FATI->FileAttributes == 0) {
+                FATI->FileAttributes = FILE_ATTRIBUTE_NORMAL;
+            }
             FATI->ReparseTag = IO_REPARSE_TAG_RESERVED_ZERO;
             Irp->IoStatus.Information = sizeof(FILE_ATTRIBUTE_TAG_INFORMATION);
             Status = STATUS_SUCCESS;
@@ -465,6 +492,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
     PFILE_OBJECT            FileObject;
     PEXT2_FCB               Fcb;
     PEXT2_CCB               Ccb;
+    PEXT2_MCB               Mcb;
     PIRP                    Irp;
     PIO_STACK_LOCATION      IoStackLocation;
     FILE_INFORMATION_CLASS  FileInformationClass;
@@ -532,11 +560,10 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             Status = STATUS_SUCCESS;
             __leave;
         }
-
         ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
-        if (IsFlagOn(Fcb->Flags, FCB_FILE_DELETED)) {
+        if (IsFlagOn(Fcb->Mcb->Flags, MCB_FILE_DELETED)) {
             Status = STATUS_FILE_DELETED;
             __leave;
         }
@@ -545,6 +572,15 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
         ASSERT(Ccb != NULL);
         ASSERT((Ccb->Identifier.Type == EXT2CCB) &&
                (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
+        Mcb = Ccb->SymLink;
+        if (Mcb) {
+            if (IsFlagOn(Mcb->Flags, MCB_FILE_DELETED)) {
+                Status = STATUS_FILE_DELETED;
+                __leave;
+            }
+        } else {
+            Mcb = Fcb->Mcb;
+        }
 
         if ( !IsDirectory(Fcb) && !FlagOn(Fcb->Flags, FCB_PAGE_FILE) &&
                 ((FileInformationClass == FileEndOfFileInformation) ||
@@ -606,7 +642,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
         /*
                 if (FileInformationClass != FileDispositionInformation
-                    && FlagOn(Fcb->Flags, FCB_DELETE_PENDING))
+                    && IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING))
                 {
                     Status = STATUS_DELETE_PENDING;
                     __leave;
@@ -617,29 +653,29 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
         case FileBasicInformation:
         {
             PFILE_BASIC_INFORMATION FBI = (PFILE_BASIC_INFORMATION) Buffer;
-            struct inode *Inode = Fcb->Inode;
+            struct inode *Inode = &Mcb->Inode;
 
             if (FBI->CreationTime.QuadPart != 0 && FBI->CreationTime.QuadPart != -1) {
                 Inode->i_ctime = Ext2LinuxTime(FBI->CreationTime);
-                Fcb->Mcb->CreationTime = Ext2NtTime(Inode->i_ctime);
+                Mcb->CreationTime = Ext2NtTime(Inode->i_ctime);
                 NotifyFilter |= FILE_NOTIFY_CHANGE_CREATION;
             }
 
             if (FBI->LastAccessTime.QuadPart != 0 && FBI->LastAccessTime.QuadPart != -1) {
                 Inode->i_atime = Ext2LinuxTime(FBI->LastAccessTime);
-                Fcb->Mcb->LastAccessTime = Ext2NtTime(Inode->i_atime);
+                Mcb->LastAccessTime = Ext2NtTime(Inode->i_atime);
                 NotifyFilter |= FILE_NOTIFY_CHANGE_LAST_ACCESS;
             }
 
             if (FBI->LastWriteTime.QuadPart != 0 && FBI->LastWriteTime.QuadPart != -1) {
                 Inode->i_mtime = Ext2LinuxTime(FBI->LastWriteTime);
-                Fcb->Mcb->LastWriteTime = Ext2NtTime(Inode->i_mtime);
+                Mcb->LastWriteTime = Ext2NtTime(Inode->i_mtime);
                 NotifyFilter |= FILE_NOTIFY_CHANGE_LAST_WRITE;
                 SetFlag(Ccb->Flags, CCB_LAST_WRITE_UPDATED);
             }
 
             if (FBI->ChangeTime.QuadPart !=0 && FBI->ChangeTime.QuadPart != -1) {
-                Fcb->Mcb->ChangeTime = FBI->ChangeTime;
+                Mcb->ChangeTime = FBI->ChangeTime;
             }
 
             if (FBI->FileAttributes != 0) {
@@ -648,9 +684,9 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 NotifyFilter |= FILE_NOTIFY_CHANGE_ATTRIBUTES;
 
                 if (IsFlagOn(FBI->FileAttributes, FILE_ATTRIBUTE_READONLY)) {
-                    Ext2SetReadOnly(Fcb->Inode->i_mode);
+                    Ext2SetReadOnly(Inode->i_mode);
                 } else {
-                    Ext2SetOwnerWritable(Fcb->Inode->i_mode);
+                    Ext2SetOwnerWritable(Inode->i_mode);
                 }
 
                 if (FBI->FileAttributes & FILE_ATTRIBUTE_TEMPORARY) {
@@ -659,10 +695,10 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                     ClearFlag(FileObject->Flags, FO_TEMPORARY_FILE);
                 }
 
-                Fcb->Mcb->FileAttr = FBI->FileAttributes;
+                Mcb->FileAttr = FBI->FileAttributes;
                 if (bIsDirectory) {
-                    SetFlag(Fcb->Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY);
-                    ClearFlag(Fcb->Mcb->FileAttr, FILE_ATTRIBUTE_NORMAL);
+                    SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY);
+                    ClearFlag(Mcb->FileAttr, FILE_ATTRIBUTE_NORMAL);
                 }
             }
 
@@ -683,12 +719,18 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             PFILE_ALLOCATION_INFORMATION FAI = (PFILE_ALLOCATION_INFORMATION)Buffer;
             LARGE_INTEGER RealSize, AllocationSize;
 
-            if (IsDirectory(Fcb)) {
+            if (IsMcbDirectory(Mcb) || IsMcbSpecialFile(Mcb)) {
                 Status = STATUS_INVALID_DEVICE_REQUEST;
                 __leave;
             } else {
                 Status = STATUS_SUCCESS;
             }
+
+            /* set Mcb to it's target */
+            if (IsMcbSymLink(Mcb)) {
+                ASSERT(Fcb->Mcb == Mcb->Target);
+            }
+            Mcb = Fcb->Mcb;
 
             /* initialize cache map if needed */
             if ((FileObject->SectionObjectPointer->DataSectionObject != NULL) &&
@@ -711,21 +753,11 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             AllocationSize.QuadPart = CEILING_ALIGNED(ULONGLONG,
                                       (ULONGLONG)FAI->AllocationSize.QuadPart,
                                       (ULONGLONG)BLOCK_SIZE);
-            RealSize = Fcb->Mcb->FileSize;
-
-            /* check if file blocks are allocated in Ext2Create */
-            if (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE)) {
-                if (Fcb->Header.AllocationSize.QuadPart <
-                        Fcb->RealSize.QuadPart) {
-                    Fcb->Header.AllocationSize = Fcb->RealSize;
-                } else {
-                    ClearLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE);
-                }
-            }
+            RealSize = Mcb->FileSize;
 
             if (AllocationSize.QuadPart > Fcb->Header.AllocationSize.QuadPart) {
 
-                Status = Ext2ExpandFile(IrpContext, Vcb, Fcb->Mcb, &AllocationSize);
+                Status = Ext2ExpandFile(IrpContext, Vcb, Mcb, &AllocationSize);
                 Fcb->Header.AllocationSize = AllocationSize;
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
 
@@ -735,15 +767,15 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
                     /* free blocks from it's real size allocated in Ext2Create */
                     if (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE)) {
-                        Fcb->Mcb->FileSize = Fcb->Header.AllocationSize;
+                        Mcb->FileSize = Fcb->Header.AllocationSize;
                     }
 
                     /* truncate file blocks */
-                    Status = Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &AllocationSize);
+                    Status = Ext2TruncateFile(IrpContext, Vcb, Mcb, &AllocationSize);
 
                     /* restore original file size */
                     if (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE)) {
-                        Fcb->Mcb->FileSize = RealSize;
+                        Mcb->FileSize = RealSize;
                         if (NT_SUCCESS(Status)) {
                             ClearLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE);
                         }
@@ -758,9 +790,9 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                         Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
                     }
 
-                    if (Fcb->Mcb->FileSize.QuadPart > AllocationSize.QuadPart) {
-                        Fcb->Mcb->FileSize.QuadPart = AllocationSize.QuadPart;
-                        Fcb->Mcb->Inode.i_size = AllocationSize.QuadPart;
+                    if (Mcb->FileSize.QuadPart > AllocationSize.QuadPart) {
+                        Mcb->FileSize.QuadPart = AllocationSize.QuadPart;
+                        Mcb->Inode.i_size = AllocationSize.QuadPart;
                     }
 
                 } else {
@@ -775,7 +807,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
                 SetFlag(FileObject->Flags, FO_FILE_MODIFIED);
                 SetLongFlag(Fcb->Flags, FCB_FILE_MODIFIED);
-                Ext2SaveInode(IrpContext, Vcb, Fcb->Inode);
+                Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
 
                 if (CcIsFileCached(FileObject)) {
                     CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
@@ -793,12 +825,18 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             PFILE_END_OF_FILE_INFORMATION FEOFI = (PFILE_END_OF_FILE_INFORMATION) Buffer;
             LARGE_INTEGER FileSize, AllocationSize, RealSize, EndOfFile;
 
-            if (IsDirectory(Fcb)) {
+            if (IsMcbDirectory(Mcb) || IsMcbSpecialFile(Mcb)) {
                 Status = STATUS_INVALID_DEVICE_REQUEST;
                 __leave;
             } else {
                 Status = STATUS_SUCCESS;
             }
+
+            /* set Mcb to it's target */
+            if (IsMcbSymLink(Mcb)) {
+                ASSERT(Fcb->Mcb == Mcb->Target);
+            }
+            Mcb = Fcb->Mcb;
 
             /* initialize cache map if needed */
             if ((FileObject->SectionObjectPointer->DataSectionObject != NULL) &&
@@ -820,12 +858,12 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             AllocationSize = Fcb->Header.AllocationSize;
             FileSize.QuadPart = CEILING_ALIGNED(ULONGLONG,
                                                 FEOFI->EndOfFile.QuadPart, BLOCK_SIZE);
-            RealSize = Fcb->Mcb->FileSize;
+            RealSize = Mcb->FileSize;
             EndOfFile = FEOFI->EndOfFile;
 
             if (IoStackLocation->Parameters.SetFile.AdvanceOnly) {
 
-                if (IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
+                if (IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING)) {
                     __leave;
                 }
 
@@ -835,19 +873,13 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
                 if (RealSize.QuadPart < EndOfFile.QuadPart) {
 
-                    Fcb->Mcb->FileSize = EndOfFile;
-                    Fcb->Inode->i_size = EndOfFile.QuadPart;
+                    Mcb->FileSize = EndOfFile;
+                    Mcb->Inode.i_size = EndOfFile.QuadPart;
                     NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
                     goto FileEndChanged;
                 }
 
                 __leave;
-            }
-
-            /* check if file blocks are allocated in Ext2Create */
-            if (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE) &&
-                    AllocationSize.QuadPart < Fcb->RealSize.QuadPart) {
-                Fcb->Header.AllocationSize = AllocationSize = Fcb->RealSize;;
             }
 
             if (FileSize.QuadPart > AllocationSize.QuadPart) {
@@ -856,7 +888,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 Status = Ext2ExpandFile(
                              IrpContext,
                              Vcb,
-                             Fcb->Mcb,
+                             Mcb,
                              &(Fcb->Header.AllocationSize)
                          );
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
@@ -877,7 +909,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
                     /* free blocks from it's real size allocated in Ext2Create */
                     if (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE)) {
-                        Fcb->Mcb->FileSize = AllocationSize;
+                        Mcb->FileSize = AllocationSize;
                     }
 
                     if (!MmCanFileBeTruncated(&(Fcb->SectionObject), &AllocationSize)) {
@@ -887,11 +919,11 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                     }
 
                     /* truncate file blocks */
-                    Status = Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &FileSize);
+                    Status = Ext2TruncateFile(IrpContext, Vcb, Mcb, &FileSize);
 
                     /* restore original file size */
                     if (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE)) {
-                        Fcb->Mcb->FileSize = RealSize;
+                        Mcb->FileSize = RealSize;
                         if (NT_SUCCESS(Status)) {
                             ClearLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE);
                         }
@@ -907,9 +939,9 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                         Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
                     }
 
-                    if (Fcb->Mcb->FileSize.QuadPart > FileSize.QuadPart) {
-                        Fcb->Mcb->FileSize.QuadPart = FileSize.QuadPart;
-                        Fcb->Mcb->Inode.i_size = FileSize.QuadPart;
+                    if (Mcb->FileSize.QuadPart > FileSize.QuadPart) {
+                        Mcb->FileSize.QuadPart = FileSize.QuadPart;
+                        Mcb->Inode.i_size = FileSize.QuadPart;
                     }
                 }
 
@@ -918,10 +950,10 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             if (NT_SUCCESS(Status)) {
 
-                Fcb->Header.FileSize.QuadPart = Fcb->Mcb->FileSize.QuadPart = EndOfFile.QuadPart;
+                Fcb->Header.FileSize.QuadPart = Mcb->FileSize.QuadPart = EndOfFile.QuadPart;
                 if (Fcb->Header.ValidDataLength.QuadPart > Fcb->Header.FileSize.QuadPart)
                     Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
-                Fcb->Inode->i_size = EndOfFile.QuadPart;
+                Mcb->Inode.i_size = EndOfFile.QuadPart;
                 if (Fcb->Header.FileSize.QuadPart >= 0x80000000 &&
                         !IsFlagOn(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE)) {
                     SetFlag(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE);
@@ -935,7 +967,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
 FileEndChanged:
 
-            Ext2SaveInode( IrpContext, Vcb, Fcb->Inode);
+            Ext2SaveInode( IrpContext, Vcb, &Mcb->Inode);
 
             if (CcIsFileCached(FileObject)) {
                 CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
@@ -954,7 +986,7 @@ FileEndChanged:
             Status = Ext2SetDispositionInfo(IrpContext, Vcb, Fcb, Ccb, FDI->DeleteFile);
 
             DEBUG(DL_INF, ( "Ext2SetInformation: SetDispositionInformation: DeleteFile=%d %wZ status = %xh\n",
-                            FDI->DeleteFile, &Fcb->Mcb->ShortName, Status));
+                            FDI->DeleteFile, &Mcb->ShortName, Status));
         }
 
         break;
@@ -1018,7 +1050,7 @@ FileEndChanged:
             Ext2NotifyReportChange(
                 IrpContext,
                 Vcb,
-                Fcb->Mcb,
+                Mcb,
                 NotifyFilter,
                 FILE_ACTION_MODIFIED );
 
@@ -1050,6 +1082,56 @@ FileEndChanged:
     return Status;
 }
 
+ULONG
+Ext2TotalBlocks(
+    PEXT2_VCB         Vcb,
+    PLARGE_INTEGER    Size,
+    PULONG            pMeta
+)
+{
+    ULONG Blocks, Meta =0, Remain;
+
+    Blocks = (ULONG)((Size->QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS);
+    if (Blocks <= EXT2_NDIR_BLOCKS)
+        goto errorout;
+    Blocks -= EXT2_NDIR_BLOCKS;
+
+    Meta += 1;
+    if (Blocks <= Vcb->max_blocks_per_layer[1]) {
+        goto errorout;
+    }
+    Blocks -= Vcb->max_blocks_per_layer[1];
+
+level2:
+
+    if (Blocks <= Vcb->max_blocks_per_layer[2]) {
+        Meta += 1 + ((Blocks + BLOCK_SIZE/4 - 1) >> (BLOCK_BITS - 2));
+        goto errorout;
+    }
+    Meta += 1 + BLOCK_SIZE/4;
+    Blocks -= Vcb->max_blocks_per_layer[2];
+
+    if (Blocks > Vcb->max_blocks_per_layer[3]) {
+        Blocks  = Vcb->max_blocks_per_layer[3];
+    }
+
+    ASSERT(Vcb->max_blocks_per_layer[2]);
+    Remain = Blocks % Vcb->max_blocks_per_layer[2];
+    Blocks = Blocks / Vcb->max_blocks_per_layer[2];
+    Meta += 1 + Blocks * (1 + BLOCK_SIZE/4);
+    if (Remain) {
+        Blocks = Remain;
+        goto level2;
+    }
+
+errorout:
+
+    if (pMeta)
+        *pMeta = Meta;
+    Blocks = (ULONG)((Size->QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS);
+    return (Blocks + Meta);
+}
+
 NTSTATUS
 Ext2ExpandFile(
     PEXT2_IRP_CONTEXT IrpContext,
@@ -1077,19 +1159,29 @@ Ext2ExpandFile(
         return STATUS_SUCCESS;
     }
 
-    /* invalid file size, too big to contain in inode->i_block */
-    if (End >= Vcb->MaxInodeBlocks) {
-        return STATUS_INVALID_PARAMETER;
+    if (INODE_HAS_EXTENT(&Mcb->Inode)) {
+
+        /* We don't support extending files with extents */
+        return STATUS_NOT_IMPLEMENTED;
+
+    } else if (IsMcbSpecialFile(Mcb)) {
+
+        return STATUS_INVALID_DEVICE_REQUEST;
+
+    } else {
+
+        if (End > Vcb->max_bitmap_bytes)
+            return STATUS_INVALID_PARAMETER;
     }
 
     Extra = End - Start;
 
     for (Layer = 0; Layer < EXT2_BLOCK_TYPES && Extra; Layer++) {
 
-        if (Start >= Vcb->NumBlocks[Layer]) {
+        if (Start >= Vcb->max_blocks_per_layer[Layer]) {
 
-            Base  += Vcb->NumBlocks[Layer];
-            Start -= Vcb->NumBlocks[Layer];
+            Base  += Vcb->max_blocks_per_layer[Layer];
+            Start -= Vcb->max_blocks_per_layer[Layer];
 
         } else {
 
@@ -1117,7 +1209,7 @@ Ext2ExpandFile(
                          Base,
                          Layer,
                          Start,
-                         (Layer == 0) ? (Vcb->NumBlocks[Layer] - Start) : 1,
+                         (Layer == 0) ? (Vcb->max_blocks_per_layer[Layer] - Start) : 1,
                          &Mcb->Inode.i_block[Slot],
                          &Hint,
                          &Extra
@@ -1130,7 +1222,7 @@ Ext2ExpandFile(
             if (Layer == 0) {
                 Base = 0;
             }
-            Base += Vcb->NumBlocks[Layer];
+            Base += Vcb->max_blocks_per_layer[Layer];
         }
     }
 
@@ -1163,13 +1255,13 @@ Ext2TruncateFile(
     PULONG   BlockArray = NULL;
 
     /* translate file size to block */
-    End = (ULONG)((Mcb->FileSize.QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS);
+    End = Base = Vcb->max_data_blocks;
     Wanted = (ULONG)((Size->QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS);
-    Base = Vcb->MaxInodeBlocks;
 
-    /* confrim it's a truncating operation */
-    if (Wanted >= End) {
-        return Status;
+    if (INODE_HAS_EXTENT(&Mcb->Inode)) {
+
+        /* We don't support extending files with extents */
+        return STATUS_NOT_IMPLEMENTED;
     }
 
     /* calculate blocks to be freed */
@@ -1177,18 +1269,16 @@ Ext2TruncateFile(
 
     for (Layer = EXT2_BLOCK_TYPES; Layer > 0 && Extra; Layer--) {
 
-        if (Vcb->NumBlocks[Layer - 1] == 0) {
+        if (Vcb->max_blocks_per_layer[Layer - 1] == 0) {
             continue;
         }
 
-        Base -= Vcb->NumBlocks[Layer - 1];
-        if (Base >= End) {
-            continue;
-        }
+        Base -= Vcb->max_blocks_per_layer[Layer - 1];
 
         if (Layer - 1 == 0) {
             BlockArray = &Mcb->Inode.i_block[0];
             SizeArray = End;
+            ASSERT(End == EXT2_NDIR_BLOCKS && Base == 0);
         } else {
             BlockArray = &Mcb->Inode.i_block[EXT2_NDIR_BLOCKS - 1 + Layer - 1];
             SizeArray = 1;
@@ -1222,42 +1312,49 @@ Ext2TruncateFile(
         }
         Ext2ClearAllExtents(&Mcb->Extents);
     }
-    Mcb->Inode.i_size = Size->QuadPart;
 
     /* save inode */
+    if (Mcb->Inode.i_size > (loff_t)(Size->QuadPart))
+        Mcb->Inode.i_size = (loff_t)(Size->QuadPart);
     Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
 
     return Status;
 }
 
-
 NTSTATUS
 Ext2IsFileRemovable(
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
-    IN PEXT2_FCB            Fcb
+    IN PEXT2_FCB            Fcb,
+    IN PEXT2_CCB            Ccb
 )
 {
-    if (!MmFlushImageSection( &Fcb->SectionObject,
-                              MmFlushForDelete )) {
+    PEXT2_MCB Mcb = Fcb->Mcb;
+
+    if (Mcb->Inode.i_ino == EXT2_ROOT_INO) {
         return STATUS_CANNOT_DELETE;
     }
 
-    if (Fcb->Inode->i_ino == EXT2_ROOT_INO) {
+    if (INODE_HAS_EXTENT(&Mcb->Inode)) {
         return STATUS_CANNOT_DELETE;
     }
 
-    if (IsDirectory(Fcb)) {
-        if (!Ext2IsDirectoryEmpty(IrpContext, Vcb, Fcb->Mcb)) {
+    if (IsMcbDirectory(Mcb)) {
+        if (!Ext2IsDirectoryEmpty(IrpContext, Vcb, Mcb)) {
             return STATUS_DIRECTORY_NOT_EMPTY;
         }
     }
 
-    if (IsDirectory(Fcb)) {
+    if (!MmFlushImageSection(&Fcb->SectionObject,
+                             MmFlushForDelete )) {
+        return STATUS_CANNOT_DELETE;
+    }
+
+    if (IsMcbDirectory(Mcb)) {
         FsRtlNotifyFullChangeDirectory(
             Vcb->NotifySync,
             &Vcb->NotifyList,
-            Fcb,
+            Ccb,
             NULL,
             FALSE,
             FALSE,
@@ -1283,6 +1380,7 @@ Ext2SetDispositionInfo(
     PIRP    Irp = IrpContext->Irp;
     PIO_STACK_LOCATION IrpSp;
     NTSTATUS status = STATUS_SUCCESS;
+    PEXT2_MCB  Mcb = Fcb->Mcb;
 
     IrpSp = IoGetCurrentIrpStackLocation(Irp);
 
@@ -1291,21 +1389,21 @@ Ext2SetDispositionInfo(
     if (bDelete) {
 
         DEBUG(DL_INF, ( "Ext2SetDispositionInformation: Removing %wZ.\n",
-                        &Fcb->Mcb->FullName));
+                        &Mcb->FullName));
 
         /* always allow deleting on symlinks */
         if (Ccb->SymLink == NULL) {
-            status = Ext2IsFileRemovable(IrpContext, Vcb, Fcb);
+            status = Ext2IsFileRemovable(IrpContext, Vcb, Fcb, Ccb);
         }
 
         if (NT_SUCCESS(status)) {
-            SetLongFlag(Fcb->Flags, FCB_DELETE_PENDING);
+            SetLongFlag(Ccb->Flags, CCB_DELETE_PENDING);
             IrpSp->FileObject->DeletePending = TRUE;
         }
 
     } else {
 
-        ClearLongFlag(Fcb->Flags, FCB_DELETE_PENDING);
+        ClearLongFlag(Ccb->Flags, CCB_DELETE_PENDING);
         IrpSp->FileObject->DeletePending = FALSE;
     }
 
@@ -1393,6 +1491,7 @@ Ext2SetRenameInfo(
         TargetMcb = Mcb->Parent;
         if (IsMcbSymLink(TargetMcb)) {
             TargetMcb = TargetMcb->Target;
+            ASSERT(!IsMcbSymLink(TargetMcb));
         }
 
         if (TargetMcb == NULL || FileName.Length >= EXT2_NAME_LEN*2) {
@@ -1492,10 +1591,9 @@ Ext2SetRenameInfo(
 
         } else {
 
-            if ( (ExistingFcb = ExistingMcb->Fcb) &&
-                    !IsMcbSymLink(ExistingMcb) ) {
+            if ( (ExistingFcb = ExistingMcb->Fcb) && !IsMcbSymLink(ExistingMcb) ) {
 
-                Status = Ext2IsFileRemovable(IrpContext, Vcb, ExistingFcb);
+                Status = Ext2IsFileRemovable(IrpContext, Vcb, ExistingFcb, Ccb);
                 if (!NT_SUCCESS(Status)) {
                     DEBUG(DL_REN, ("Ext2SetRenameInfo: Target file %wZ cannot be removed.\n",
                                    &ExistingMcb->FullName));
@@ -1504,7 +1602,7 @@ Ext2SetRenameInfo(
                 }
             }
 
-            Status = Ext2DeleteFile(IrpContext, Vcb, ExistingMcb);
+            Status = Ext2DeleteFile(IrpContext, Vcb, ExistingFcb, ExistingMcb);
             Ext2DerefMcb(ExistingMcb);
             if (!NT_SUCCESS(Status)) {
                 DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to delete %wZ with status: %xh.\n",
@@ -1684,12 +1782,11 @@ NTSTATUS
 Ext2DeleteFile(
     PEXT2_IRP_CONTEXT IrpContext,
     PEXT2_VCB         Vcb,
+    PEXT2_FCB         Fcb,
     PEXT2_MCB         Mcb
 )
 {
-    LARGE_INTEGER   Size;
     PEXT2_FCB       Dcb = NULL;
-    PEXT2_FCB       Fcb = Mcb->Fcb;
 
     NTSTATUS        Status = STATUS_UNSUCCESSFUL;
 
@@ -1698,24 +1795,26 @@ Ext2DeleteFile(
     BOOLEAN         FcbResourceAcquired = FALSE;
     BOOLEAN         DcbResourceAcquired = FALSE;
 
-    BOOLEAN         bNewDcb = FALSE;
-
+    LARGE_INTEGER   Size;
     LARGE_INTEGER   SysTime;
+
+    BOOLEAN         bNewDcb = FALSE;
 
     DEBUG(DL_INF, ( "Ext2DeleteFile: File %wZ (%xh) will be deleted!\n",
                     &Mcb->FullName, Mcb->Inode.i_ino));
 
-    if (Fcb && IsFlagOn(Fcb->Flags, FCB_FILE_DELETED)) {
+    if (IsFlagOn(Mcb->Flags, MCB_FILE_DELETED)) {
         return STATUS_SUCCESS;
     }
 
     if (!IsMcbSymLink(Mcb) && IsMcbDirectory(Mcb)) {
         if (!Ext2IsDirectoryEmpty(IrpContext, Vcb, Mcb)) {
-            if (Fcb) {
-                ClearLongFlag(Fcb->Flags, FCB_DELETE_PENDING);
-            }
             return STATUS_DIRECTORY_NOT_EMPTY;
         }
+    }
+
+    if (INODE_HAS_EXTENT(&Mcb->Inode)) {
+        return STATUS_CANNOT_DELETE;
     }
 
     __try {
@@ -1768,7 +1867,7 @@ Ext2DeleteFile(
                 __leave;
             }
 
-            if (IsMcbSymLink(Mcb)) {
+            if (S_ISLNK(Mcb->Inode.i_mode)) {
 
                 /* for symlink, we should do differenctly  */
                 if (Mcb->Inode.i_size > EXT2_LINKLEN_IN_INODE) {
@@ -1822,10 +1921,7 @@ Ext2DeleteFile(
 SkipTruncate:
 
             Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
-
-            if (Fcb && !IsMcbSymLink(Mcb)) {
-                SetFlag(Fcb->Flags, FCB_FILE_DELETED);
-            }
+            SetFlag(Mcb->Flags, MCB_FILE_DELETED);
 
             Ext2RemoveMcb(Vcb, Mcb);
         }
@@ -1860,8 +1956,8 @@ SkipTruncate:
         }
     }
 
-    DEBUG(DL_INF, ( "Ext2DeleteFile: %wZ Succeed... EXT2SB->S_FREE_BLOCKS = %xh .\n",
-                    &Mcb->FullName, Vcb->SuperBlock->s_free_blocks_count));
+    DEBUG(DL_INF, ( "Ext2DeleteFile: %wZ Succeed... EXT2SB->S_FREE_BLOCKS = %I64xh .\n",
+                    &Mcb->FullName, ext3_free_blocks_count(SUPER_BLOCK)));
 
     return Status;
 }

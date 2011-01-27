@@ -19,10 +19,14 @@
 #include <linux/ext2_fs.h>
 #include <linux/ext3_fs.h>
 #include <linux/ext3_fs_i.h>
+#include <linux/ext4_ext.h>
 
 /* DEBUG ****************************************************************/
-
-#define EXT2_DEBUG DBG
+#if DBG
+# define EXT2_DEBUG   1
+#else
+# define EXT2_DEBUG   0
+#endif
 
 #if EXT2_DEBUG
 #if _X86_
@@ -36,7 +40,7 @@
 
 /* STRUCTS & CONSTS******************************************************/
 
-#define EXT2FSD_VERSION  "0.48"
+#define EXT2FSD_VERSION  "0.50"
 
 
 //
@@ -71,18 +75,19 @@
 #define INODE_SIZE                      (Vcb->InodeSize)
 #define BLOCK_SIZE                      (Vcb->BlockSize)
 #define BLOCK_BITS                      (SUPER_BLOCK->s_log_block_size + 10)
+#define GROUP_DESC_SIZE                 (Vcb->sbi.s_desc_size)
 
 #define INODES_COUNT                    (Vcb->SuperBlock->s_inodes_count)
 
 #define INODES_PER_GROUP                (SUPER_BLOCK->s_inodes_per_group)
 #define BLOCKS_PER_GROUP                (SUPER_BLOCK->s_blocks_per_group)
-#define TOTAL_BLOCKS                    (SUPER_BLOCK->s_blocks_count)
+#define TOTAL_BLOCKS                    (ext3_blocks_count(SUPER_BLOCK))
 
 #define EXT2_FIRST_DATA_BLOCK           (SUPER_BLOCK->s_first_data_block)
 
 typedef struct ext3_super_block EXT2_SUPER_BLOCK, *PEXT2_SUPER_BLOCK;
 typedef struct ext3_inode EXT2_INODE, *PEXT2_INODE;
-typedef struct ext3_group_desc EXT2_GROUP_DESC, *PEXT2_GROUP_DESC;
+typedef struct ext4_group_desc EXT2_GROUP_DESC, *PEXT2_GROUP_DESC;
 typedef struct ext3_dir_entry EXT2_DIR_ENTRY, *PEXT2_DIR_ENTRY;
 typedef struct ext3_dir_entry_2 EXT2_DIR_ENTRY2, *PEXT2_DIR_ENTRY2;
 
@@ -223,13 +228,11 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 #define IsEndOfFile(Pos) ((Pos.LowPart == FILE_WRITE_TO_END_OF_FILE) && \
                           (Pos.HighPart == -1 ))
 
-#define IsMcbReadonly(Mcb)  IsFlagOn(Mcb->FileAttr, FILE_ATTRIBUTE_READONLY)
-#define IsMcbDirectory(Mcb) IsFlagOn(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY)
-#define IsDirectory(Fcb)    IsMcbDirectory(Fcb->Mcb)
-#define IsSymLink(Fcb)      IsMcbSymLink(Fcb->Mcb)
-#define IsInodeSymlink(I)   S_ISLNK((I)->i_mode)
-#define IsRoot(Fcb)         IsMcbRoot(Fcb->Mcb)
-#define IsMcbRoot(Mcb)      (Mcb->Inode.i_ino == EXT2_ROOT_INO)
+#define IsDirectory(Fcb)    IsMcbDirectory((Fcb)->Mcb)
+#define IsSpecialFile(Fcb)  IsMcbSpecialFile((Fcb)->Mcb)
+#define IsSymLink(Fcb)      IsMcbSymLink((Fcb)->Mcb)
+#define IsInodeSymLink(I)   S_ISLNK((I)->i_mode)
+#define IsRoot(Fcb)         IsMcbRoot((Fcb)->Mcb)
 
 //
 // Pool Tags
@@ -308,6 +311,7 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 #define S_IFDIR  0x04000            /* 004 0000 */
 #define S_IFCHR  0x02000            /* 002 0000 */
 #define S_IFIFO  0x01000            /* 001 0000 */
+
 #define S_ISUID  0x00800            /* 000 4000 */
 #define S_ISGID  0x00400            /* 000 2000 */
 #define S_ISVTX  0x00200            /* 000 1000 */
@@ -623,11 +627,7 @@ typedef struct _EXT2_VCB {
 
     BOOLEAN                     IsExt3fs;
     PEXT2_SUPER_BLOCK           SuperBlock;
-    PEXT2_GROUP_DESC            GroupDesc;
-//  PVOID                       GroupDescBcb;
 
-    // Number of Group Decsciptions
-    ULONG                       NumOfGroups;
     /*
         // Bitmap Block per group
         PRTL_BITMAP                 BlockBitMaps;
@@ -639,10 +639,6 @@ typedef struct _EXT2_VCB {
 
     // Sector size in bits
     ULONG                       SectorBits;
-
-    /* Maximum file size in blocks ... */
-    ULONG                       MaxInodeBlocks;
-    ULONG                       NumBlocks[EXT2_BLOCK_TYPES];
 
     // Inode size
     ULONG                       InodeSize;
@@ -675,6 +671,11 @@ typedef struct _EXT2_VCB {
     struct super_block          sb;
     struct ext3_sb_info         sbi;
 
+    /* Maximum file size in blocks ... */
+    ULONG                       max_blocks_per_layer[EXT2_BLOCK_TYPES];
+    ULONG                       max_data_blocks;
+    loff_t                      max_bitmap_bytes;
+    loff_t                      max_bytes;
 } EXT2_VCB, *PEXT2_VCB;
 
 //
@@ -750,9 +751,6 @@ typedef struct _EXT2_FCB {
     // Mcb Node ...
     PEXT2_MCB                       Mcb;
 
-    // Allocation size allocated in Ext2Create
-    LARGE_INTEGER                   RealSize;
-
 } EXT2_FCB, *PEXT2_FCB;
 
 //
@@ -761,9 +759,6 @@ typedef struct _EXT2_FCB {
 
 #define FCB_FROM_POOL               0x00000001
 #define FCB_PAGE_FILE               0x00000002
-#define FCB_DELETE_ON_CLOSE         0x00000004
-#define FCB_DELETE_PENDING          0x00000008
-#define FCB_FILE_DELETED            0x00000010
 #define FCB_FILE_MODIFIED           0x00000020
 #define FCB_STATE_BUSY              0x00000040
 #define FCB_ALLOC_IN_CREATE         0x00000080
@@ -831,13 +826,22 @@ struct _EXT2_MCB {
 #define MCB_FROM_POOL               0x00000001
 #define MCB_VCB_LINK                0x00000002
 #define MCB_ENTRY_TREE              0x00000004
+#define MCB_FILE_DELETED            0x00000008
 
-#define MCB_ZONE_INIT               0x08000000
-#define MCB_IS_SYMLINK              0x80000000
+#define MCB_ZONE_INIT               0x20000000
+#define MCB_TYPE_SPECIAL            0x40000000  /* unresolved symlink + device node */
+#define MCB_TYPE_SYMLINK            0x80000000
 
-#define IsMcbUsed(Mcb)      (Mcb->Refercount > 0)
-#define IsMcbSymLink(Mcb)   IsFlagOn(Mcb->Flags, MCB_IS_SYMLINK)
-#define IsZoneInited(Mcb)   IsFlagOn(Mcb->Flags, MCB_ZONE_INIT)
+#define IsMcbUsed(Mcb)          ((Mcb)->Refercount > 0)
+#define IsMcbSymLink(Mcb)       IsFlagOn((Mcb)->Flags, MCB_TYPE_SYMLINK)
+#define IsZoneInited(Mcb)       IsFlagOn((Mcb)->Flags, MCB_ZONE_INIT)
+#define IsMcbSpecialFile(Mcb)   IsFlagOn((Mcb)->Flags, MCB_TYPE_SPECIAL)
+#define IsMcbRoot(Mcb)          ((Mcb)->Inode.i_ino == EXT2_ROOT_INO)
+#define IsMcbReadonly(Mcb)      IsFlagOn((Mcb)->FileAttr, FILE_ATTRIBUTE_READONLY)
+#define IsMcbDirectory(Mcb)     IsFlagOn((Mcb)->FileAttr, FILE_ATTRIBUTE_DIRECTORY)
+#define IsFileDeleted(Mcb)      IsFlagOn((Mcb)->Flags, MCB_FILE_DELETED)
+
+#define IsLinkInvalid(Mcb)      (IsMcbSymLink(Mcb) && IsFileDeleted(Mcb->Target))
 
 /*
  * routines for reference count management
@@ -897,6 +901,9 @@ typedef struct _EXT2_CCB {
 #define CCB_FROM_POOL               0x00000001
 #define CCB_VOLUME_DASD_PURGE       0x00000002
 #define CCB_LAST_WRITE_UPDATED      0x00000004
+
+#define CCB_DELETE_ON_CLOSE         0x00000010
+#define CCB_DELETE_PENDING          0x00000020
 
 #define CCB_ALLOW_EXTENDED_DASD_IO  0x80000000
 
@@ -1285,7 +1292,7 @@ Ext2SupersedeOrOverWriteFile(
 /* debug levels */
 #define DL_NVR 0
 #define DL_VIT 0x00000001
-#define DL_ERR 0x00000003
+#define DL_ERR 0x00000002
 #define DL_DBG 0x00000004
 #define DL_INF 0x00000008
 #define DL_FUN 0x00000010
@@ -1302,7 +1309,7 @@ Ext2SupersedeOrOverWriteFile(
 #define DL_BH  0x00008000   /* buffer head */
 #define DL_PNP 0x00010000   /* pnp */
 
-#define DL_DEFAULT (DL_ERR)
+#define DL_DEFAULT (DL_ERR|DL_VIT)
 
 #if EXT2_DEBUG
 extern  ULONG DebugFilter;
@@ -1359,6 +1366,18 @@ Ext2DbgPrintComplete (
 
 PUCHAR
 Ext2NtStatusToString (IN NTSTATUS Status );
+
+PVOID Ext2AllocatePool(
+    IN POOL_TYPE PoolType,
+    IN SIZE_T NumberOfBytes,
+    IN ULONG Tag
+);
+
+VOID
+Ext2FreePool(
+    IN PVOID P,
+    IN ULONG Tag
+);
 
 //
 // Devctl.c
@@ -1510,6 +1529,93 @@ Ext2ExceptionHandler (IN PEXT2_IRP_CONTEXT IrpContext);
 // ext3\generic.c
 //
 
+static inline ext3_fsblk_t ext3_blocks_count(struct ext3_super_block *es)
+{
+    return ((ext3_fsblk_t)le32_to_cpu(es->s_blocks_count_hi) << 32) |
+           le32_to_cpu(es->s_blocks_count);
+}
+
+static inline ext3_fsblk_t ext3_r_blocks_count(struct ext3_super_block *es)
+{
+    return ((ext3_fsblk_t)le32_to_cpu(es->s_r_blocks_count_hi) << 32) |
+           le32_to_cpu(es->s_r_blocks_count);
+}
+
+static inline ext3_fsblk_t ext3_free_blocks_count(struct ext3_super_block *es)
+{
+    return ((ext3_fsblk_t)le32_to_cpu(es->s_free_blocks_count_hi) << 32) |
+           le32_to_cpu(es->s_free_blocks_count);
+}
+
+static inline void ext3_blocks_count_set(struct ext3_super_block *es,
+        ext3_fsblk_t blk)
+{
+    es->s_blocks_count = cpu_to_le32((u32)blk);
+    es->s_blocks_count_hi = cpu_to_le32(blk >> 32);
+}
+
+static inline void ext3_free_blocks_count_set(struct ext3_super_block *es,
+        ext3_fsblk_t blk)
+{
+    es->s_free_blocks_count = cpu_to_le32((u32)blk);
+    es->s_free_blocks_count_hi = cpu_to_le32(blk >> 32);
+}
+
+static inline void ext3_r_blocks_count_set(struct ext3_super_block *es,
+        ext3_fsblk_t blk)
+{
+    es->s_r_blocks_count = cpu_to_le32((u32)blk);
+    es->s_r_blocks_count_hi = cpu_to_le32(blk >> 32);
+}
+
+blkcnt_t ext3_inode_blocks(struct ext3_inode *raw_inode,
+                           struct inode *inode);
+
+int ext3_inode_blocks_set(struct ext3_inode *raw_inode,
+                          struct inode * inode);
+ext4_fsblk_t ext4_block_bitmap(struct super_block *sb,
+                               struct ext4_group_desc *bg);
+
+ext4_fsblk_t ext4_inode_bitmap(struct super_block *sb,
+                               struct ext4_group_desc *bg);
+ext4_fsblk_t ext4_inode_table(struct super_block *sb,
+                              struct ext4_group_desc *bg);
+__u32 ext4_free_blks_count(struct super_block *sb,
+                           struct ext4_group_desc *bg);
+__u32 ext4_free_inodes_count(struct super_block *sb,
+                             struct ext4_group_desc *bg);
+__u32 ext4_used_dirs_count(struct super_block *sb,
+                           struct ext4_group_desc *bg);
+__u32 ext4_itable_unused_count(struct super_block *sb,
+                               struct ext4_group_desc *bg);
+void ext4_block_bitmap_set(struct super_block *sb,
+                           struct ext4_group_desc *bg, ext4_fsblk_t blk);
+void ext4_inode_bitmap_set(struct super_block *sb,
+                           struct ext4_group_desc *bg, ext4_fsblk_t blk);
+void ext4_inode_table_set(struct super_block *sb,
+                          struct ext4_group_desc *bg, ext4_fsblk_t blk);
+void ext4_free_blks_set(struct super_block *sb,
+                        struct ext4_group_desc *bg, __u32 count);
+void ext4_free_inodes_set(struct super_block *sb,
+                          struct ext4_group_desc *bg, __u32 count);
+void ext4_used_dirs_set(struct super_block *sb,
+                        struct ext4_group_desc *bg, __u32 count);
+void ext4_itable_unused_set(struct super_block *sb,
+                            struct ext4_group_desc *bg, __u32 count);
+
+int ext3_bg_has_super(struct super_block *sb, ext3_group_t group);
+unsigned long ext4_bg_num_gdb(struct super_block *sb, ext4_group_t group);
+unsigned ext4_init_inode_bitmap(struct super_block *sb, struct buffer_head *bh,
+                                ext4_group_t block_group,
+                                struct ext4_group_desc *gdp);
+unsigned ext4_init_block_bitmap(struct super_block *sb, struct buffer_head *bh,
+                                ext4_group_t block_group, struct ext4_group_desc *gdp);
+struct ext4_group_desc * ext4_get_group_desc(struct super_block *sb,
+                    ext4_group_t block_group, struct buffer_head **bh);
+ext4_fsblk_t ext4_count_free_blocks(struct super_block *sb);
+unsigned long ext4_count_free_inodes(struct super_block *sb);
+int ext4_check_descriptors(struct super_block *sb);
+
 NTSTATUS
 Ext2LoadSuper(
     IN PEXT2_VCB      Vcb,
@@ -1532,6 +1638,9 @@ Ext2RefreshSuper(
 
 BOOLEAN
 Ext2LoadGroup(IN PEXT2_VCB Vcb);
+
+VOID
+Ext2PutGroup(IN PEXT2_VCB Vcb);
 
 BOOLEAN
 Ext2SaveGroup(
@@ -1771,6 +1880,22 @@ int ext3_check_dir_entry (const char * function, struct inode * dir,
                           struct ext3_dir_entry_2 * de,
                           struct buffer_head * bh,
                           unsigned long offset);
+
+loff_t ext3_max_size(int blkbits, int has_huge_files);
+loff_t ext3_max_bitmap_size(int bits, int has_huge_files);
+
+
+__le16 ext4_group_desc_csum(struct ext3_sb_info *sbi, __u32 block_group,
+                            struct ext4_group_desc *gdp);
+int ext4_group_desc_csum_verify(struct ext3_sb_info *sbi, __u32 block_group,
+                                struct ext4_group_desc *gdp);
+
+ext3_fsblk_t descriptor_loc(struct super_block *sb,
+                            ext3_fsblk_t logical_sb_block, unsigned int nr);
+struct ext4_group_desc * ext4_get_group_desc(struct super_block *sb,
+                    ext4_group_t block_group, struct buffer_head **bh);
+int ext4_check_descriptors(struct super_block *sb);
+
 //
 // Fastio.c
 //
@@ -1900,6 +2025,13 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext);
 NTSTATUS
 Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext);
 
+ULONG
+Ext2TotalBlocks(
+    PEXT2_VCB         Vcb,
+    PLARGE_INTEGER    Size,
+    PULONG            pMeta
+);
+
 NTSTATUS
 Ext2ExpandFile(
     PEXT2_IRP_CONTEXT IrpContext,
@@ -1919,7 +2051,8 @@ NTSTATUS
 Ext2IsFileRemovable(
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
-    IN PEXT2_FCB            Fcb
+    IN PEXT2_FCB            Fcb,
+    IN PEXT2_CCB            Ccb
 );
 
 NTSTATUS
@@ -1946,6 +2079,7 @@ NTSTATUS
 Ext2DeleteFile(
     PEXT2_IRP_CONTEXT IrpContext,
     PEXT2_VCB Vcb,
+    PEXT2_FCB Fcb,
     PEXT2_MCB Mcb
 );
 
@@ -2092,6 +2226,7 @@ __u32 ext3_current_time(struct inode *in);
 void ext3_warning (struct super_block * sb, const char * function,
                    char * fmt, ...);
 #define ext3_error ext3_warning
+#define ext4_error ext3_error
 
 void ext3_update_dx_flag(struct inode *inode);
 int ext3_mark_inode_dirty(struct ext2_icb *icb, struct inode *in);
@@ -2124,8 +2259,8 @@ int ext3_add_entry(struct ext2_icb *icb, struct dentry *dentry, struct inode *in
 int ext3_delete_entry(struct ext2_icb *icb, struct inode *dir,
                       struct ext3_dir_entry_2 *de_del,
                       struct buffer_head *bh);
-int ext3_is_dir_empty(struct ext2_icb *icb, struct inode *inode);
 
+int ext3_is_dir_empty(struct ext2_icb *icb, struct inode *inode);
 //
 // Init.c
 //
@@ -2381,7 +2516,7 @@ Ext2CleanupAllMcbs(
 BOOLEAN
 Ext2CheckSetBlock(
     PEXT2_IRP_CONTEXT IrpContext,
-    PEXT2_VCB Vcb, ULONG Block
+    PEXT2_VCB Vcb, LONGLONG Block
 );
 
 BOOLEAN

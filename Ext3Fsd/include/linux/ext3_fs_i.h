@@ -20,15 +20,19 @@
 
 /* data type for block offset of block group */
 typedef int ext3_grpblk_t;
+typedef int ext4_grpblk_t;
 
 /* data type for filesystem-wide blocks number */
 typedef unsigned long long ext3_fsblk_t;
+typedef unsigned long long ext4_fsblk_t;
 
 /* data type for file logical block number */
 typedef __u32 ext3_lblk_t;
+typedef __u32 ext4_lblk_t;
 
 /* data type for block group number */
 typedef unsigned int ext3_group_t;
+typedef unsigned int ext4_group_t;
 
 #define E3FSBLK "%lu"
 

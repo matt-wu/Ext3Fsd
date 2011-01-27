@@ -10,7 +10,6 @@
 /* INCLUDES *****************************************************************/
 
 #include "ext2fs.h"
-#include <linux\ext3_fs.h>
 
 /* GLOBALS ***************************************************************/
 
@@ -242,7 +241,8 @@ Ext2FreeFcb (IN PEXT2_FCB Fcb)
     if ((Fcb->Mcb->Identifier.Type == EXT2MCB) &&
             (Fcb->Mcb->Identifier.Size == sizeof(EXT2_MCB))) {
 
-        if (IsFlagOn(Fcb->Flags, FCB_FILE_DELETED)) {
+        if (IsFlagOn(Fcb->Mcb->Flags, MCB_FILE_DELETED) ||
+                IsMcbSpecialFile(Fcb->Mcb) || IsMcbSymLink(Fcb->Mcb)) {
             ASSERT(!IsRoot(Fcb));
             Ext2RemoveMcb(Fcb->Vcb, Fcb->Mcb);
         }
@@ -1033,6 +1033,7 @@ Ext2InitializeZone(
     ULONG       Block;
     ULONG       Mapped;
 
+    ASSERT(Mcb != NULL);
     End = (ULONG)((Mcb->FileSize.QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS);
 
     while (Start < End) {
@@ -1040,7 +1041,7 @@ Ext2InitializeZone(
         Block = Mapped = 0;
 
         /* mapping file offset to ext2 block */
-        if (Mcb->Inode.i_flags & EXT2_EXTENTS_FL) {
+        if (INODE_HAS_EXTENT(&Mcb->Inode)) {
             Status = Ext2ExtentMap(
                          IrpContext,
                          Vcb,
@@ -1158,16 +1159,16 @@ Ext2BuildExtents(
                      &Mapped);
 
             if (!rc) {
-                DbgBreak();
-                Status = STATUS_INSUFFICIENT_RESOURCES;
-                goto errorout;
+                /* we likely get a sparse file here */
+                Mapped = 1;
+                Block = 0;
             }
         }
 
         /* try to BlockMap in case failed to access Extents cache */
         if (!IsZoneInited(Mcb) || (bAlloc && Block == 0)) {
 
-            if (Mcb->Inode.i_flags & EXT2_EXTENTS_FL) {
+            if (INODE_HAS_EXTENT(&Mcb->Inode)) {
                 Status = Ext2ExtentMap(
                              IrpContext,
                              Vcb,
@@ -1590,8 +1591,8 @@ Ext2InsertMcb (
         /* use it's target if it's a symlink */
         if (IsMcbSymLink(Parent)) {
             Parent = Parent->Target;
+            ASSERT(!IsMcbSymLink(Parent));
         }
-        ASSERT(!IsMcbSymLink(Parent));
 
         Mcb = Parent->Child;
         while (Mcb) {
@@ -1727,8 +1728,9 @@ Ext2CleanupAllMcbs(PEXT2_VCB Vcb)
 }
 
 BOOLEAN
-Ext2CheckSetBlock(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb, ULONG Block)
+Ext2CheckSetBlock(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb, LONGLONG Block)
 {
+    PEXT2_GROUP_DESC gd;
     ULONG           Group, dwBlk, Length;
 
     RTL_BITMAP      BlockBitmap;
@@ -1740,14 +1742,18 @@ Ext2CheckSetBlock(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb, ULONG Block)
     BOOLEAN         bModified = FALSE;
 
 
-    Group = (Block - EXT2_FIRST_DATA_BLOCK) / BLOCKS_PER_GROUP;
-    dwBlk = (Block - EXT2_FIRST_DATA_BLOCK) % BLOCKS_PER_GROUP;
+    Group = (ULONG)(Block - EXT2_FIRST_DATA_BLOCK) / BLOCKS_PER_GROUP;
+    dwBlk = (ULONG)(Block - EXT2_FIRST_DATA_BLOCK) % BLOCKS_PER_GROUP;
 
-    Offset.QuadPart = (LONGLONG) Vcb->BlockSize;
-    Offset.QuadPart = Offset.QuadPart * Vcb->GroupDesc[Group].bg_block_bitmap;
+    gd = ext4_get_group_desc(&Vcb->sb, Group, NULL);
+    if (!gd) {
+        return FALSE;
+    }
+    Offset.QuadPart = ext4_block_bitmap(&Vcb->sb, gd);
+    Offset.QuadPart <<= BLOCK_BITS;
 
-    if (Group == Vcb->NumOfGroups - 1) {
-        Length = TOTAL_BLOCKS % BLOCKS_PER_GROUP;
+    if (Group == Vcb->sbi.s_groups_count - 1) {
+        Length = (ULONG)(TOTAL_BLOCKS % BLOCKS_PER_GROUP);
 
         /* s_blocks_count is integer multiple of s_blocks_per_group */
         if (Length == 0)
@@ -1767,7 +1773,7 @@ Ext2CheckSetBlock(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb, ULONG Block)
                     &BitmapCache ) ) {
 
         DEBUG(DL_ERR, ( "Ext2CheckSetBlock: Failed to PinLock block %xh ...\n",
-                        Vcb->GroupDesc[Group].bg_block_bitmap));
+                        ext4_block_bitmap(&Vcb->sb, gd)));
         return FALSE;
     }
 
@@ -1803,13 +1809,18 @@ Ext2CheckBitmapConsistency(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb)
 {
     ULONG i, j, InodeBlocks;
 
-    for (i = 0; i < Vcb->NumOfGroups; i++) {
+    for (i = 0; i < Vcb->sbi.s_groups_count; i++) {
 
-        Ext2CheckSetBlock(IrpContext, Vcb, Vcb->GroupDesc[i].bg_block_bitmap);
-        Ext2CheckSetBlock(IrpContext, Vcb, Vcb->GroupDesc[i].bg_inode_bitmap);
+        PEXT2_GROUP_DESC    gd;
+
+        gd = ext4_get_group_desc(&Vcb->sb, i, NULL);
+        if (!gd)
+            continue;
+        Ext2CheckSetBlock(IrpContext, Vcb, ext4_block_bitmap(&Vcb->sb, gd));
+        Ext2CheckSetBlock(IrpContext, Vcb, ext4_inode_bitmap(&Vcb->sb, gd));
 
 
-        if (i == Vcb->NumOfGroups - 1) {
+        if (i == Vcb->sbi.s_groups_count - 1) {
             InodeBlocks = ((INODES_COUNT % INODES_PER_GROUP) *
                            Vcb->InodeSize + Vcb->BlockSize - 1) /
                           (Vcb->BlockSize);
@@ -1819,7 +1830,7 @@ Ext2CheckBitmapConsistency(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb)
         }
 
         for (j = 0; j < InodeBlocks; j++ )
-            Ext2CheckSetBlock(IrpContext, Vcb, Vcb->GroupDesc[i].bg_inode_table + j);
+            Ext2CheckSetBlock(IrpContext, Vcb, ext4_inode_table(&Vcb->sb, gd) + j);
     }
 
     return TRUE;
@@ -2154,28 +2165,7 @@ static __inline BOOLEAN Ext2IsNullUuid (__u8 * uuid)
     return (i >= 16);
 }
 
-/*
- * Maximal file size.  There is a direct, and {,double-,triple-}indirect
- * block limit, and also a limit of (2^32 - 1) 512-byte sectors in i_blocks.
- * We need to be 1 filesystem block less than the 2^32 sector limit.
- */
-static loff_t ext3_max_size(int bits)
-{
-    loff_t res = EXT3_NDIR_BLOCKS;
-    /* This constant is calculated to be the largest file size for a
-     * dense, 4k-blocksize file such that the total number of
-     * sectors in the file, including data and all indirect blocks,
-     * does not exceed 2^32. */
-    const loff_t upper_limit = 0x1ff7fffd000LL;
-
-    res += 1LL << (bits-2);
-    res += 1LL << (2*(bits-2));
-    res += 1LL << (3*(bits-2));
-    res <<= bits;
-    if (res > upper_limit)
-        res = upper_limit;
-    return res;
-}
+#define is_power_of_2(x)        ((x) != 0 && (((x) & ((x) - 1)) == 0))
 
 NTSTATUS
 Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
@@ -2191,9 +2181,9 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
     LONGLONG                    PartSize;
     UNICODE_STRING              RootNode;
     USHORT                      Buffer[2];
-    ULONG                       ChangeCount = 0;
+    ULONG                       ChangeCount = 0, features;
     CC_FILE_SIZES               FileSizes;
-    int                         i;
+    int                         i, has_huge_files;
 
     BOOLEAN                     VcbResourceInitialized = FALSE;
     BOOLEAN                     NotifySyncInitialized = FALSE;
@@ -2212,7 +2202,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             Vcb->IsExt3fs = TRUE;
         }
 
-        /* don't mount an journal device */
+        /* don't mount any volumes with external journal devices */
         if (IsFlagOn(sb->s_feature_incompat, EXT3_FEATURE_INCOMPAT_JOURNAL_DEV)) {
             __leave;
         }
@@ -2370,6 +2360,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         /* create the stream object for ext2 volume */
         Vcb->Volume = IoCreateStreamFileObject(NULL, Vcb->Vpb->RealDevice);
         if (!Vcb->Volume) {
+            Status = STATUS_UNRECOGNIZED_VOLUME;
             __leave;
         }
 
@@ -2417,65 +2408,128 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         Vcb->bd.bd_bh_cache = kmem_cache_create("bd_bh_buffer",
                                                 Vcb->BlockSize, 0, 0, NULL);
         if (!Vcb->bd.bd_bh_cache) {
+            Status = STATUS_INSUFFICIENT_RESOURCES;
             __leave;
         }
 
+        Vcb->SectorBits = Ext2Log2(SECTOR_SIZE);
         Vcb->sb.s_magic = sb->s_magic;
         Vcb->sb.s_bdev = &Vcb->bd;
         Vcb->sb.s_blocksize = BLOCK_SIZE;
         Vcb->sb.s_blocksize_bits = BLOCK_BITS;
         Vcb->sb.s_priv = (void *) Vcb;
         Vcb->sb.s_fs_info = &Vcb->sbi;
-        Vcb->sb.s_maxbytes = ext3_max_size(BLOCK_BITS);
 
         Vcb->sbi.s_es = sb;
         Vcb->sbi.s_blocks_per_group = sb->s_blocks_per_group;
         Vcb->sbi.s_first_ino = sb->s_first_ino;
+        Vcb->sbi.s_desc_size = sb->s_desc_size;
+
+        if (EXT3_HAS_INCOMPAT_FEATURE(&Vcb->sb, EXT4_FEATURE_INCOMPAT_64BIT)) {
+            if (Vcb->sbi.s_desc_size < EXT4_MIN_DESC_SIZE_64BIT ||
+                    Vcb->sbi.s_desc_size > EXT4_MAX_DESC_SIZE ||
+                    !is_power_of_2(Vcb->sbi.s_desc_size)) {
+                DEBUG(DL_ERR, ("EXT4-fs: unsupported descriptor size %lu\n", Vcb->sbi.s_desc_size));
+                Status = STATUS_DISK_CORRUPT_ERROR;
+                __leave;
+            }
+        } else {
+            Vcb->sbi.s_desc_size = EXT4_MIN_DESC_SIZE;
+        }
+
+        Vcb->sbi.s_blocks_per_group = sb->s_blocks_per_group;
+        Vcb->sbi.s_inodes_per_group = sb->s_inodes_per_group;
+        if (EXT3_INODES_PER_GROUP(&Vcb->sb) == 0) {
+            Status = STATUS_DISK_CORRUPT_ERROR;
+            __leave;
+        }
+        Vcb->sbi.s_inodes_per_block = BLOCK_SIZE / Vcb->InodeSize;
+        if (Vcb->sbi.s_inodes_per_block == 0) {
+            Status = STATUS_DISK_CORRUPT_ERROR;
+            __leave;
+        }
+        Vcb->sbi.s_itb_per_group = Vcb->sbi.s_inodes_per_group /
+                                   Vcb->sbi.s_inodes_per_block;
+
+
+        Vcb->sbi.s_desc_per_block = BLOCK_SIZE / GROUP_DESC_SIZE;
+        Vcb->sbi.s_desc_per_block_bits = ilog2(Vcb->sbi.s_desc_per_block);
+
         for (i=0; i < 4; i++) {
             Vcb->sbi.s_hash_seed[i] = sb->s_hash_seed[i];
         }
         Vcb->sbi.s_def_hash_version = sb->s_def_hash_version;
 
+        if (le32_to_cpu(sb->s_rev_level) == EXT3_GOOD_OLD_REV &&
+                (EXT3_HAS_COMPAT_FEATURE(&Vcb->sb, ~0U) ||
+                 EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb, ~0U) ||
+                 EXT3_HAS_INCOMPAT_FEATURE(&Vcb->sb, ~0U))) {
+            printk(KERN_WARNING
+                   "EXT3-fs warning: feature flags set on rev 0 fs, "
+                   "running e2fsck is recommended\n");
+        }
+
+        /*
+         * Check feature flags regardless of the revision level, since we
+         * previously didn't change the revision level when setting the flags,
+         * so there is a chance incompat flags are set on a rev 0 filesystem.
+         */
+        features = EXT3_HAS_INCOMPAT_FEATURE(&Vcb->sb, ~EXT3_FEATURE_INCOMPAT_SUPP);
+        if (features & EXT4_FEATURE_INCOMPAT_DIRDATA) {
+            SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
+            ClearFlag(features, EXT4_FEATURE_INCOMPAT_DIRDATA);
+        }
+        if (features) {
+            printk(KERN_ERR "EXT3-fs: %s: couldn't mount because of "
+                   "unsupported optional features (%x).\n",
+                   Vcb->sb.s_id, le32_to_cpu(features));
+            Status = STATUS_UNRECOGNIZED_VOLUME;
+            __leave;
+        }
+        features = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb, ~EXT3_FEATURE_RO_COMPAT_SUPP);
+        if (features) {
+            printk(KERN_ERR "EXT3-fs: %s: couldn't mount RDWR because of "
+                   "unsupported optional features (%x).\n",
+                   Vcb->sb.s_id, le32_to_cpu(features));
+            SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
+        }
+
+        has_huge_files = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb,
+                         EXT4_FEATURE_RO_COMPAT_HUGE_FILE);
+
+        Vcb->sb.s_maxbytes = ext3_max_size(BLOCK_BITS, has_huge_files);
+        Vcb->max_bitmap_bytes = ext3_max_bitmap_size(BLOCK_BITS,
+                                has_huge_files);
+        Vcb->max_bytes = ext3_max_size(BLOCK_BITS, has_huge_files);
+
         /* calculate maximum file bocks ... */
         {
-            ULONG   dwData[EXT2_BLOCK_TYPES] = {EXT2_NDIR_BLOCKS, 1, 1, 1};
-            ULONG   i;
-            ULONGLONG MaxBlocks = 0x100000000;
+            ULONG  dwData[EXT2_BLOCK_TYPES] = {EXT2_NDIR_BLOCKS, 1, 1, 1};
+            ULONG  i;
 
-            Vcb->SectorBits = Ext2Log2(SECTOR_SIZE);
             ASSERT(BLOCK_BITS == Ext2Log2(BLOCK_SIZE));
 
-            Vcb->NumOfGroups = (sb->s_blocks_count - sb->s_first_data_block +
-                                sb->s_blocks_per_group - 1) / sb->s_blocks_per_group;
+            Vcb->sbi.s_groups_count = (ULONG)(ext3_blocks_count(sb) - sb->s_first_data_block +
+                                              sb->s_blocks_per_group - 1) / sb->s_blocks_per_group;
 
-            MaxBlocks = (MaxBlocks >> (BLOCK_BITS - SECTOR_BITS));
-            if (MaxBlocks > (ULONGLONG)0xFFFFFFF0) {
-                MaxBlocks = (ULONGLONG)0xFFFFFFF0;
-            }
-
+            Vcb->max_data_blocks = 0;
             for (i = 0; i < EXT2_BLOCK_TYPES; i++) {
-
-                dwData[i] = dwData[i] << ((BLOCK_BITS - 2) * i);
-                if ( (((BLOCK_BITS - 2) * i) >= 32) ||
-                        (ULONGLONG)Vcb->MaxInodeBlocks + dwData[i] > MaxBlocks) {
-                    dwData[i] = (ULONG)(MaxBlocks - Vcb->MaxInodeBlocks);
-                    Vcb->MaxInodeBlocks = (ULONG)MaxBlocks;
+                if (BLOCK_BITS >= 12 && i == (EXT2_BLOCK_TYPES - 1)) {
+                    dwData[i] = 0x40000000;
                 } else {
-                    Vcb->MaxInodeBlocks += dwData[i];
+                    dwData[i] = dwData[i] << ((BLOCK_BITS - 2) * i);
                 }
-                Vcb->NumBlocks[i] = dwData[i];
+                Vcb->max_blocks_per_layer[i] = dwData[i];
+                Vcb->max_data_blocks += Vcb->max_blocks_per_layer[i];
             }
         }
 
+        Vcb->sbi.s_gdb_count = (Vcb->sbi.s_groups_count + Vcb->sbi.s_desc_per_block - 1) /
+                               Vcb->sbi.s_desc_per_block;
         /* load all gorup desc */
         if (!Ext2LoadGroup(Vcb)) {
             Status = STATUS_UNSUCCESSFUL;
             __leave;
-        }
-
-        /* mount ext4 read-only to be safe */
-        if (IsFlagOn(sb->s_feature_ro_compat, EXT4_FEATURE_RO_COMPAT_GDT_CSUM)) {
-            SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
         }
 
         /* recovery journal since it's ext3 */
@@ -2514,6 +2568,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
 
         /* load root inode */
         Vcb->McbTree->Inode.i_ino = EXT2_ROOT_INO;
+        Vcb->McbTree->Inode.i_sb = &Vcb->sb;
         if (!Ext2LoadInode(Vcb, &Vcb->McbTree->Inode)) {
             DbgBreak();
             Status = STATUS_CANT_WAIT;
@@ -2540,18 +2595,19 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
 
         if (!NT_SUCCESS(Status)) {
 
+            if (Vcb->McbTree) {
+                Ext2FreeMcb(Vcb, Vcb->McbTree);
+            }
+
             if (InodeLookasideInitialized) {
                 ExDeleteNPagedLookasideList(&(Vcb->InodeLookasideList));
             }
 
             if (ExtentsInitialized) {
+                Ext2PutGroup(Vcb);
                 if (Vcb->bd.bd_bh_cache)
                     kmem_cache_destroy(Vcb->bd.bd_bh_cache);
                 FsRtlUninitializeLargeMcb(&(Vcb->Extents));
-            }
-
-            if (Vcb->McbTree) {
-                Ext2FreeMcb(Vcb, Vcb->McbTree);
             }
 
             if (Vcb->Volume) {
@@ -2563,11 +2619,6 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
 
             if (NotifySyncInitialized) {
                 FsRtlNotifyUninitializeSync(&Vcb->NotifySync);
-            }
-
-            if (Vcb->GroupDesc) {
-                Ext2FreePool(Vcb->GroupDesc, EXT2_GD_MAGIC);
-                Vcb->GroupDesc = NULL;
             }
 
             if (VcbResourceInitialized) {
@@ -2630,13 +2681,10 @@ Ext2DestroyVcb (IN PEXT2_VCB Vcb)
 
     Ext2CleanupAllMcbs(Vcb);
 
+    Ext2PutGroup(Vcb);
+
     if (Vcb->bd.bd_bh_cache)
         kmem_cache_destroy(Vcb->bd.bd_bh_cache);
-
-    if (Vcb->GroupDesc) {
-        Ext2FreePool(Vcb->GroupDesc, EXT2_GD_MAGIC);
-        Vcb->GroupDesc = NULL;
-    }
 
     if (Vcb->SuperBlock) {
         Ext2FreePool(Vcb->SuperBlock, EXT2_SB_MAGIC);
@@ -2786,8 +2834,9 @@ Ext2FirstUnusedMcb(PEXT2_VCB Vcb, BOOLEAN Wait, ULONG Number)
                 ASSERT(IsFlagOn(Mcb->Flags, MCB_VCB_LINK));
 
                 if (Mcb->Fcb == NULL && !IsMcbRoot(Mcb) &&
-                        (IsMcbSymLink(Mcb) || Mcb->Child == NULL) &&
-                        Mcb->Refercount == 0 ) {
+                        Mcb->Refercount == 0 &&
+                        (IsMcbSymLink(Mcb) || Mcb->Child == NULL ||
+                         IsFileDeleted(Mcb)) ) {
 
                     Ext2RemoveMcb(Vcb, Mcb);
                     ClearLongFlag(Mcb->Flags, MCB_VCB_LINK);

@@ -38,8 +38,8 @@
  * good macro practice, in favor of extra legibility.
  * Rotation is separate from addition to prevent recomputation
  */
-#define ROUND(f, a, b, c, d, x, s)  \
-    (a += f(b, c, d) + x, a = (a << s) | (a >> (32 - s)))
+#define ROUND(f, a, b, c, d, x, s)	\
+	(a += f(b, c, d) + x, a = (a << s) | (a >> (32 - s)))
 #define K1 0
 #define K2 013240474631
 #define K3 015666365641
@@ -93,10 +93,10 @@ __u32 half_md4_transform(__u32 buf[4], __u32 const in[8])
 
 static void TEA_transform(__u32 buf[4], __u32 const in[])
 {
-    __u32   sum = 0;
-    __u32   b0 = buf[0], b1 = buf[1];
-    __u32   a = in[0], b = in[1], c = in[2], d = in[3];
-    int n = 16;
+    __u32	sum = 0;
+    __u32	b0 = buf[0], b1 = buf[1];
+    __u32	a = in[0], b = in[1], c = in[2], d = in[3];
+    int	n = 16;
 
     do {
         sum += DELTA;
@@ -125,8 +125,8 @@ static __u32 dx_hack_hash (const char *name, int len)
 
 static void str2hashbuf(const char *msg, int len, __u32 *buf, int num)
 {
-    __u32   pad, val;
-    int i;
+    __u32	pad, val;
+    int	i;
 
     pad = (__u32)len | ((__u32)len << 8);
     pad |= pad << 16;
@@ -175,6 +175,8 @@ void ext3_warning (struct super_block * sb, const char * function,
 }
 
 
+/* ext3_bread is safe for meta-data blocks. it's not safe to read file data,
+   since file data is managed by file cache, not volume cache */
 struct buffer_head *ext3_bread(struct ext2_icb *icb, struct inode *inode,
                                            unsigned long block, int *err)
 {
@@ -193,7 +195,7 @@ struct buffer_head *ext3_bread(struct ext2_icb *icb, struct inode *inode,
     }
 
     /* mapping file offset to ext2 block */
-    if (Mcb->Inode.i_flags & EXT2_EXTENTS_FL) {
+    if (INODE_HAS_EXTENT(&Mcb->Inode)) {
         status = Ext2ExtentMap(icb, inode->i_sb->s_priv,
                                Mcb, block, FALSE,
                                &lbn, &num);
@@ -335,12 +337,12 @@ int add_dirent_to_buf(struct ext2_icb *icb, struct dentry *dentry,
                       struct buffer_head *bh)
 {
     struct inode *dir = dentry->d_parent->d_inode;
-    const char  *name = dentry->d_name.name;
-    int     namelen = dentry->d_name.len;
-    unsigned int    offset = 0;
-    unsigned short  reclen;
-    int     nlen, rlen, err;
-    char        *top;
+    const char	*name = dentry->d_name.name;
+    int		namelen = dentry->d_name.len;
+    unsigned int	offset = 0;
+    unsigned short	reclen;
+    int		nlen, rlen, err;
+    char		*top;
 
     reclen = EXT3_DIR_REC_LEN(namelen);
     if (!de) {
@@ -422,11 +424,11 @@ int add_dirent_to_buf(struct ext2_icb *icb, struct dentry *dentry,
  */
 int ext3_dirhash(const char *name, int len, struct dx_hash_info *hinfo)
 {
-    __u32   hash;
-    __u32   minor_hash = 0;
-    const char  *p;
-    int     i;
-    __u32       in[8], buf[4];
+    __u32	hash;
+    __u32	minor_hash = 0;
+    const char	*p;
+    int		i;
+    __u32 		in[8], buf[4];
 
     /* Initialize the default seed for the hash checksum functions */
     buf[0] = 0x67452301;
@@ -497,23 +499,23 @@ EXPORT_SYMBOL(ext3_dirhash);
  * system call.  Worse yet, NFSv2 only allows for a 32-bit readdir
  * cookie.  Sigh.
  */
-#define hash2pos(major, minor)  (major >> 1)
-#define pos2maj_hash(pos)   ((pos << 1) & 0xffffffff)
-#define pos2min_hash(pos)   (0)
+#define hash2pos(major, minor)	(major >> 1)
+#define pos2maj_hash(pos)	((pos << 1) & 0xffffffff)
+#define pos2min_hash(pos)	(0)
 
 /*
  * This structure holds the nodes of the red-black tree used to store
  * the directory entry in hash order.
  */
 struct fname {
-    __u32       hash;
-    __u32       minor_hash;
-    struct rb_node  rb_hash;
-    struct fname    *next;
-    __u32       inode;
-    __u8        name_len;
-    __u8        file_type;
-    char        name[0];
+    __u32		hash;
+    __u32		minor_hash;
+    struct rb_node	rb_hash;
+    struct fname	*next;
+    __u32		inode;
+    __u8		name_len;
+    __u8		file_type;
+    char		name[0];
 };
 
 /*
@@ -522,9 +524,9 @@ struct fname {
  */
 static void free_rb_tree_fname(struct rb_root *root)
 {
-    struct rb_node  *n = root->rb_node;
-    struct rb_node  *parent;
-    struct fname    *fname;
+    struct rb_node	*n = root->rb_node;
+    struct rb_node	*parent;
+    struct fname	*fname;
 
     while (n) {
         /* Do the node's children first */
@@ -670,7 +672,7 @@ static int call_filldir(struct file * filp, void * cookie,
                         filldir_t filldir, struct fname *fname)
 {
     struct dir_private_info *info = filp->private_data;
-    loff_t  curr_pos;
+    loff_t	curr_pos;
     struct inode *inode = filp->f_dentry->d_inode;
     struct super_block * sb;
     int error;
@@ -737,13 +739,13 @@ struct dx_root
         __u8 unused_flags;
     }
     info;
-    struct dx_entry entries[0];
+    struct dx_entry	entries[0];
 };
 
 struct dx_node
 {
     struct fake_dirent fake;
-    struct dx_entry entries[0];
+    struct dx_entry	entries[0];
 };
 
 
@@ -1365,7 +1367,7 @@ struct buffer_head *
                                struct ext3_dir_entry_2 **res_dir, int *err)
 {
     struct super_block * sb;
-    struct dx_hash_info hinfo;
+    struct dx_hash_info	hinfo;
     u32 hash;
     struct dx_frame frames[2], *frame;
     struct ext3_dir_entry_2 *de, *top;
@@ -1383,9 +1385,9 @@ struct buffer_head *
             return NULL;
     } else {
         frame = frames;
-        frame->bh = NULL;           /* for dx_release() */
-        frame->at = (struct dx_entry *)frames;  /* hack for zero entry*/
-        dx_set_block(frame->at, 0);     /* dx_root block is 0 */
+        frame->bh = NULL;			/* for dx_release() */
+        frame->at = (struct dx_entry *)frames;	/* hack for zero entry*/
+        dx_set_block(frame->at, 0);		/* dx_root block is 0 */
     }
     hash = hinfo.hash;
     do {
@@ -1435,7 +1437,7 @@ int ext3_dx_readdir(struct file *filp, filldir_t filldir,
     struct inode *inode = filp->f_dentry->d_inode;
     struct fname *fname;
     PEXT2_FILLDIR_CONTEXT fc = context;
-    int ret;
+    int	ret;
 
     if (!info) {
         info = create_dir_info(filp->f_pos);
@@ -1445,7 +1447,7 @@ int ext3_dx_readdir(struct file *filp, filldir_t filldir,
     }
 
     if (filp->f_pos == EXT3_HTREE_EOF)
-        return 0;   /* EOF */
+        return 0;	/* EOF */
 
     /* Some one has messed with f_pos; reset the world */
     if (info->last_pos != filp->f_pos) {
@@ -1707,7 +1709,7 @@ struct ext3_dir_entry_2 *
     char *data1 = (*bh)->b_data, *data2;
     unsigned split, move, size;
     struct ext3_dir_entry_2 *de = NULL, *de2;
-    int err, i;
+    int	err, i;
 
     bh2 = ext3_append (icb, dir, &newblock, error);
     if (!(bh2)) {
@@ -1772,18 +1774,18 @@ errout:
 int make_indexed_dir(struct ext2_icb *icb, struct dentry *dentry,
                      struct inode *inode, struct buffer_head *bh)
 {
-    struct inode    *dir = dentry->d_parent->d_inode;
-    const char  *name = dentry->d_name.name;
-    int     namelen = dentry->d_name.len;
+    struct inode	*dir = dentry->d_parent->d_inode;
+    const char	*name = dentry->d_name.name;
+    int		namelen = dentry->d_name.len;
     struct buffer_head *bh2;
-    struct dx_root  *root;
-    struct dx_frame frames[2], *frame;
+    struct dx_root	*root;
+    struct dx_frame	frames[2], *frame;
     struct dx_entry *entries;
-    struct ext3_dir_entry_2 *de, *de2;
-    char        *data1, *top;
-    unsigned    len;
-    int     retval;
-    unsigned    blocksize;
+    struct ext3_dir_entry_2	*de, *de2;
+    char		*data1, *top;
+    unsigned	len;
+    int		retval;
+    unsigned	blocksize;
     struct dx_hash_info hinfo;
     ext3_lblk_t  block;
     struct fake_dirent *fde;
@@ -1859,7 +1861,7 @@ int ext3_release_dir (struct inode * inode, struct file * filp)
 #endif /* !EXT2_HTREE_INDEX */
 
 /*
- *  ext3_add_entry()
+ *	ext3_add_entry()
  *
  * adds a file entry to the specified directory, using the same
  * semantics as ext3_find_entry(). It returns NULL if it failed.
@@ -1874,9 +1876,9 @@ int ext3_add_entry(struct ext2_icb *icb, struct dentry *dentry, struct inode *in
     struct buffer_head *bh;
     struct ext3_dir_entry_2 *de;
     struct super_block *sb;
-    int retval;
+    int	retval;
 #ifdef EXT2_HTREE_INDEX
-    int dx_fallback=0;
+    int	dx_fallback=0;
 #endif
     unsigned blocksize;
     ext3_lblk_t block, blocks;
@@ -2074,11 +2076,11 @@ static inline int search_dirblock(struct buffer_head * bh,
  */
 #define NAMEI_RA_CHUNKS  2
 #define NAMEI_RA_BLOCKS  4
-#define NAMEI_RA_SIZE        (NAMEI_RA_CHUNKS * NAMEI_RA_BLOCKS)
+#define NAMEI_RA_SIZE	     (NAMEI_RA_CHUNKS * NAMEI_RA_BLOCKS)
 #define NAMEI_RA_INDEX(c,b)  (((c) * NAMEI_RA_BLOCKS) + (b))
 
 /*
- *  ext4_find_entry()
+ *	ext4_find_entry()
  *
  * finds an entry in the specified directory with the wanted name. It
  * returns the cache buffer in which the entry was found, and the entry
@@ -2097,10 +2099,10 @@ struct buffer_head * ext3_find_entry (struct ext2_icb *icb,
     struct buffer_head *bh_use[NAMEI_RA_SIZE];
     struct buffer_head *bh, *ret = NULL;
     ext3_lblk_t start, block, b;
-    int ra_max = 0;     /* Number of bh's in the readahead
-                   buffer, bh_use[] */
-    int ra_ptr = 0;     /* Current index into readahead
-                   buffer */
+    int ra_max = 0;		/* Number of bh's in the readahead
+				   buffer, bh_use[] */
+    int ra_ptr = 0;		/* Current index into readahead
+				   buffer */
     int num = 0;
     ext3_lblk_t  nblocks;
     int i, err;
