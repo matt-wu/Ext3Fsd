@@ -245,11 +245,16 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                 FcbPagingIoResourceAcquired = TRUE;
 
                 Size.QuadPart = CEILING_ALIGNED(ULONGLONG,
-                                                (ULONGLONG)Fcb->Mcb->FileSize.QuadPart,
+                                                (ULONGLONG)Fcb->Mcb->Inode.i_size,
                                                 (ULONGLONG)BLOCK_SIZE);
                 if (!IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING)) {
+
                     Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &Size);
-                    Fcb->Mcb->FileSize = Fcb->Header.FileSize;
+                    Size.QuadPart = CEILING_ALIGNED(ULONGLONG,
+                                                    (ULONGLONG)Fcb->Mcb->Inode.i_size,
+                                                    (ULONGLONG)BLOCK_SIZE);
+                    Fcb->Header.ValidDataLength.QuadPart =
+                        Fcb->Header.FileSize.QuadPart = Fcb->Mcb->Inode.i_size;
                     Fcb->Header.AllocationSize = Size;
                     if (CcIsFileCached(FileObject)) {
                         CcSetFileSizes(FileObject,

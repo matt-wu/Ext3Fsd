@@ -206,11 +206,10 @@ Ext2AllocateFcb (
     Fcb->Header.Resource = &(Fcb->MainResource);
     Fcb->Header.PagingIoResource = &(Fcb->PagingIoResource);
 
-    Fcb->Header.FileSize.QuadPart = Mcb->FileSize.QuadPart;
+    Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size;
+    Fcb->Header.ValidDataLength.QuadPart = Mcb->Inode.i_size;
     Fcb->Header.AllocationSize.QuadPart = CEILING_ALIGNED(ULONGLONG,
                                           Fcb->Header.FileSize.QuadPart, (ULONGLONG)Vcb->BlockSize);
-
-    Fcb->Header.ValidDataLength.QuadPart = Mcb->FileSize.QuadPart;
 
     Fcb->SectionObject.DataSectionObject = NULL;
     Fcb->SectionObject.SharedCacheMap = NULL;
@@ -373,7 +372,7 @@ Ext2AllocateInode (PEXT2_VCB  Vcb)
     RtlZeroMemory(inode, INODE_SIZE);
 
     DEBUG(DL_INF, ("ExtAllocateInode: Inode created: %ph.\n", inode));
-    INC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
+    //INC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
 
     return inode;
 }
@@ -386,7 +385,7 @@ Ext2DestroyInode (IN PEXT2_VCB Vcb, IN PEXT2_INODE inode)
     DEBUG(DL_INF, ("Ext2FreeInode: Inode = %ph.\n", inode));
 
     ExFreeToNPagedLookasideList(&(Vcb->InodeLookasideList), inode);
-    DEC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
+    //DEC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
 }
 
 struct dentry * Ext2AllocateEntry()
@@ -400,7 +399,7 @@ struct dentry * Ext2AllocateEntry()
     }
 
     RtlZeroMemory(de, sizeof(struct dentry));
-    INC_MEM_COUNT(PS_DENTRY, de, sizeof(struct dentry));
+    //INC_MEM_COUNT(PS_DENTRY, de, sizeof(struct dentry));
 
     return de;
 }
@@ -413,7 +412,7 @@ VOID Ext2FreeEntry (IN struct dentry *de)
         ExFreePool(de->d_name.name);
 
     ExFreeToPagedLookasideList(&(Ext2Global->Ext2DentryLookasideList), de);
-    DEC_MEM_COUNT(PS_DENTRY, de, sizeof(struct dentry));
+    //DEC_MEM_COUNT(PS_DENTRY, de, sizeof(struct dentry));
 }
 
 
@@ -1034,7 +1033,7 @@ Ext2InitializeZone(
     ULONG       Mapped;
 
     ASSERT(Mcb != NULL);
-    End = (ULONG)((Mcb->FileSize.QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS);
+    End = (ULONG)((Mcb->Inode.i_size + BLOCK_SIZE - 1) >> BLOCK_BITS);
 
     while (Start < End) {
 
@@ -1137,8 +1136,8 @@ Ext2BuildExtents(
     Start = (ULONG)(Offset >> BLOCK_BITS);
     End = (ULONG)((Size + Offset + BLOCK_SIZE - 1) >> BLOCK_BITS);
 
-    if (End > (ULONG)((Mcb->FileSize.QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS) ) {
-        End = (ULONG)((Mcb->FileSize.QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS);
+    if (End > (ULONG)((Mcb->Inode.i_size + BLOCK_SIZE - 1) >> BLOCK_BITS) ) {
+        End = (ULONG)((Mcb->Inode.i_size + BLOCK_SIZE - 1) >> BLOCK_BITS);
     }
 
     while (Size > 0 && Start < End) {
@@ -1768,7 +1767,7 @@ Ext2CheckSetBlock(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb, LONGLONG Block)
     if (!CcPinRead( Vcb->Volume,
                     &Offset,
                     Vcb->BlockSize,
-                    Ext2CanIWait(),
+                    PIN_WAIT,
                     &BitmapBcb,
                     &BitmapCache ) ) {
 
@@ -2204,6 +2203,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
 
         /* don't mount any volumes with external journal devices */
         if (IsFlagOn(sb->s_feature_incompat, EXT3_FEATURE_INCOMPAT_JOURNAL_DEV)) {
+            Status = STATUS_UNRECOGNIZED_VOLUME;
             __leave;
         }
 
@@ -2576,7 +2576,6 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         }
 
         /* initializeroot node */
-        Vcb->McbTree->FileSize.QuadPart = Vcb->McbTree->Inode.i_size;
         Vcb->McbTree->CreationTime = Ext2NtTime(Vcb->McbTree->Inode.i_ctime);
         Vcb->McbTree->LastAccessTime = Ext2NtTime(Vcb->McbTree->Inode.i_atime);
         Vcb->McbTree->LastWriteTime = Ext2NtTime(Vcb->McbTree->Inode.i_mtime);

@@ -45,7 +45,6 @@ Ext2LoadInternalJournal(
         Ext2FreeMcb(Vcb, Jcb);
         goto errorout;
     }
-    Jcb->FileSize.QuadPart = Jcb->Inode.i_size;
 
 errorout:
 

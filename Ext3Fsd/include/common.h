@@ -29,10 +29,11 @@ CTL_CODE(FILE_DEVICE_UNKNOWN, 2002, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #define PS_DISK_EVENT   0x0D
 #define PS_DISK_BUFFER  0x0E
 #define PS_BLOCK_DATA   0x0F
+
 #define PS_EXT2_INODE   0x10
 #define PS_DENTRY       0x11
 
-#define PS_MAX_TYPE     (0x11)
+#define PS_MAX_TYPE     (0x10)
 
 typedef union {
 

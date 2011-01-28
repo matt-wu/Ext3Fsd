@@ -717,7 +717,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
         case FileAllocationInformation:
         {
             PFILE_ALLOCATION_INFORMATION FAI = (PFILE_ALLOCATION_INFORMATION)Buffer;
-            LARGE_INTEGER RealSize, AllocationSize;
+            LARGE_INTEGER  AllocationSize;
 
             if (IsMcbDirectory(Mcb) || IsMcbSpecialFile(Mcb)) {
                 Status = STATUS_INVALID_DEVICE_REQUEST;
@@ -753,7 +753,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             AllocationSize.QuadPart = CEILING_ALIGNED(ULONGLONG,
                                       (ULONGLONG)FAI->AllocationSize.QuadPart,
                                       (ULONGLONG)BLOCK_SIZE);
-            RealSize = Mcb->FileSize;
 
             if (AllocationSize.QuadPart > Fcb->Header.AllocationSize.QuadPart) {
 
@@ -765,34 +764,21 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
                 if (MmCanFileBeTruncated(&(Fcb->SectionObject), &AllocationSize))  {
 
-                    /* free blocks from it's real size allocated in Ext2Create */
-                    if (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE)) {
-                        Mcb->FileSize = Fcb->Header.AllocationSize;
-                    }
-
                     /* truncate file blocks */
                     Status = Ext2TruncateFile(IrpContext, Vcb, Mcb, &AllocationSize);
 
-                    /* restore original file size */
-                    if (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE)) {
-                        Mcb->FileSize = RealSize;
-                        if (NT_SUCCESS(Status)) {
-                            ClearLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE);
-                        }
+                    if (NT_SUCCESS(Status)) {
+                        ClearLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE);
                     }
 
                     NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
                     Fcb->Header.AllocationSize.QuadPart = AllocationSize.QuadPart;
-                    if (Fcb->Header.FileSize.QuadPart > AllocationSize.QuadPart) {
-                        Fcb->Header.FileSize.QuadPart = AllocationSize.QuadPart;
+                    if (Mcb->Inode.i_size > (loff_t)AllocationSize.QuadPart) {
+                        Mcb->Inode.i_size = AllocationSize.QuadPart;
                     }
+                    Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size;
                     if (Fcb->Header.ValidDataLength.QuadPart > Fcb->Header.FileSize.QuadPart) {
                         Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
-                    }
-
-                    if (Mcb->FileSize.QuadPart > AllocationSize.QuadPart) {
-                        Mcb->FileSize.QuadPart = AllocationSize.QuadPart;
-                        Mcb->Inode.i_size = AllocationSize.QuadPart;
                     }
 
                 } else {
@@ -808,14 +794,17 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 SetFlag(FileObject->Flags, FO_FILE_MODIFIED);
                 SetLongFlag(Fcb->Flags, FCB_FILE_MODIFIED);
                 Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
-
                 if (CcIsFileCached(FileObject)) {
                     CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
                 }
             }
 
-            DEBUG(DL_INF, ( "Ext2SetInformation: AllocatieonSize = %I64xh Allocated = %I64xh status = %xh\n",
-                            AllocationSize.QuadPart, Fcb->Header.AllocationSize.QuadPart, Status));
+            DEBUG(DL_IO, ("Ext2SetInformation: %wZ NewSize=%I64xh AllocationSize=%I64xh "
+                          "FileSize=%I64xh VDL=%I64xh i_size=%I64xh status = %xh\n",
+                          &Fcb->Mcb->ShortName, AllocationSize.QuadPart,
+                          Fcb->Header.AllocationSize.QuadPart,
+                          Fcb->Header.FileSize.QuadPart, Fcb->Header.ValidDataLength.QuadPart,
+                          Mcb->Inode.i_size, Status));
         }
 
         break;
@@ -823,7 +812,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
         case FileEndOfFileInformation:
         {
             PFILE_END_OF_FILE_INFORMATION FEOFI = (PFILE_END_OF_FILE_INFORMATION) Buffer;
-            LARGE_INTEGER FileSize, AllocationSize, RealSize, EndOfFile;
+            LARGE_INTEGER NewSize, OldSize, EndOfFile;
 
             if (IsMcbDirectory(Mcb) || IsMcbSpecialFile(Mcb)) {
                 Status = STATUS_INVALID_DEVICE_REQUEST;
@@ -855,10 +844,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 CacheInitialized = TRUE;
             }
 
-            AllocationSize = Fcb->Header.AllocationSize;
-            FileSize.QuadPart = CEILING_ALIGNED(ULONGLONG,
-                                                FEOFI->EndOfFile.QuadPart, BLOCK_SIZE);
-            RealSize = Mcb->FileSize;
+            OldSize = Fcb->Header.AllocationSize;
             EndOfFile = FEOFI->EndOfFile;
 
             if (IoStackLocation->Parameters.SetFile.AdvanceOnly) {
@@ -867,24 +853,21 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                     __leave;
                 }
 
-                if (EndOfFile.QuadPart > Fcb->Header.FileSize.QuadPart) {
-                    EndOfFile.QuadPart = Fcb->Header.FileSize.QuadPart;
+                if (EndOfFile.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
+                    EndOfFile.QuadPart = Fcb->Header.ValidDataLength.QuadPart;
                 }
 
-                if (RealSize.QuadPart < EndOfFile.QuadPart) {
-
-                    Mcb->FileSize = EndOfFile;
-                    Mcb->Inode.i_size = EndOfFile.QuadPart;
-                    NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
-                    goto FileEndChanged;
+                if ((loff_t)EndOfFile.QuadPart <= Mcb->Inode.i_size) {
+                    __leave;
                 }
-
-                __leave;
             }
 
-            if (FileSize.QuadPart > AllocationSize.QuadPart) {
+            NewSize.QuadPart = CEILING_ALIGNED(ULONGLONG,
+                                               EndOfFile.QuadPart, BLOCK_SIZE);
 
-                Fcb->Header.AllocationSize = FileSize;
+            if (NewSize.QuadPart > OldSize.QuadPart) {
+
+                Fcb->Header.AllocationSize = NewSize;
                 Status = Ext2ExpandFile(
                              IrpContext,
                              Vcb,
@@ -893,7 +876,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                          );
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
 
-            } else if (FileSize.QuadPart == AllocationSize.QuadPart) {
+            } else if (NewSize.QuadPart == OldSize.QuadPart) {
 
                 /* we are luck ;) */
                 Status = STATUS_SUCCESS;
@@ -907,42 +890,33 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
                 } else {
 
-                    /* free blocks from it's real size allocated in Ext2Create */
-                    if (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE)) {
-                        Mcb->FileSize = AllocationSize;
-                    }
-
-                    if (!MmCanFileBeTruncated(&(Fcb->SectionObject), &AllocationSize)) {
+                    if (!MmCanFileBeTruncated(&(Fcb->SectionObject), &NewSize)) {
                         Status = STATUS_USER_MAPPED_FILE;
                         DbgBreak();
                         __leave;
                     }
 
                     /* truncate file blocks */
-                    Status = Ext2TruncateFile(IrpContext, Vcb, Mcb, &FileSize);
+                    Status = Ext2TruncateFile(IrpContext, Vcb, Mcb, &NewSize);
 
                     /* restore original file size */
-                    if (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE)) {
-                        Mcb->FileSize = RealSize;
-                        if (NT_SUCCESS(Status)) {
-                            ClearLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE);
-                        }
+                    if (NT_SUCCESS(Status)) {
+                        ClearLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE);
                     }
 
                     /* update file allocateion size */
-                    Fcb->Header.AllocationSize.QuadPart = FileSize.QuadPart;
+                    Fcb->Header.AllocationSize.QuadPart = NewSize.QuadPart;
 
-                    if (Fcb->Header.FileSize.QuadPart > FileSize.QuadPart) {
-                        Fcb->Header.FileSize.QuadPart = FileSize.QuadPart;
+                    ASSERT((loff_t)NewSize.QuadPart >= Mcb->Inode.i_size);
+                    if ((loff_t)Fcb->Header.FileSize.QuadPart < Mcb->Inode.i_size) {
+                        Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size;
                     }
                     if (Fcb->Header.ValidDataLength.QuadPart > Fcb->Header.FileSize.QuadPart) {
                         Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
                     }
 
-                    if (Mcb->FileSize.QuadPart > FileSize.QuadPart) {
-                        Mcb->FileSize.QuadPart = FileSize.QuadPart;
-                        Mcb->Inode.i_size = FileSize.QuadPart;
-                    }
+                    SetFlag(FileObject->Flags, FO_FILE_MODIFIED);
+                    SetLongFlag(Fcb->Flags, FCB_FILE_MODIFIED);
                 }
 
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
@@ -950,10 +924,10 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             if (NT_SUCCESS(Status)) {
 
-                Fcb->Header.FileSize.QuadPart = Mcb->FileSize.QuadPart = EndOfFile.QuadPart;
+                Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size = EndOfFile.QuadPart;
                 if (Fcb->Header.ValidDataLength.QuadPart > Fcb->Header.FileSize.QuadPart)
                     Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
-                Mcb->Inode.i_size = EndOfFile.QuadPart;
+
                 if (Fcb->Header.FileSize.QuadPart >= 0x80000000 &&
                         !IsFlagOn(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE)) {
                     SetFlag(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE);
@@ -965,16 +939,17 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
             }
 
-FileEndChanged:
-
             Ext2SaveInode( IrpContext, Vcb, &Mcb->Inode);
 
             if (CcIsFileCached(FileObject)) {
                 CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
             }
 
-            DEBUG(DL_INF, ( "Ext2SetInformation: FileSize = %I64xh RealSize = %I64xh status = %xh\n",
-                            FEOFI->EndOfFile.QuadPart, Fcb->Header.FileSize.QuadPart, Status));
+            DEBUG(DL_IO, ("Ext2SetInformation: FileEndOfFileInformation %wZ EndofFile=%I64xh "
+                          "AllocatieonSize=%I64xh FileSize=%I64xh VDL=%I64xh i_size=%I64xh status = %xh\n",
+                          &Fcb->Mcb->ShortName, EndOfFile.QuadPart, Fcb->Header.AllocationSize.QuadPart,
+                          Fcb->Header.FileSize.QuadPart, Fcb->Header.ValidDataLength.QuadPart,
+                          Mcb->Inode.i_size, Status));
         }
 
         break;
@@ -1150,7 +1125,7 @@ Ext2ExpandFile(
     ULONG    Slot = 0;
     ULONG    Base = 0;
 
-    Start = (ULONG)((Mcb->FileSize.QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS);
+    Start = (ULONG)((Mcb->Inode.i_size + BLOCK_SIZE - 1) >> BLOCK_BITS);
     End = (ULONG)((Size->QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS);
 
     /* should be a truncate operation */
@@ -1895,20 +1870,20 @@ Ext2DeleteFile(
                 Ext2ClearAllExtents(&Mcb->Extents);
                 ClearLongFlag(Mcb->Flags, MCB_ZONE_INIT);
 
-                /* Update the inode's data length . It should be ZERO if succeeds. */
                 if (Fcb) {
                     Fcb->Header.AllocationSize.QuadPart = Size.QuadPart;
                     if (Fcb->Header.FileSize.QuadPart > Size.QuadPart) {
                         Fcb->Header.FileSize.QuadPart = Size.QuadPart;
+                        Fcb->Mcb->Inode.i_size = Size.QuadPart;
                     }
                     if (Fcb->Header.ValidDataLength.QuadPart > Fcb->Header.FileSize.QuadPart) {
                         Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
                     }
-                }
-
-                if (Mcb->FileSize.QuadPart > Size.QuadPart) {
-                    Mcb->FileSize.QuadPart = Size.QuadPart;
-                    Mcb->Inode.i_size = Size.QuadPart;
+                } else if (Mcb) {
+                    /* Update the inode's data length . It should be ZERO if succeeds. */
+                    if (Mcb->Inode.i_size > (loff_t)Size.QuadPart) {
+                        Mcb->Inode.i_size = Size.QuadPart;
+                    }
                 }
             }
 

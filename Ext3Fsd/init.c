@@ -551,13 +551,8 @@ DriverEntry (
 
     FastIoDispatch->SizeOfFastIoDispatch        = sizeof(FAST_IO_DISPATCH);
     FastIoDispatch->FastIoCheckIfPossible       = Ext2FastIoCheckIfPossible;
-#if EXT2_DEBUG
     FastIoDispatch->FastIoRead                  = Ext2FastIoRead;
     FastIoDispatch->FastIoWrite                 = Ext2FastIoWrite;
-#else
-    FastIoDispatch->FastIoRead                  = FsRtlCopyRead;
-    FastIoDispatch->FastIoWrite                 = FsRtlCopyWrite;
-#endif
     FastIoDispatch->FastIoQueryBasicInfo        = Ext2FastIoQueryBasicInfo;
     FastIoDispatch->FastIoQueryStandardInfo     = Ext2FastIoQueryStandardInfo;
     FastIoDispatch->FastIoLock                  = Ext2FastIoLock;

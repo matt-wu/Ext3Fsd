@@ -184,14 +184,12 @@ Ext2FollowLink (
             SetLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
             ClearLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
             ASSERT(Mcb->Target->Refercount > 0);
-            Mcb->FileSize = Target->FileSize;
             Mcb->FileAttr = Target->FileAttr;
         } else {
             Mcb->Target = Target;
             SetLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
             ClearLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
             ASSERT(Mcb->Target->Refercount > 0);
-            Mcb->FileSize = Target->FileSize;
             Mcb->FileAttr = Target->FileAttr;
         }
 
@@ -458,7 +456,6 @@ Ext2LookupFile (
                         Mcb->LastAccessTime = Ext2NtTime(Mcb->Inode.i_atime);
                         Mcb->LastWriteTime = Ext2NtTime(Mcb->Inode.i_mtime);
                         Mcb->ChangeTime = Ext2NtTime(Mcb->Inode.i_mtime);
-                        Mcb->FileSize.QuadPart = Mcb->Inode.i_size;
 
                         /* process symlink */
                         if (S_ISLNK(Mcb->Inode.i_mode)) {
@@ -1886,7 +1883,7 @@ Ext2SupersedeOrOverWriteFile(
                                     (ULONGLONG)AllocationSize->QuadPart,
                                     (ULONGLONG)BLOCK_SIZE);
 
-    if (Size.QuadPart > Fcb->Mcb->FileSize.QuadPart) {
+    if ((loff_t)Size.QuadPart > Fcb->Inode->i_size) {
         Ext2ExpandFile(IrpContext, Vcb, Fcb->Mcb, &Size);
     } else {
         Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &Size);
@@ -1905,7 +1902,6 @@ Ext2SupersedeOrOverWriteFile(
         DbgBreak();
     }
 
-    Fcb->Mcb->FileSize.QuadPart = 0;
     Fcb->Inode->i_size = 0;
 
     if (Disposition == FILE_SUPERSEDE) {

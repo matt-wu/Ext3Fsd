@@ -181,29 +181,17 @@ Ext2ZeroHoles (
     IN LONGLONG Count
 )
 {
-    LARGE_INTEGER StartAddr = {0,0};
-    LARGE_INTEGER EndAddr = {0,0};
+    LARGE_INTEGER Start, End;
 
-    StartAddr.QuadPart = (Offset + (SECTOR_SIZE - 1)) &
-                         ~((LONGLONG)SECTOR_SIZE - 1);
+    Start.QuadPart = Offset;
+    End.QuadPart = Offset + Count;
 
-    if (Offset != 0 && StartAddr.QuadPart == 0) {
-        return TRUE;
-    }
-
-    EndAddr.QuadPart = (Offset + Count + (SECTOR_SIZE - 1)) &
-                       ~((LONGLONG)SECTOR_SIZE - 1);
-
-    if (StartAddr.QuadPart < EndAddr.QuadPart) {
-        return CcZeroData( FileObject,
-                           &StartAddr,
-                           &EndAddr,
-                           IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) );
+    if (Count > 0) {
+        return CcZeroData(FileObject, &Start, &End, PIN_WAIT);
     }
 
     return TRUE;
 }
-
 
 VOID
 Ext2DeferWrite(IN PEXT2_IRP_CONTEXT IrpContext, PIRP Irp)
@@ -279,8 +267,8 @@ Ext2WriteVolume (IN PEXT2_IRP_CONTEXT IrpContext)
             ASSERT(Nocache);
         }
 
-        DEBUG(DL_INF, ( "Ext2WriteVolume: Off=%I64xh Len=%xh Paging=%xh Nocache=%xh\n",
-                        ByteOffset.QuadPart, Length, PagingIo, Nocache));
+        DEBUG(DL_INF, ("Ext2WriteVolume: Off=%I64xh Len=%xh Paging=%xh Nocache=%xh\n",
+                       ByteOffset.QuadPart, Length, PagingIo, Nocache));
 
         if (Length == 0) {
             Irp->IoStatus.Information = 0;
@@ -813,8 +801,8 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             ASSERT(Nocache);
         }
 
-        DEBUG(DL_INF, ( "Ext2WriteFile: %wZ Offset=%I64xh Length=%xh Paging=%xh Nocache=%xh\n",
-                        &Fcb->Mcb->ShortName, ByteOffset.QuadPart, Length, PagingIo, Nocache));
+        DEBUG(DL_INF, ("Ext2WriteFile: %wZ Offset=%I64xh Length=%xh Paging=%xh Nocache=%xh\n",
+                       &Fcb->Mcb->ShortName, ByteOffset.QuadPart, Length, PagingIo, Nocache));
 
         if (IsSpecialFile(Fcb)) {
             Status = STATUS_INVALID_DEVICE_REQUEST;
@@ -832,7 +820,8 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             __leave;
         }
 
-        if (Nocache && (ByteOffset.LowPart & (SECTOR_SIZE - 1))) {
+        if (Nocache && ( (ByteOffset.LowPart & (SECTOR_SIZE - 1)) ||
+                         (Length & (SECTOR_SIZE - 1))) ) {
             Status = STATUS_INVALID_PARAMETER;
             __leave;
         }
@@ -995,17 +984,17 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
         if (PagingIo) {
 
-            if ( (ByteOffset.QuadPart + Length) > Fcb->Header.FileSize.QuadPart) {
+            if ( (ByteOffset.QuadPart + Length) > Fcb->Header.AllocationSize.QuadPart) {
 
-                if ( ByteOffset.QuadPart >= Fcb->Header.FileSize.QuadPart) {
+                if ( ByteOffset.QuadPart >= Fcb->Header.AllocationSize.QuadPart) {
 
-                    Status = STATUS_SUCCESS;
+                    Status = STATUS_END_OF_FILE;
                     Irp->IoStatus.Information = 0;
                     __leave;
 
                 } else {
 
-                    Length = (ULONG)(Fcb->Header.FileSize.QuadPart - ByteOffset.QuadPart);
+                    Length = (ULONG)(Fcb->Header.AllocationSize.QuadPart - ByteOffset.QuadPart);
                 }
             }
 
@@ -1019,53 +1008,34 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             //  Extend the inode size when the i/o is beyond the file end ?
             //
 
-            if ((ByteOffset.QuadPart + Length) > (Fcb->Header.FileSize.QuadPart)) {
+            if ((ByteOffset.QuadPart + Length) > (Fcb->Header.AllocationSize.QuadPart)) {
 
-                LARGE_INTEGER   ExtendSize, AllocationSize;
+                LARGE_INTEGER AllocationSize, Last;
 
-                ExtendSize.QuadPart = (LONGLONG)(ByteOffset.QuadPart + Length);
+                Last.QuadPart = Fcb->Header.AllocationSize.QuadPart;
+                AllocationSize.QuadPart = (LONGLONG)(ByteOffset.QuadPart + Length);
                 AllocationSize.QuadPart = CEILING_ALIGNED(ULONGLONG,
-                                          (ULONGLONG)ExtendSize.QuadPart,
+                                          (ULONGLONG)AllocationSize.QuadPart,
                                           (ULONGLONG)BLOCK_SIZE);
-                if (AllocationSize.QuadPart > Fcb->Header.AllocationSize.QuadPart) {
-                    Status = Ext2ExpandFile(IrpContext, Vcb, Fcb->Mcb, &AllocationSize);
-                    if (NT_SUCCESS(Status)) {
-                        Fcb->Header.AllocationSize.QuadPart = AllocationSize.QuadPart;
-                        if (CcIsFileCached(FileObject)) {
-                            CcSetFileSizes(FileObject,
-                                           (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
-                        }
-                        SetLongFlag(Fcb->Flags, FCB_ALLOC_IN_WRITE);
-                        ClearLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE);
-                    } else {
-                        __leave;
+                Status = Ext2ExpandFile(IrpContext, Vcb, Fcb->Mcb, &AllocationSize);
+                if (AllocationSize.QuadPart > Last.QuadPart) {
+                    Fcb->Header.AllocationSize.QuadPart = AllocationSize.QuadPart;
+                    if (CcIsFileCached(FileObject)) {
+                        CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
+                        CcZeroData(FileObject, &Last, &AllocationSize, PIN_WAIT);
                     }
+                    SetLongFlag(Fcb->Flags, FCB_ALLOC_IN_WRITE);
+                } else if (ByteOffset.QuadPart >= Fcb->Header.AllocationSize.QuadPart) {
+                    if (NT_SUCCESS(Status)) {
+                        DbgBreak();
+                        Status = STATUS_UNSUCCESSFUL;
+                    }
+                    __leave;
                 }
 
-                Fcb->Header.FileSize.QuadPart =
-                    Fcb->Mcb->FileSize.QuadPart = ExtendSize.QuadPart;
-                Fcb->Inode->i_size = ExtendSize.QuadPart;
-                Ext2SaveInode(IrpContext, Vcb, Fcb->Inode);
-
-                if (Fcb->Header.FileSize.QuadPart >= 0x80000000 &&
-                        !IsFlagOn(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE)) {
-                    SetFlag(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE);
-                    Ext2SaveSuper(IrpContext, Vcb);
-                }
-
-                if (CcIsFileCached(FileObject)) {
-                    CcSetFileSizes(FileObject,
-                                   (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
-                }
-
-                Ext2NotifyReportChange(
-                    IrpContext,
-                    Vcb,
-                    Fcb->Mcb,
-                    FILE_NOTIFY_CHANGE_SIZE,
-                    FILE_ACTION_MODIFIED );
-
-                DEBUG(DL_INF, ( "Ext2WriteFile: expanding %wZ to %I64xh\n", &Fcb->Mcb->ShortName, Fcb->Header.FileSize.QuadPart));
+                DEBUG(DL_IO, ("Ext2WriteFile: expanding %wZ to FS: %I64xh FA: %I64xh\n",
+                              &Fcb->Mcb->ShortName, Fcb->Header.FileSize.QuadPart,
+                              Fcb->Header.AllocationSize.QuadPart));
             }
         }
 
@@ -1087,11 +1057,6 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             CacheObject = FileObject;
-
-            if (ByteOffset.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
-                Ext2ZeroHoles( IrpContext, Vcb, FileObject, Fcb->Header.ValidDataLength.QuadPart,
-                               ByteOffset.QuadPart - Fcb->Header.ValidDataLength.QuadPart );
-            }
 
             if (FlagOn(IrpContext->MinorFunction, IRP_MN_MDL)) {
 
@@ -1129,9 +1094,7 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             if (NT_SUCCESS(Status)) {
-
                 Irp->IoStatus.Information = Length;
-
                 if (IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK)) {
                     DEBUG(DL_FLP, ("Ext2WriteFile is starting FlushingDpc...\n"));
                     Ext2StartFloppyFlushDpc(Vcb, Fcb, FileObject);
@@ -1140,8 +1103,7 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
         } else {
 
-            Length = (Length + SECTOR_SIZE - 1) & (~(SECTOR_SIZE - 1));
-            if (CcIsFileCached(FileObject) && !RecursiveWriteThrough &&
+            if (!PagingIo && CcIsFileCached(FileObject) && !RecursiveWriteThrough &&
                     Fcb->LazyWriterThread != PsGetCurrentThread() &&
                     ByteOffset.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
 
@@ -1176,19 +1138,30 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
         }
 
         /* Update files's ValiDateLength */
-        if ( NT_SUCCESS(Status) && !RecursiveWriteThrough &&
-                Fcb->LazyWriterThread != PsGetCurrentThread() &&
-                (ByteOffset.QuadPart + ReturnedLength) > (Fcb->Header.ValidDataLength.QuadPart)) {
-            if (Fcb->Header.FileSize.QuadPart > ByteOffset.QuadPart + ReturnedLength) {
-                Fcb->Header.ValidDataLength.QuadPart = ByteOffset.QuadPart + ReturnedLength;
-            } else {
-                Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
-            }
-        }
+        if (NT_SUCCESS(Status) && !PagingIo && (Fcb->Header.ValidDataLength.QuadPart <
+                                                ByteOffset.QuadPart + ReturnedLength)) {
 
-        DEBUG(DL_INF, ( "Ext2WriteFile: Writing %wZ at Offset=%I64xh Length=%xh RetLen=%xh VDL=%I64xh done! (%xh)\n",
-                        &Fcb->Mcb->ShortName, ByteOffset, Length, ReturnedLength,
-                        Fcb->Header.ValidDataLength.QuadPart, Status));
+            Fcb->Mcb->Inode.i_size = ByteOffset.QuadPart + ReturnedLength;
+            Fcb->Header.FileSize.QuadPart = Fcb->Mcb->Inode.i_size;
+            Fcb->Header.ValidDataLength.QuadPart = Fcb->Mcb->Inode.i_size;
+            Ext2SaveInode(IrpContext, Vcb, Fcb->Inode);
+            if (CcIsFileCached(FileObject)) {
+                CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
+            }
+
+            if (Fcb->Header.FileSize.QuadPart >= 0x80000000 &&
+                    !IsFlagOn(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE)) {
+                SetFlag(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE);
+                Ext2SaveSuper(IrpContext, Vcb);
+            }
+
+            Ext2NotifyReportChange(
+                IrpContext,
+                Vcb,
+                Fcb->Mcb,
+                FILE_NOTIFY_CHANGE_SIZE,
+                FILE_ACTION_MODIFIED );
+        }
 
     } __finally {
 
@@ -1235,6 +1208,12 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             }
         }
     }
+
+    DEBUG(DL_IO, ("Ext2WriteFile: %wZ written at Offset=%I64xh Length=%xh PagingIo=%d Nocache=%d "
+                  "RetLen=%xh VDL=%I64xh FileSize=%I64xh i_size=%I64xh Status=%xh\n",
+                  &Fcb->Mcb->ShortName, ByteOffset, Length, PagingIo, Nocache, ReturnedLength,
+                  Fcb->Header.ValidDataLength.QuadPart,Fcb->Header.FileSize.QuadPart,
+                  Fcb->Inode->i_size, Status));
 
     return Status;
 }

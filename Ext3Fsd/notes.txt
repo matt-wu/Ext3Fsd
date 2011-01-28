@@ -1,27 +1,52 @@
 
 ==================================
-Release Notes for Ext2Fsd V0.48
+Release Notes for Ext2Fsd V0.50
 ==================================
 
-Modifications from V0.46:
+Features implemented and bugfix from V0.48:
 
-    1, Acronis TrueImage compatible issue solved:
-       Verified with Acronis True Image Home 2009. Also verified with
-       FreeOFTE 3.0, TrueCrypt 6.2a.
-    2, Driver code-signed for Vista and Server 2008
-    3, Bo Branten's 5+ patches merged, lots ifstest failures resolved
-    4, Code improvements for FastIo routines and drive letter & mount
-       points management
-    5, Mount point automatic assignment for USB key and other removable
-       disks or removable media devices
+    1, Ext4 extent readonly support by Bo Branten. Writing is
+       possible but with no size-extending
+    2, Ext3 directory index (hash-tree) support
+    3, Fast fsck (uninit_bg) and group block checksum support
+    4, Ext4 64k block size support
+    5, Symlink/special inodes open/read/deletion support
+    6, Buffer head implemented over cache pages
+    7, Memory allocation optimization for flexible-size inodes
+    8, FIXME: return zero-content for sparse file gaps
+    9, FIXME: check available spaces before blocks allocation
+   10, FIXME: refresh stale root dir content after journal replay
+   11, FIXME: incompatible dentry management for 64k block size
+   12, FIXME: don't do journal replay for devices set as readonly
+   13, FIXME: Win7 cmd.exe always reports file sizes as zero
+   14, FIXME: Win7 memory throttling issue calling CcPinRead
+   15, FIXME: Ext3Fsd Build issues (SLIST/div64 for Win2k, browser files)
+   16, FIXME: Compiling test failure (fastio doesn't update i_size)
+
+Supported Ext3/4 features by 0.50:
+
+    1, flexible inode size: > 128 bytes, up to block size
+    2, dir_index:    htree directory index
+    3, filetype:     extra file mode in dentry
+    4, large_file:   > 4G files supported
+    5, sparse_super: super block backup in group descriptor
+    6, uninit_bg:    fast fsck and group checksum
+    7, extent:       reading, writing with no extending.
+    8, journal:      only support replay for internal journal
+
+Unsupported Ext3/4 features:
+    1, journal: log-based operations, external journal
+    2, extent: size truncating & expanding, file deletion
+    2, flex_bg: first metadata group
+    3, EA (extended attributes), ACL support
 
 Features to be implemented in future:
 
-    1, EXT3 features support (htree, journal)
+    1, EXT3/4 features support (extents, journal, flex_bg,)
     2, Documents improvement: clear and elaborate
-    3, LVM support
-    4, Performance improvement, code optimization
-    5, Automatic check & update of new versions
+    3, Performance improvement, code optimization
+    4, Automatic check & update of new versions
+    5, LVM support, e2fsprogs porting for Windows
 
     Since 0.38, Ext2fsd is much stable even under heavy i/o loads,
     both for reading and writing. Performance and stability are

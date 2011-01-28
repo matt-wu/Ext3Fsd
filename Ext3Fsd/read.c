@@ -311,7 +311,8 @@ Ext2ReadVolume (IN PEXT2_IRP_CONTEXT IrpContext)
 
 #define SafeZeroMemory(AT,BYTE_COUNT) {                                 \
     __try {                                                             \
-        RtlZeroMemory((AT), (BYTE_COUNT));                              \
+        if (AT)                                                         \
+            RtlZeroMemory((AT), (BYTE_COUNT));                          \
     } __except(EXCEPTION_EXECUTE_HANDLER) {                             \
          Ext2RaiseStatus( IrpContext, STATUS_INVALID_USER_BUFFER );     \
     }                                                                   \
@@ -407,14 +408,15 @@ Ext2ReadInode (
                 if (Extent->Offset) {
                     SafeZeroMemory((PCHAR)Buffer, Extent->Offset);
                 }
-            } else if (NULL == Extent->Next) {
+            } else if (Extent->Offset > (Prev->Offset + Prev->Length)) {
+                SafeZeroMemory((PCHAR)Buffer + Prev->Offset + Prev->Length,
+                               Extent->Offset - Prev->Offset - Prev->Length);
+            }
+            if (NULL == Extent->Next) {
                 if (Extent->Offset + Extent->Length < Size) {
                     SafeZeroMemory((PCHAR)Buffer + Extent->Offset + Extent->Length,
                                    Size - Extent->Offset - Extent->Length);
                 }
-            } else if (Extent->Offset > (Prev->Offset + Prev->Length)) {
-                SafeZeroMemory((PCHAR)Buffer + Prev->Offset + Prev->Length,
-                               Extent->Offset - Prev->Offset - Prev->Length);
             }
             Prev = Extent;
         }
@@ -439,7 +441,7 @@ Ext2ReadInode (
                             Vcb->Volume,
                             (PLARGE_INTEGER)(&(Extent->Lba)),
                             Extent->Length,
-                            Ext2CanIWait(),
+                            PIN_WAIT,
                             (PVOID)((PUCHAR)Buffer + Extent->Offset),
                             &IoStatus
                         )) {
@@ -533,8 +535,8 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
             ASSERT(Nocache);
         }
 
-        DEBUG(DL_INF, ( "Ext2ReadFile: Off=%I64xh Len=%xh Paging=%xh Nocache=%xh\n",
-                        ByteOffset.QuadPart, Length, PagingIo, Nocache));
+        DEBUG(DL_INF, ("Ext2ReadFile: reading %wZ Off=%I64xh Len=%xh Paging=%xh Nocache=%xh\n",
+                       &Fcb->Mcb->ShortName, ByteOffset.QuadPart, Length, PagingIo, Nocache));
 
         if (IsSymLink(Fcb) && IsFileDeleted(Fcb->Mcb->Target)) {
             Status = STATUS_FILE_DELETED;
@@ -573,47 +575,9 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
             }
         }
 
-        if ((ByteOffset.QuadPart + (LONGLONG)Length) > Fcb->Header.FileSize.QuadPart) {
-
-            if (ByteOffset.QuadPart >= Fcb->Header.FileSize.QuadPart) {
-                Irp->IoStatus.Information = 0;
-                Status = STATUS_END_OF_FILE;
-                __leave;
-            }
-
-            Length = (ULONG)(Fcb->Header.FileSize.QuadPart - ByteOffset.QuadPart);
-        }
-
         ReturnedLength = Length;
 
-        if (!PagingIo) {
-
-            if (Nocache) {
-                if (!ExAcquireResourceExclusiveLite(
-                            &Fcb->MainResource,
-                            IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) )) {
-                    Status = STATUS_PENDING;
-                    __leave;
-                }
-            } else {
-                if (!ExAcquireResourceSharedLite(
-                            &Fcb->MainResource,
-                            IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) )) {
-                    Status = STATUS_PENDING;
-                    __leave;
-                }
-            }
-
-            MainResourceAcquired = TRUE;
-
-            if (!FsRtlCheckLockForReadAccess(
-                        &Fcb->FileLockAnchor,
-                        Irp         )) {
-                Status = STATUS_FILE_LOCK_CONFLICT;
-                __leave;
-            }
-
-        } else {
+        if (PagingIo) {
 
             if (!ExAcquireResourceSharedLite(
                         &Fcb->PagingIoResource,
@@ -621,8 +585,54 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
                 Status = STATUS_PENDING;
                 __leave;
             }
-
             PagingIoResourceAcquired = TRUE;
+
+            if ((ByteOffset.QuadPart + (LONGLONG)Length) > Fcb->Header.AllocationSize.QuadPart) {
+                if (ByteOffset.QuadPart >= Fcb->Header.AllocationSize.QuadPart) {
+                    Irp->IoStatus.Information = 0;
+                    Status = STATUS_END_OF_FILE;
+                    __leave;
+                }
+                ReturnedLength = (ULONG)(Fcb->Header.AllocationSize.QuadPart - ByteOffset.QuadPart);
+            }
+        } else {
+
+            if (Nocache) {
+
+                if (!ExAcquireResourceExclusiveLite(
+                            &Fcb->MainResource,
+                            IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) )) {
+                    Status = STATUS_PENDING;
+                    __leave;
+                }
+                MainResourceAcquired = TRUE;
+
+            } else {
+
+                if (!ExAcquireResourceSharedLite(
+                            &Fcb->MainResource,
+                            IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) )) {
+                    Status = STATUS_PENDING;
+                    __leave;
+                }
+                MainResourceAcquired = TRUE;
+
+                if ((ByteOffset.QuadPart + (LONGLONG)Length) > Fcb->Header.ValidDataLength.QuadPart) {
+                    if (ByteOffset.QuadPart >= Fcb->Header.ValidDataLength.QuadPart) {
+                        Irp->IoStatus.Information = 0;
+                        Status = STATUS_END_OF_FILE;
+                        __leave;
+                    }
+                    ReturnedLength = (ULONG)(Fcb->Header.ValidDataLength.QuadPart - ByteOffset.QuadPart);
+                }
+            }
+
+            if (!FsRtlCheckLockForReadAccess(
+                        &Fcb->FileLockAnchor,
+                        Irp         )) {
+                Status = STATUS_FILE_LOCK_CONFLICT;
+                __leave;
+            }
         }
 
         if (!IsDirectory(Fcb) && Ccb != NULL) {
@@ -671,7 +681,7 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
                 CcMdlRead(
                     CacheObject,
                     (&ByteOffset),
-                    Length,
+                    ReturnedLength,
                     &Irp->MdlAddress,
                     &Irp->IoStatus );
 
@@ -690,7 +700,7 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
                 if (!CcCopyRead(
                             CacheObject,
                             (PLARGE_INTEGER)&ByteOffset,
-                            Length,
+                            ReturnedLength,
                             IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT),
                             Buffer,
                             &Irp->IoStatus )) {
@@ -704,43 +714,40 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
         } else {
 
-            BOOLEAN bBeyondVDL = FALSE;
-            ULONG   VDLOffset, ZeroBytes, BytesRead;
-            PVOID   SystemVA;
+            ULONG   VDLOffset, BytesRead = ReturnedLength;
+            PVOID   SystemVA = Ext2GetUserBuffer(IrpContext->Irp);
+            BOOLEAN ZeroByte = FALSE;
 
-            if (ByteOffset.QuadPart + Length > Fcb->Header.ValidDataLength.QuadPart) {
+            if (!PagingIo && ByteOffset.QuadPart + BytesRead > Fcb->Header.ValidDataLength.QuadPart) {
 
-                if ( ByteOffset.QuadPart < Fcb->Header.ValidDataLength.QuadPart) {
+                ReturnedLength = (ULONG)(Fcb->Header.ValidDataLength.QuadPart - ByteOffset.QuadPart);
+                if (ByteOffset.QuadPart < Fcb->Header.ValidDataLength.QuadPart) {
 
                     if (!IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
                         Status = STATUS_PENDING;
                         __leave;
                     }
 
-                    VDLOffset = (ULONG)(Fcb->Header.ValidDataLength.QuadPart -
-                                        ByteOffset.QuadPart);
-                    ZeroBytes = Length - VDLOffset;
-                    bBeyondVDL = TRUE;
+                    VDLOffset = ReturnedLength;
+                    ZeroByte = TRUE;
 
                 } else {
 
-                    SystemVA = Ext2GetUserBuffer(IrpContext->Irp);
-                    SafeZeroMemory(SystemVA, Length);
+                    if (SystemVA)
+                        SafeZeroMemory(SystemVA, Length);
 
                     Irp->IoStatus.Information = Length;
                     Status = STATUS_SUCCESS;
                     __leave;
                 }
 
-                Length = (ULONG)(Fcb->Header.ValidDataLength.QuadPart - ByteOffset.QuadPart);
-            }
+                BytesRead = (ReturnedLength + SECTOR_SIZE - 1) & (~(SECTOR_SIZE - 1));
 
-            BytesRead = (Length + SECTOR_SIZE - 1) & (~(SECTOR_SIZE - 1));
-
-            if ( BytesRead > Length ) {
-                if (!IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
-                    Status = STATUS_PENDING;
-                    __leave;
+                if (BytesRead > ReturnedLength ) {
+                    if (!IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
+                        Status = STATUS_PENDING;
+                        __leave;
+                    }
                 }
             }
 
@@ -781,24 +788,19 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
             if (!NT_SUCCESS(Status)) {
                 Ext2NormalizeAndRaiseStatus(IrpContext, Status);
-            } else {
-                Irp->IoStatus.Information = ReturnedLength;
             }
-
-            if (BytesRead > Length || bBeyondVDL) {
-
-                SystemVA = Ext2GetUserBuffer(IrpContext->Irp);
-
-                if (BytesRead > Length) {
-                    SafeZeroMemory( (PUCHAR)SystemVA + Length,
-                                    BytesRead - Length );
-                }
-
-                if (bBeyondVDL) {
-                    SafeZeroMemory((PUCHAR)SystemVA + VDLOffset, ZeroBytes);
+            ASSERT(ReturnedLength <= Length);
+            if (SystemVA && ReturnedLength < Length) {
+                SafeZeroMemory((PUCHAR)SystemVA + ReturnedLength,
+                               Length - ReturnedLength);
+                if (ZeroByte && VDLOffset < ReturnedLength) {
+                    SafeZeroMemory((PUCHAR)SystemVA + VDLOffset,
+                                   ReturnedLength - VDLOffset);
                 }
             }
         }
+
+        Irp->IoStatus.Information = ReturnedLength;
 
     } __finally {
 
@@ -849,6 +851,8 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
         }
     }
 
+    DEBUG(DL_IO, ("Ext2ReadFile: %wZ fetch at Off=%I64xh Len=%xh Paging=%xh Nocache=%xh Returned=%xh Status=%xh\n",
+                  &Fcb->Mcb->ShortName, ByteOffset.QuadPart, Length, PagingIo, Nocache, ReturnedLength, Status));
     return Status;
 
 }

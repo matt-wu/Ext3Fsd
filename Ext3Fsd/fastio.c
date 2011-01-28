@@ -18,10 +18,9 @@ extern PEXT2_GLOBAL Ext2Global;
 /* DEFINITIONS *************************************************************/
 
 #ifdef ALLOC_PRAGMA
-#if EXT2_DEBUG
+
 #pragma alloc_text(PAGE, Ext2FastIoRead)
 #pragma alloc_text(PAGE, Ext2FastIoWrite)
-#endif
 #pragma alloc_text(PAGE, Ext2FastIoCheckIfPossible)
 #pragma alloc_text(PAGE, Ext2FastIoQueryBasicInfo)
 #pragma alloc_text(PAGE, Ext2FastIoQueryStandardInfo)
@@ -154,7 +153,6 @@ Ext2FastIoCheckIfPossible (
 }
 
 
-#if EXT2_DEBUG
 BOOLEAN
 Ext2FastIoRead (IN PFILE_OBJECT         FileObject,
                 IN PLARGE_INTEGER       FileOffset,
@@ -165,33 +163,23 @@ Ext2FastIoRead (IN PFILE_OBJECT         FileObject,
                 OUT PIO_STATUS_BLOCK    IoStatus,
                 IN PDEVICE_OBJECT       DeviceObject)
 {
-    BOOLEAN     Status = FALSE;
     PEXT2_FCB    Fcb;
+    BOOLEAN      Status = FALSE;
 
     Fcb = (PEXT2_FCB) FileObject->FsContext;
-
     if (Fcb == NULL) {
-        return Status;
+        return FALSE;
     }
 
     ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
-#if EXT2_DEBUG
-    DEBUG(DL_INF, ( "Ext2FastIoRead: %s %s %wZ\n",
-                    Ext2GetCurrentProcessName(),
-                    "FASTIO_READ",
-                    &Fcb->Mcb->FullName     ));
-
-    DEBUG(DL_INF, ( "Ext2FastIoRead: Offset: %I64xh Length: %xh Key: %u\n",
-                    FileOffset->QuadPart,
-                    Length,
-                    LockKey       ));
-#endif
-
     Status = FsRtlCopyRead (
                  FileObject, FileOffset, Length, Wait,
                  LockKey, Buffer, IoStatus, DeviceObject);
+
+    DEBUG(DL_IO, ("Ext2FastIoRead: %wZ Offset: %I64xh Length: %xh Key: %u Status: %d\n",
+                  &Fcb->Mcb->ShortName, FileOffset->QuadPart, Length, LockKey, Status));
 
     return Status;
 }
@@ -207,43 +195,48 @@ Ext2FastIoWrite (
     OUT PIO_STATUS_BLOCK    IoStatus,
     IN PDEVICE_OBJECT       DeviceObject)
 {
-    BOOLEAN      Status = FALSE;
-    PEXT2_FCB    Fcb;
+    PEXT2_FCB   Fcb;
+    BOOLEAN     Status = TRUE;
+    BOOLEAN     Locked = FALSE;
 
     Fcb = (PEXT2_FCB) FileObject->FsContext;
-
     if (Fcb == NULL) {
-        return Status;
+        return FALSE;
     }
 
     ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
-#if EXT2_DEBUG
-    DEBUG(DL_INF, (
-              "Ext2FastIoWrite: %s %s %wZ\n",
-              Ext2GetCurrentProcessName(),
-              "FASTIO_WRITE",
-              &Fcb->Mcb->FullName     ));
-    DEBUG(DL_INF, (
-              "Ext2FastIoWrite: Offset: %I64xh Length: %xh Key: %xh\n",
-              FileOffset->QuadPart,
-              Length,
-              LockKey       ));
-#endif
 
     if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY)) {
         return FALSE;
     }
 
-    Status = FsRtlCopyWrite (
-                 FileObject, FileOffset, Length, Wait,
-                 LockKey, Buffer, IoStatus, DeviceObject);
+    ExAcquireResourceExclusiveLite(&Fcb->MainResource, TRUE);
+    Locked = TRUE;
+
+    if (IsEndOfFile(*FileOffset) || (Fcb->Inode->i_size <=
+                                     (loff_t)FileOffset->QuadPart + Length) ) {
+    } else {
+        ExReleaseResourceLite(&Fcb->MainResource);
+        Locked = FALSE;
+    }
+
+    Status = FsRtlCopyWrite(FileObject, FileOffset, Length, Wait,
+                            LockKey, Buffer, IoStatus, DeviceObject);
+
+    if (Locked) {
+        if (Status) {
+            Fcb->Inode->i_size = Fcb->Header.FileSize.QuadPart;
+            Ext2SaveInode(NULL, Fcb->Vcb, Fcb->Inode);
+        }
+        ExReleaseResourceLite(&Fcb->MainResource);
+    }
+
+    DEBUG(DL_IO, ("Ext2FastIoWrite: %wZ Offset: %I64xh Length: %xh Key: %xh Status=%d\n",
+                  &Fcb->Mcb->ShortName,  FileOffset->QuadPart, Length, LockKey, Status));
 
     return Status;
 }
-
-#endif /* EXT2_DEBUG */
-
 
 BOOLEAN
 Ext2FastIoQueryBasicInfo (

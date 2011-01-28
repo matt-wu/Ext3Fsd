@@ -239,10 +239,8 @@ struct buffer_head *ext3_append(struct ext2_icb *icb, struct inode *inode,
     if (NT_SUCCESS(status)) {
 
         /* update Dcb */
-        dcb->Inode->i_size = dcb->Header.AllocationSize.QuadPart;
-
-        dcb->Header.ValidDataLength = dcb->Header.FileSize =
-                                          mcb->FileSize = dcb->Header.AllocationSize;
+        dcb->Header.ValidDataLength = dcb->Header.FileSize = dcb->Header.AllocationSize;
+        mcb->Inode.i_size = dcb->Header.AllocationSize.QuadPart;
 
         /* save parent directory's inode */
         Ext2SaveInode(icb, dcb->Vcb, inode);

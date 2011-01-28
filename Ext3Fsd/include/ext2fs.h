@@ -225,8 +225,8 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 
 #define FILE_WRITE_TO_END_OF_FILE       0xffffffff
 
-#define IsEndOfFile(Pos) ((Pos.LowPart == FILE_WRITE_TO_END_OF_FILE) && \
-                          (Pos.HighPart == -1 ))
+#define IsEndOfFile(Pos) (((Pos).LowPart == FILE_WRITE_TO_END_OF_FILE) && \
+                          ((Pos).HighPart == -1 ))
 
 #define IsDirectory(Fcb)    IsMcbDirectory((Fcb)->Mcb)
 #define IsSpecialFile(Fcb)  IsMcbSpecialFile((Fcb)->Mcb)
@@ -801,9 +801,6 @@ struct _EXT2_MCB {
     // reference count
     ULONG                           Refercount;
 
-    // File size (sync to inode.i_size/i_size_high)
-    LARGE_INTEGER                   FileSize;
-
     // Extents zone
     LARGE_MCB                       Extents;
 
@@ -1308,6 +1305,7 @@ Ext2SupersedeOrOverWriteFile(
 #define DL_WRN 0x00004000   /* warning */
 #define DL_BH  0x00008000   /* buffer head */
 #define DL_PNP 0x00010000   /* pnp */
+#define DL_IO  0x00020000   /* file i/o */
 
 #define DL_DEFAULT (DL_ERR|DL_VIT)
 

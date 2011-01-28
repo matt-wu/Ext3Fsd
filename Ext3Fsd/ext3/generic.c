@@ -161,7 +161,6 @@ Ext2RefreshSuper (
             return FALSE;
 
         /* initializeroot node */
-        Vcb->McbTree->FileSize.QuadPart = Vcb->McbTree->Inode.i_size;
         Vcb->McbTree->CreationTime = Ext2NtTime(Vcb->McbTree->Inode.i_ctime);
         Vcb->McbTree->LastAccessTime = Ext2NtTime(Vcb->McbTree->Inode.i_atime);
         Vcb->McbTree->LastWriteTime = Ext2NtTime(Vcb->McbTree->Inode.i_mtime);
@@ -513,7 +512,7 @@ Ext2ZeroBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
                 (PLARGE_INTEGER) (&Offset),
                 Size,
                 FALSE,
-                Ext2CanIWait(),
+                PIN_WAIT,
                 &Bcb,
                 &Buffer )) {
 
@@ -558,7 +557,7 @@ Ext2SaveBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
                 (PLARGE_INTEGER) (&Offset),
                 Size,
                 FALSE,
-                Ext2CanIWait(),
+                PIN_WAIT,
                 &Bcb,
                 &Buffer )) {
 

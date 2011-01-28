@@ -156,7 +156,7 @@ Ext2ProcessEntry(
             if (IsMcbDirectory(Target)) {
                 FileSize = 0;
             } else {
-                FileSize = Target->FileSize.QuadPart;
+                FileSize = Target->Inode.i_size;
             }
             if (IsFileDeleted(Target)) {
                 ClearFlag(FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
@@ -166,7 +166,7 @@ Ext2ProcessEntry(
             if (IsMcbDirectory(Mcb)) {
                 FileSize = 0;
             } else {
-                FileSize = Mcb->FileSize.QuadPart;
+                FileSize = Mcb->Inode.i_size;
             }
         }
 

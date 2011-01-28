@@ -29,6 +29,27 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
  Revision history
 ======================
 
+41, V0.50:   2011-01-30
+
+Modifications from V0.48:
+
+    1, Ext4 extent readonly support by Bo Branten. Writing is
+       possible but with no size-extending
+    2, Ext3 directory index (hash-tree) support
+    3, Fast fsck (uninit_bg) and group block checksum support
+    4, Ext4 64k block size support
+    5, Symlink/special inodes open/read/deletion support
+    6, Buffer head implemented over cache pages
+    7, Memory allocation optimization for flexible-size inodes
+    8, FIXME: return zero-content for sparse file gaps
+    9, FIXME: check available spaces before blocks allocation
+   10, FIXME: refresh stale root dir content after journal replay
+   11, FIXME: incompatible dentry management for 64k block size
+   12, FIXME: don't do journal replay for devices set as readonly
+   13, FIXME: Win7 cmd.exe always reports file sizes as zero
+   14, FIXME: Win7 memory throttling issue calling CcPinRead
+   15, FIXME: Build issues (SLIST/div64 for Win2k, browser files)
+
 40, V0.48:   2009-07-26
 
 Modifications from V0.47:
