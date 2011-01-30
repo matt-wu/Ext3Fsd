@@ -1,0 +1,170 @@
+# Microsoft Developer Studio Generated Dependency File, included by Ext2Mgr.mak
+
+.\DiskBox.cpp : \
+	".\DiskBox.h"\
+	
+
+.\Donate.cpp : \
+	".\Donate.h"\
+	".\Ext2Mgr.h"\
+	".\HyperLink.h"\
+	
+
+.\Ext2Attribute.cpp : \
+	".\DiskBox.h"\
+	".\Donate.h"\
+	".\Ext2Attribute.h"\
+	".\Ext2Mgr.h"\
+	".\Ext2MgrDlg.h"\
+	".\HyperLink.h"\
+	".\MountPoints.h"\
+	".\PartBox.h"\
+	".\Properties.h"\
+	".\SelectDrvLetter.h"\
+	".\ServiceManage.h"\
+	".\Splash.h"\
+	".\SysTray.h"\
+	".\Toolbar.h"\
+	".\TreeList.h"\
+	
+
+.\Ext2Mgr.cpp : \
+	".\DiskBox.h"\
+	".\Donate.h"\
+	".\Ext2Attribute.h"\
+	".\Ext2Mgr.h"\
+	".\Ext2MgrDlg.h"\
+	".\HyperLink.h"\
+	".\MountPoints.h"\
+	".\PartBox.h"\
+	".\Properties.h"\
+	".\SelectDrvLetter.h"\
+	".\ServiceManage.h"\
+	".\Splash.h"\
+	".\SysTray.h"\
+	".\Toolbar.h"\
+	".\TreeList.h"\
+	
+
+.\Ext2Mgr.rc : \
+	".\res\about.bmp"\
+	".\res\abouts.bmp"\
+	".\res\cdrom.bmp"\
+	".\res\disk.bmp"\
+	".\res\dvd.bmp"\
+	".\res\dynamic.bmp"\
+	".\res\Ext2Mgr.ico"\
+	".\res\Ext2Mgr.rc2"\
+	".\res\floppy.bmp"\
+	".\res\images\penguin.bmp"\
+	".\res\images\smallpenguin.bmp"\
+	".\res\line.bmp"\
+	".\res\toolbar.bmp"\
+	
+
+.\Ext2MgrDlg.cpp : \
+	".\DiskBox.h"\
+	".\dlgview.h"\
+	".\Donate.h"\
+	".\Ext2Attribute.h"\
+	".\Ext2Mgr.h"\
+	".\Ext2MgrDlg.h"\
+	".\HyperLink.h"\
+	".\MountPoints.h"\
+	".\PartBox.h"\
+	".\Properties.h"\
+	".\SelectDrvLetter.h"\
+	".\ServiceManage.h"\
+	".\Splash.h"\
+	".\SysTray.h"\
+	".\Toolbar.h"\
+	".\TreeList.h"\
+	
+
+.\HyperLink.cpp : \
+	".\HyperLink.h"\
+	
+
+.\MountPoints.cpp : \
+	".\Ext2Mgr.h"\
+	".\MountPoints.h"\
+	".\SelectDrvLetter.h"\
+	
+
+.\PartBox.cpp : \
+	".\PartBox.h"\
+	
+
+.\Properties.cpp : \
+	".\DiskBox.h"\
+	".\Donate.h"\
+	".\Ext2Attribute.h"\
+	".\Ext2Mgr.h"\
+	".\Ext2MgrDlg.h"\
+	".\HyperLink.h"\
+	".\MountPoints.h"\
+	".\PartBox.h"\
+	".\Properties.h"\
+	".\SelectDrvLetter.h"\
+	".\ServiceManage.h"\
+	".\Splash.h"\
+	".\SysTray.h"\
+	".\Toolbar.h"\
+	".\TreeList.h"\
+	
+
+.\SelectDrvLetter.cpp : \
+	".\Ext2Mgr.h"\
+	".\SelectDrvLetter.h"\
+	
+
+.\ServiceManage.cpp : \
+	".\Ext2Mgr.h"\
+	".\ServiceManage.h"\
+	
+
+.\Splash.cpp : \
+	".\Splash.h"\
+	
+
+.\StdAfx.cpp : \
+	"..\ext2fsd\common.h"\
+	".\enumDisk.h"\
+	".\ext2fs.h"\
+	".\ntdll.h"\
+	".\StdAfx.h"\
+	".\types.h"\
+	"c:\winddk\3790\inc\ddk\w2k\mountmgr.h"\
+	"c:\winddk\3790\inc\ddk\w2k\ntddk.h"\
+	"c:\winddk\3790\inc\w2k\basetsd.h"\
+	"c:\winddk\3790\inc\w2k\bugcodes.h"\
+	"c:\winddk\3790\inc\w2k\cfg.h"\
+	"c:\winddk\3790\inc\w2k\cfgmgr32.h"\
+	"c:\winddk\3790\inc\w2k\devioctl.h"\
+	"c:\winddk\3790\inc\w2k\guiddef.h"\
+	"c:\winddk\3790\inc\w2k\ntdef.h"\
+	"c:\winddk\3790\inc\w2k\ntiologc.h"\
+	"c:\winddk\3790\inc\w2k\ntstatus.h"\
+	"c:\winddk\3790\inc\w2k\propidl.h"\
+	"c:\winddk\3790\inc\w2k\shldisp.h"\
+	"c:\winddk\3790\inc\w2k\tvout.h"\
+	
+
+.\SysTray.cpp : \
+	".\SysTray.h"\
+	
+
+.\Toolbar.cpp : \
+	".\Toolbar.h"\
+	
+
+.\TreeList.cpp : \
+	".\TreeList.h"\
+	
+
+!IF  "$(CFG)" == "Ext2Mgr - Win32 Release"
+
+!ELSEIF  "$(CFG)" == "Ext2Mgr - Win32 Debug"
+
+!ENDIF 
+
