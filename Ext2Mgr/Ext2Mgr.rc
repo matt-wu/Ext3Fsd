@@ -415,8 +415,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,5,0,1
- PRODUCTVERSION 2,5,0,1
+ FILEVERSION 2,5,2,1
+ PRODUCTVERSION 2,5,2,1
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -434,14 +434,14 @@ BEGIN
             VALUE "Comments", "\0"
             VALUE "CompanyName", "Ext2Fsd Group (www.ext2fsd.com)\0"
             VALUE "FileDescription", "Ext2 Volume Manager for Windows\0"
-            VALUE "FileVersion", "2, 5, 0, 1\0"
+            VALUE "FileVersion", "2, 5, 2, 1\0"
             VALUE "InternalName", "Ext2Mgr\0"
             VALUE "LegalCopyright", "Copyright (C) 2010 Ext2Fsd Group\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "Ext2Mgr.exe\0"
             VALUE "PrivateBuild", "\0"
             VALUE "ProductName", "Ext2 Volume Manager for Windows\0"
-            VALUE "ProductVersion", "2, 5, 0, 1\0"
+            VALUE "ProductVersion", "2, 5, 2, 1\0"
             VALUE "SpecialBuild", "\0"
         END
     END
@@ -1004,8 +1004,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,5,0,1
- PRODUCTVERSION 2,5,0,1
+ FILEVERSION 2,5,2,1
+ PRODUCTVERSION 2,5,2,1
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -1023,14 +1023,14 @@ BEGIN
             VALUE "Comments", "\0"
             VALUE "CompanyName", "Ext2Fsd Group (www.ext2fsd.com)\0"
             VALUE "FileDescription", "Ext2 Volume Manager for Windows\0"
-            VALUE "FileVersion", "2, 4, 5, 0\0"
+            VALUE "FileVersion", "2, 5, 2, 1\0"
             VALUE "InternalName", "Ext2Mgr\0"
             VALUE "LegalCopyright", "Copyright (C) 2010 Ext2Fsd Group\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "Ext2Mgr.exe\0"
             VALUE "PrivateBuild", "\0"
             VALUE "ProductName", "Ext2 Volume Manager for Windows\0"
-            VALUE "ProductVersion", "2, 5, 0, 1\0"
+            VALUE "ProductVersion", "2, 5, 2, 1\0"
             VALUE "SpecialBuild", "\0"
         END
     END

@@ -36,8 +36,8 @@
 /*
  * The second extended file system version
  */
-#define EXT2FS_DATE		"95/08/09"
-#define EXT2FS_VERSION		"0.5b"
+#define EXT2FS_DATE		"11/02/01"
+#define EXT2FS_VERSION		"0.50"
 
 /*
  * Special inodes numbers
