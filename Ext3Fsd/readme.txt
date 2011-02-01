@@ -29,7 +29,7 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
  Revision history
 ======================
 
-41, V0.50:   2011-01-30
+41, V0.50:   2011-02-01
 
 Modifications from V0.48:
 
@@ -41,14 +41,17 @@ Modifications from V0.48:
     5, Symlink/special inodes open/read/deletion support
     6, Buffer head implemented over cache pages
     7, Memory allocation optimization for flexible-size inodes
-    8, FIXME: return zero-content for sparse file gaps
-    9, FIXME: check available spaces before blocks allocation
-   10, FIXME: refresh stale root dir content after journal replay
-   11, FIXME: incompatible dentry management for 64k block size
-   12, FIXME: don't do journal replay for devices set as readonly
-   13, FIXME: Win7 cmd.exe always reports file sizes as zero
-   14, FIXME: Win7 memory throttling issue calling CcPinRead
-   15, FIXME: Build issues (SLIST/div64 for Win2k, browser files)
+    8, Improve file deletion: don't grab global lock when deleting
+    9, FIXME: return zero-content for sparse file gaps
+   10, FIXME: check available spaces before blocks allocation
+   11, FIXME: refresh stale root dir content after journal replay
+   12, FIXME: incompatible dentry management for 64k block size
+   13, FIXME: don't do journal replay for devices set as readonly
+   14, FIXME: Win7 cmd.exe always reports file sizes as zero
+   15, FIXME: Win7 memory throttling issue calling CcPinRead
+   16, FIXME: Ext3Fsd Build issues (SLIST/div64 for Win2k, browser files)
+   17, FIXME: Compiling test failure (fastio doesn't update i_size)
+   18, FIXME: Possible Mcb memory leak for symbolic links
 
 40, V0.48:   2009-07-26
 
