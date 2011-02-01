@@ -809,7 +809,8 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             __leave;
         }
 
-        if (IsFileDeleted(Fcb->Mcb)) {
+        if (IsFileDeleted(Fcb->Mcb) ||
+            (IsSymLink(Fcb) && IsFileDeleted(Fcb->Mcb->Target)) ) {
             Status = STATUS_FILE_DELETED;
             __leave;
         }

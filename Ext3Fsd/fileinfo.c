@@ -1560,8 +1560,6 @@ Ext2SetRenameInfo(
             Status = STATUS_OBJECT_NAME_COLLISION;
             DEBUG(DL_RES, ("Ext2SetRenameInfo: Target file %wZ exists\n",
                            &ExistingMcb->FullName));
-            Ext2DerefMcb(ExistingMcb);
-
             goto errorout;
 
         } else {
@@ -1572,13 +1570,11 @@ Ext2SetRenameInfo(
                 if (!NT_SUCCESS(Status)) {
                     DEBUG(DL_REN, ("Ext2SetRenameInfo: Target file %wZ cannot be removed.\n",
                                    &ExistingMcb->FullName));
-                    Ext2DerefMcb(ExistingMcb);
                     goto errorout;
                 }
             }
 
             Status = Ext2DeleteFile(IrpContext, Vcb, ExistingFcb, ExistingMcb);
-            Ext2DerefMcb(ExistingMcb);
             if (!NT_SUCCESS(Status)) {
                 DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to delete %wZ with status: %xh.\n",
                                &FileName, Status));
@@ -1736,6 +1732,9 @@ errorout:
         }
     }
 
+    if (ExistingMcb)
+        Ext2DerefMcb(ExistingMcb);
+
     return Status;
 }
 
@@ -1794,6 +1793,8 @@ Ext2DeleteFile(
 
     __try {
 
+        Ext2ReferMcb(Mcb);
+
         ExAcquireResourceExclusiveLite(&Vcb->MainResource, TRUE);
         VcbResourceAcquired = TRUE;
 
@@ -1816,12 +1817,24 @@ Ext2DeleteFile(
 
         if (NT_SUCCESS(Status)) {
 
+            Ext2RemoveMcb(Vcb, Mcb);
+
             if (Fcb) {
                 FcbResourceAcquired =
                     ExAcquireResourceExclusiveLite(&Fcb->MainResource, TRUE);
 
                 FcbPagingIoAcquired =
                     ExAcquireResourceExclusiveLite(&Fcb->PagingIoResource, TRUE);
+            }
+
+            if (DcbResourceAcquired) {
+                ExReleaseResourceLite(&Dcb->MainResource);
+                DcbResourceAcquired = FALSE;
+            }
+
+            if (VcbResourceAcquired) {
+                ExReleaseResourceLite(&Vcb->MainResource);
+                VcbResourceAcquired = FALSE;
             }
 
             if (IsMcbSymLink(Mcb)) {
@@ -1895,10 +1908,8 @@ Ext2DeleteFile(
 
 SkipTruncate:
 
-            Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
             SetFlag(Mcb->Flags, MCB_FILE_DELETED);
-
-            Ext2RemoveMcb(Vcb, Mcb);
+            Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
         }
 
     } __finally {
@@ -1929,6 +1940,8 @@ SkipTruncate:
         if (VcbResourceAcquired) {
             ExReleaseResourceLite(&Vcb->MainResource);
         }
+
+        Ext2DerefMcb(Mcb);
     }
 
     DEBUG(DL_INF, ( "Ext2DeleteFile: %wZ Succeed... EXT2SB->S_FREE_BLOCKS = %I64xh .\n",

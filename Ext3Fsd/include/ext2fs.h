@@ -2327,7 +2327,7 @@ Ext2FreeMcb (
 );
 
 VOID
-Ext2FreeCcb (IN PEXT2_CCB Ccb);
+Ext2FreeCcb (IN PEXT2_VCB Vcb, IN PEXT2_CCB Ccb);
 
 PEXT2_INODE
 Ext2AllocateInode (PEXT2_VCB  Vcb);

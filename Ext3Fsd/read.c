@@ -538,7 +538,8 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
         DEBUG(DL_INF, ("Ext2ReadFile: reading %wZ Off=%I64xh Len=%xh Paging=%xh Nocache=%xh\n",
                        &Fcb->Mcb->ShortName, ByteOffset.QuadPart, Length, PagingIo, Nocache));
 
-        if (IsSymLink(Fcb) && IsFileDeleted(Fcb->Mcb->Target)) {
+        if ((IsSymLink(Fcb) && IsFileDeleted(Fcb->Mcb->Target)) ||
+            IsFileDeleted(Fcb->Mcb)) {
             Status = STATUS_FILE_DELETED;
             __leave;
         }

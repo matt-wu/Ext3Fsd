@@ -93,8 +93,7 @@ Ext2Close (IN PEXT2_IRP_CONTEXT IrpContext)
             Ccb = (PEXT2_CCB) FileObject->FsContext2;
         }
 
-
-        DEBUG(DL_DBG, ( "Ext2Close: (VCB) bBeingClosed = %d Vcb = %p ReferCount = %d\n",
+        DEBUG(DL_INF, ( "Ext2Close: (VCB) bBeingClosed = %d Vcb = %p ReferCount = %d\n",
                         bBeingClosed, Vcb, Vcb->ReferenceCount));
 
         if (Fcb->Identifier.Type == EXT2VCB) {
@@ -102,7 +101,7 @@ Ext2Close (IN PEXT2_IRP_CONTEXT IrpContext)
             if (Ccb) {
 
                 Ext2DerefXcb(&Vcb->ReferenceCount);
-                Ext2FreeCcb(Ccb);
+                Ext2FreeCcb(Vcb, Ccb);
 
                 if (FileObject) {
                     FileObject->FsContext2 = Ccb = NULL;
@@ -148,7 +147,7 @@ Ext2Close (IN PEXT2_IRP_CONTEXT IrpContext)
 
         if (Ccb) {
 
-            Ext2FreeCcb(Ccb);
+            Ext2FreeCcb(Vcb, Ccb);
 
             if (FileObject) {
                 FileObject->FsContext2 = Ccb = NULL;

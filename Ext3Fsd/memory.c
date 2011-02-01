@@ -196,7 +196,7 @@ Ext2AllocateFcb (
     Fcb->Mcb = Mcb;
     Mcb->Fcb = Fcb;
 
-    DEBUG(DL_INF, ("Ext2AllocateFcb: Fcb %p created: %wZ.\n",
+    DEBUG(DL_RES, ("Ext2AllocateFcb: Fcb %p created: %wZ.\n",
                    Fcb, &Fcb->Mcb->FullName));
 
     RtlZeroMemory(&Fcb->Header, sizeof(FSRTL_COMMON_FCB_HEADER));
@@ -228,6 +228,8 @@ Ext2AllocateFcb (
 VOID
 Ext2FreeFcb (IN PEXT2_FCB Fcb)
 {
+    PEXT2_VCB   Vcb = Fcb->Vcb;
+
     ASSERT((Fcb != NULL) && (Fcb->Identifier.Type == EXT2FCB) &&
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
     ASSERT((Fcb->Mcb->Identifier.Type == EXT2MCB) &&
@@ -240,15 +242,22 @@ Ext2FreeFcb (IN PEXT2_FCB Fcb)
     if ((Fcb->Mcb->Identifier.Type == EXT2MCB) &&
             (Fcb->Mcb->Identifier.Size == sizeof(EXT2_MCB))) {
 
-        if (IsFlagOn(Fcb->Mcb->Flags, MCB_FILE_DELETED) ||
-                IsMcbSpecialFile(Fcb->Mcb) || IsMcbSymLink(Fcb->Mcb)) {
+        ASSERT (Fcb->Mcb->Fcb == Fcb);
+        if (IsMcbSpecialFile(Fcb->Mcb) || IsFileDeleted(Fcb->Mcb)) {
+
             ASSERT(!IsRoot(Fcb));
             Ext2RemoveMcb(Fcb->Vcb, Fcb->Mcb);
-        }
+            Fcb->Mcb->Fcb = NULL;
 
-        ASSERT (Fcb->Mcb->Fcb == Fcb);
-        Fcb->Mcb->Fcb = NULL;
-        Ext2DerefMcb(Fcb->Mcb);
+            Ext2UnlinkMcb(Vcb, Fcb->Mcb);
+            Ext2DerefMcb(Fcb->Mcb);
+            Ext2LinkHeadMcb(Vcb, Fcb->Mcb);
+
+        } else {
+
+            Fcb->Mcb->Fcb = NULL;
+            Ext2DerefMcb(Fcb->Mcb);
+        }
 
     } else {
         DbgBreak();
@@ -261,7 +270,7 @@ Ext2FreeFcb (IN PEXT2_FCB Fcb)
     ExDeleteResourceLite(&Fcb->MainResource);
     ExDeleteResourceLite(&Fcb->PagingIoResource);
 
-    DEBUG(DL_INF, ( "Ext2FreeFcb: Fcb (%p) is being released: %wZ.\n",
+    DEBUG(DL_RES, ( "Ext2FreeFcb: Fcb (%p) is being released: %wZ.\n",
                     Fcb, &Fcb->Mcb->FullName));
 
     Fcb->Identifier.Type = 0;
@@ -308,7 +317,7 @@ Ext2AllocateCcb (PEXT2_MCB  SymLink)
         return NULL;
     }
 
-    DEBUG(DL_INF, ( "ExtAllocateCcb: Ccb created: %ph.\n", Ccb));
+    DEBUG(DL_RES, ( "ExtAllocateCcb: Ccb created: %ph.\n", Ccb));
 
     RtlZeroMemory(Ccb, sizeof(EXT2_CCB));
 
@@ -333,19 +342,25 @@ Ext2AllocateCcb (PEXT2_MCB  SymLink)
 }
 
 VOID
-Ext2FreeCcb (IN PEXT2_CCB Ccb)
+Ext2FreeCcb (IN PEXT2_VCB Vcb, IN PEXT2_CCB Ccb)
 {
     ASSERT(Ccb != NULL);
 
     ASSERT((Ccb->Identifier.Type == EXT2CCB) &&
            (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
 
-    DEBUG(DL_INF, ( "Ext2FreeCcb: Ccb = %ph.\n", Ccb));
+    DEBUG(DL_RES, ( "Ext2FreeCcb: Ccb = %ph.\n", Ccb));
 
     if (Ccb->SymLink) {
         DEBUG(DL_INF, ( "Ext2FreeCcb: Ccb SymLink: %wZ.\n",
                         &Ccb->SymLink->FullName));
-        Ext2DerefMcb(Ccb->SymLink);
+        if (IsFileDeleted(Ccb->SymLink->Target)) {
+            Ext2UnlinkMcb(Vcb, Ccb->SymLink);
+            Ext2DerefMcb(Ccb->SymLink);
+            Ext2LinkHeadMcb(Vcb, Ccb->SymLink);
+        } else {
+            Ext2DerefMcb(Ccb->SymLink);
+        }
     }
 
     if (Ccb->DirectorySearchPattern.Buffer != NULL) {
@@ -1667,6 +1682,8 @@ Ext2RemoveMcb (
 
             if (bLinked) {
                 if (IsFlagOn(Mcb->Flags, MCB_ENTRY_TREE)) {
+                    DEBUG(DL_RES, ("Mcb %p %wZ removed from Mcb %p %wZ\n", Mcb,
+                                   &Mcb->FullName, Mcb->Parent, &Mcb->Parent->FullName));
                     Ext2DerefMcb(Mcb->Parent);
                     ClearLongFlag(Mcb->Flags, MCB_ENTRY_TREE);
                 } else {
@@ -2834,8 +2851,7 @@ Ext2FirstUnusedMcb(PEXT2_VCB Vcb, BOOLEAN Wait, ULONG Number)
 
                 if (Mcb->Fcb == NULL && !IsMcbRoot(Mcb) &&
                         Mcb->Refercount == 0 &&
-                        (IsMcbSymLink(Mcb) || Mcb->Child == NULL ||
-                         IsFileDeleted(Mcb)) ) {
+                        (Mcb->Child == NULL || IsMcbSymLink(Mcb))) {
 
                     Ext2RemoveMcb(Vcb, Mcb);
                     ClearLongFlag(Mcb->Flags, MCB_VCB_LINK);
@@ -2911,21 +2927,24 @@ Ext2ReaperThread(
                 Timeout.QuadPart = (LONGLONG)-2*1000*1000*10; /* 2 second */
                 NumOfMcbs = Ext2Global->MaxDepth / 4;
             } else if (Ext2Global->PerfStat.Current.Mcb > (ULONG)Ext2Global->MaxDepth) {
-                Timeout.QuadPart = (LONGLONG)-10*1000*1000*10; /* 10 seconds */
+                Timeout.QuadPart = (LONGLONG)-4*1000*1000*10; /* 4 seconds */
                 NumOfMcbs = Ext2Global->MaxDepth / 8;
             } else if (DidNothing) {
-                Timeout.QuadPart = (LONGLONG)-3*60*1000*1000*10; /* 3 mins */
+                Timeout.QuadPart = (LONGLONG)-8*1000*1000*10; /* 8 seconds */
                 if (LastState) {
                     Timeout.QuadPart *= 2;
                 }
                 NumOfMcbs = Ext2Global->MaxDepth / 16;
             } else {
-                Timeout.QuadPart = (LONGLONG)-15*1000*1000*10; /* 15 seconds */
+                Timeout.QuadPart = (LONGLONG)-5*1000*1000*10; /* 5 seconds */
                 if (LastState) {
                     Timeout.QuadPart *= 2;
                 }
                 NumOfMcbs = Ext2Global->MaxDepth / 32;
             }
+
+            if (NumOfMcbs == 0)
+                NumOfMcbs = 1;
 
             LastState = DidNothing;
 
@@ -2956,8 +2975,8 @@ Ext2ReaperThread(
                 Mcb = Ext2FirstUnusedMcb(Vcb, WaitLock, NumOfMcbs);
                 while (Mcb) {
                     PEXT2_MCB   Next = Mcb->Next;
-                    DEBUG(DL_RES, ( "Ext2ReaperThread: releasing Mcb: %wZ"
-                                    " Total: %xh\n", &Mcb->FullName,
+                    DEBUG(DL_RES, ( "Ext2ReaperThread: releasing Mcb (%p): %wZ"
+                                    " Total: %xh\n", Mcb, &Mcb->FullName,
                                     Ext2Global->PerfStat.Current.Mcb));
                     Ext2FreeMcb(Vcb, Mcb);
                     Mcb = Next;
