@@ -763,6 +763,8 @@ typedef struct _EXT2_FCB {
 #define FCB_STATE_BUSY              0x00000040
 #define FCB_ALLOC_IN_CREATE         0x00000080
 #define FCB_ALLOC_IN_WRITE          0x00000100
+#define FCB_DELETE_PENDING          0x00000200
+
 //
 // Mcb Node
 //
@@ -900,7 +902,6 @@ typedef struct _EXT2_CCB {
 #define CCB_LAST_WRITE_UPDATED      0x00000004
 
 #define CCB_DELETE_ON_CLOSE         0x00000010
-#define CCB_DELETE_PENDING          0x00000020
 
 #define CCB_ALLOW_EXTENDED_DASD_IO  0x80000000
 

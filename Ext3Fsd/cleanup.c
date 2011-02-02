@@ -123,7 +123,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
 
         if (IsDirectory(Fcb)) {
             if (IsFlagOn(Ccb->Flags, CCB_DELETE_ON_CLOSE))  {
-                SetLongFlag(Ccb->Flags, CCB_DELETE_PENDING);
+                SetLongFlag(Fcb->Flags, FCB_DELETE_PENDING);
 
                 FsRtlNotifyFullChangeDirectory(
                     Vcb->NotifySync,
@@ -203,7 +203,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             if (IsFlagOn(Ccb->Flags, CCB_DELETE_ON_CLOSE))  {
-                SetLongFlag(Ccb->Flags, CCB_DELETE_PENDING);
+                SetLongFlag(Fcb->Flags, FCB_DELETE_PENDING);
             }
 
             //
@@ -247,7 +247,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                 Size.QuadPart = CEILING_ALIGNED(ULONGLONG,
                                                 (ULONGLONG)Fcb->Mcb->Inode.i_size,
                                                 (ULONGLONG)BLOCK_SIZE);
-                if (!IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING)) {
+                if (!IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
 
                     Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &Size);
                     Size.QuadPart = CEILING_ALIGNED(ULONGLONG,
@@ -267,7 +267,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
             }
         }
 
-        if (IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING)) {
+        if (IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
 
             if (Fcb->OpenHandleCount == 0 || (Mcb = Ccb->SymLink)) {
 

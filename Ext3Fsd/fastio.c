@@ -419,7 +419,7 @@ Ext2FastIoQueryStandardInfo (
             */
 
             Buffer->NumberOfLinks = Fcb->Inode->i_nlink;
-            Buffer->DeletePending = FALSE;
+            Buffer->DeletePending = IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING);
 
             if (IsDirectory(Fcb)) {
                 Buffer->Directory = IsDirectory(Fcb);

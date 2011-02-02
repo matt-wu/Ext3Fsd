@@ -1086,7 +1086,7 @@ Ext2NotifyChangeDirectory (
 
         WatchTree = IsFlagOn(IrpSp->Flags, SL_WATCH_TREE);
 
-        if (FlagOn(Ccb->Flags, CCB_DELETE_PENDING)) {
+        if (FlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
             Status = STATUS_DELETE_PENDING;
             __leave;
         }

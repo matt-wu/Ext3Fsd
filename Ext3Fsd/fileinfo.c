@@ -160,7 +160,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY))
                 FSI->DeletePending = FALSE;
             else
-                FSI->DeletePending = IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING);
+                FSI->DeletePending = IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING);
 
             if (IsLinkInvalid(Mcb)) {
                 FSI->Directory = FALSE;
@@ -318,7 +318,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY))
                 FSI->DeletePending = FALSE;
             else
-                FSI->DeletePending = IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING);
+                FSI->DeletePending = IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING);
 
             if (IsLinkInvalid(Mcb)) {
                 FSI->Directory = FALSE;
@@ -642,7 +642,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
         /*
                 if (FileInformationClass != FileDispositionInformation
-                    && IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING))
+                    && IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING))
                 {
                     Status = STATUS_DELETE_PENDING;
                     __leave;
@@ -849,7 +849,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             if (IoStackLocation->Parameters.SetFile.AdvanceOnly) {
 
-                if (IsFlagOn(Ccb->Flags, CCB_DELETE_PENDING)) {
+                if (IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
                     __leave;
                 }
 
@@ -1372,13 +1372,13 @@ Ext2SetDispositionInfo(
         }
 
         if (NT_SUCCESS(status)) {
-            SetLongFlag(Ccb->Flags, CCB_DELETE_PENDING);
+            SetLongFlag(Fcb->Flags, FCB_DELETE_PENDING);
             IrpSp->FileObject->DeletePending = TRUE;
         }
 
     } else {
 
-        ClearLongFlag(Ccb->Flags, CCB_DELETE_PENDING);
+        ClearLongFlag(Fcb->Flags, FCB_DELETE_PENDING);
         IrpSp->FileObject->DeletePending = FALSE;
     }
 

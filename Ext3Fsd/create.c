@@ -706,7 +706,6 @@ Ext2CreateFile(
 
     ACCESS_MASK         DesiredAccess;
     ULONG               ShareAccess;
-    ULONG               CcbFlags = 0;
 
     RtlZeroMemory(&FileName, sizeof(UNICODE_STRING));
 
@@ -1284,8 +1283,6 @@ Openit:
                         Ext2RaiseStatus(IrpContext, STATUS_MEDIA_WRITE_PROTECTED);
                     }
 
-                    SetLongFlag(CcbFlags, CCB_DELETE_ON_CLOSE);
-
                 } else {
 
                     //
@@ -1374,7 +1371,10 @@ Openit:
                 DbgBreak();
                 __leave;
             }
-            Ccb->Flags |= CcbFlags;
+
+            if (DeleteOnClose)
+                SetLongFlag(Ccb->Flags, CCB_DELETE_ON_CLOSE);
+
             if (SymLink)
                 Ccb->filp.f_dentry = SymLink->de;
             else
