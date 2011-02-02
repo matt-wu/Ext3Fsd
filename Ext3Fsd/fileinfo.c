@@ -1817,6 +1817,7 @@ Ext2DeleteFile(
 
         if (NT_SUCCESS(Status)) {
 
+            SetFlag(Mcb->Flags, MCB_FILE_DELETED);
             Ext2RemoveMcb(Vcb, Mcb);
 
             if (Fcb) {
@@ -1840,19 +1841,16 @@ Ext2DeleteFile(
             if (IsMcbSymLink(Mcb)) {
                 if (Mcb->Inode.i_nlink > 0) {
                     Status = STATUS_CANNOT_DELETE;
+                    __leave;
                 }
             } else if (!IsMcbDirectory(Mcb)) {
                 if (Mcb->Inode.i_nlink > 0) {
-                    goto SkipTruncate;
+                    __leave;
                 }
             } else {
                 if (Mcb->Inode.i_nlink >= 2) {
-                    goto SkipTruncate;
+                    __leave;
                 }
-            }
-
-            if (!NT_SUCCESS(Status)) {
-                __leave;
             }
 
             if (S_ISLNK(Mcb->Inode.i_mode)) {
@@ -1904,12 +1902,8 @@ Ext2DeleteFile(
             KeQuerySystemTime(&SysTime);
             Mcb->Inode.i_nlink = 0;
             Mcb->Inode.i_dtime = Ext2LinuxTime(SysTime);
-            Ext2FreeInode(IrpContext, Vcb, Mcb->Inode.i_ino, Ext2InodeType(Mcb));
-
-SkipTruncate:
-
-            SetFlag(Mcb->Flags, MCB_FILE_DELETED);
             Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
+            Ext2FreeInode(IrpContext, Vcb, Mcb->Inode.i_ino, Ext2InodeType(Mcb));
         }
 
     } __finally {
