@@ -487,8 +487,10 @@ static int Ext2FillEntry(void *context, const char *name, int namlen,
 errorout:
 
     fc->efc_status = Status;
-    if (Unicode.Buffer)
+    if (Unicode.Buffer) {
+        DEC_MEM_COUNT(PS_INODE_NAME, Unicode.Buffer, Unicode.MaximumLength );
         Ext2FreePool(Unicode.Buffer, EXT2_INAME_MAGIC);
+    }
 
     return rc;
 }
@@ -964,7 +966,7 @@ errorout:
         }
 
         if (Unicode.Buffer != NULL) {
-            DEC_MEM_COUNT(PS_INODE_NAME, Unicode.Buffer, Unicode.MaximumLength );
+            DEC_MEM_COUNT(PS_INODE_NAME, Unicode.Buffer, Unicode.MaximumLength);
             Ext2FreePool(Unicode.Buffer, EXT2_INAME_MAGIC);
         }
 
