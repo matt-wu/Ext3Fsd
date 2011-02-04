@@ -683,7 +683,9 @@ Ext2QueryExt2Property (
 BOOLEAN
 Ext2QueryPerfStat (
     HANDLE                      Handle,
-    PEXT2_PERF_STATISTICS       Stat
+    PEXT2_QUERY_PERFSTAT        Stat,
+    PEXT2_PERF_STATISTICS_V1   *PerfV1,
+    PEXT2_PERF_STATISTICS_V2   *PerfV2
 );
 
 BOOLEAN Ext2IsNullUuid (__u8 * uuid);

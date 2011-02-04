@@ -26,7 +26,7 @@ public:
     CListCtrl *         m_MemList;
 
     HANDLE               m_Handle;
-    EXT2_PERF_STATISTICS m_PerfStat;
+    EXT2_QUERY_PERFSTAT  m_PerfStat;
 
 // Overrides
     // ClassWizard generated virtual function overrides

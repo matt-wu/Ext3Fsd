@@ -121,8 +121,6 @@ CMountPoints::AddMountPoint(
         CString str;
 
         if (Ext2SetRegistryMountPoint(&drvChar, devPath, bRegistry)) {
-            Ext2AssignDrvLetter(drvLetter, devPath, FALSE);
-            EndDialog(0);
         } else {
             str.Format("Failed to modify registry: SYSTEM\\CurrentControlSet\\Control\\Session Manager\\DOS Devices\n");
             AfxMessageBox(str, MB_OK|MB_ICONWARNING);

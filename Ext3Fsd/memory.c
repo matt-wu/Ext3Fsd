@@ -387,7 +387,7 @@ Ext2AllocateInode (PEXT2_VCB  Vcb)
     RtlZeroMemory(inode, INODE_SIZE);
 
     DEBUG(DL_INF, ("ExtAllocateInode: Inode created: %ph.\n", inode));
-    //INC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
+    INC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
 
     return inode;
 }
@@ -400,7 +400,7 @@ Ext2DestroyInode (IN PEXT2_VCB Vcb, IN PEXT2_INODE inode)
     DEBUG(DL_INF, ("Ext2FreeInode: Inode = %ph.\n", inode));
 
     ExFreeToNPagedLookasideList(&(Vcb->InodeLookasideList), inode);
-    //DEC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
+    DEC_MEM_COUNT(PS_EXT2_INODE, inode, INODE_SIZE);
 }
 
 struct dentry * Ext2AllocateEntry()
@@ -414,7 +414,7 @@ struct dentry * Ext2AllocateEntry()
     }
 
     RtlZeroMemory(de, sizeof(struct dentry));
-    //INC_MEM_COUNT(PS_DENTRY, de, sizeof(struct dentry));
+    INC_MEM_COUNT(PS_DENTRY, de, sizeof(struct dentry));
 
     return de;
 }
@@ -427,7 +427,7 @@ VOID Ext2FreeEntry (IN struct dentry *de)
         ExFreePool(de->d_name.name);
 
     ExFreeToPagedLookasideList(&(Ext2Global->Ext2DentryLookasideList), de);
-    //DEC_MEM_COUNT(PS_DENTRY, de, sizeof(struct dentry));
+    DEC_MEM_COUNT(PS_DENTRY, de, sizeof(struct dentry));
 }
 
 

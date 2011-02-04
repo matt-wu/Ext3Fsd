@@ -87,12 +87,16 @@ PerfStatStrings[] = {
     "VPB",
     "FCB_NAME",
     "MCB_NAME",
-    "INODE_NAME",
+    "FILE_NAME",
     "DIR_ENTRY",
     "DIR_PATTERN",
     "DISK_EVENT",
     "DISK_BUFFER",
-    "BLOCK_DATA"
+    "BLOCK_DATA",
+    "inode",
+    "dentry",
+    "buffer head",
+    NULL
 };
 
 PARTITION_LIST PartitionList[] = {
@@ -2094,26 +2098,48 @@ Ext2QueryExt2Property (
 BOOLEAN
 Ext2QueryPerfStat (
     HANDLE                      Handle,
-    PEXT2_PERF_STATISTICS       Perf
+    PEXT2_QUERY_PERFSTAT        Stat,
+    PEXT2_PERF_STATISTICS_V1   *PerfV1,
+    PEXT2_PERF_STATISTICS_V2   *PerfV2
 )
 {
     NT::NTSTATUS                status;
     NT::IO_STATUS_BLOCK         iosb;
-    EXT2_QUERY_PERFSTAT         Stat;
 
-    memset(&Stat, 0, sizeof(EXT2_QUERY_PERFSTAT));
-    Stat.Magic = EXT2_VOLUME_PROPERTY_MAGIC;
-    Stat.Command = IOCTL_APP_QUERY_PERFSTAT;
+    memset(Stat, 0, sizeof(EXT2_QUERY_PERFSTAT));
+    Stat->Magic = EXT2_VOLUME_PROPERTY_MAGIC;
+    Stat->Command = IOCTL_APP_QUERY_PERFSTAT;
+
+    *PerfV1 = NULL;
+    *PerfV2 = NULL;
 
     status = NT::ZwDeviceIoControlFile(
                  Handle, NULL, NULL, NULL, &iosb,
                  IOCTL_APP_QUERY_PERFSTAT,
-                 &Stat, sizeof(EXT2_QUERY_PERFSTAT),
-                 &Stat, sizeof(EXT2_QUERY_PERFSTAT)
+                 Stat, sizeof(EXT2_QUERY_PERFSTAT),
+                 Stat, sizeof(EXT2_QUERY_PERFSTAT)
              );
-    *Perf = Stat.PerfStat;
+    if (!NT_SUCCESS(!status))
+        return FALSE;
 
-    return NT_SUCCESS(status);
+    if (iosb.Information == EXT2_QUERY_PERFSTAT_SZV2 &&
+            (Stat->Flags & EXT2_QUERY_PERFSTAT_VER2) != 0) {
+
+        if (Stat->PerfStatV2.Magic == EXT2_PERF_STAT_MAGIC &&
+                Stat->PerfStatV2.Length == sizeof(EXT2_PERF_STATISTICS_V2) &&
+                Stat->PerfStatV2.Version == EXT2_PERF_STAT_VER2) {
+            *PerfV2 = &Stat->PerfStatV2;
+        }
+
+    } else if (iosb.Information >= EXT2_QUERY_PERFSTAT_SZV1)  {
+
+        *PerfV1 = &Stat->PerfStatV1;
+    }
+
+    if (PerfV1 || PerfV2)
+        return TRUE;
+
+    return FALSE;
 }
 
 VOID

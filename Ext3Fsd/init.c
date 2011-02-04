@@ -572,17 +572,31 @@ DriverEntry (
 
     //
     //  initializing structure sizes for statistics
+    //  1 means flexible/not fixed for all allocations (for different volumes).
     //
+    Ext2Global->PerfStat.Magic   = EXT2_PERF_STAT_MAGIC;
+    Ext2Global->PerfStat.Version = EXT2_PERF_STAT_VER2;
+    Ext2Global->PerfStat.Length  = sizeof(EXT2_PERF_STATISTICS_V2);
 
-    Ext2Global->PerfStat.Unit.IrpContext = sizeof(EXT2_IRP_CONTEXT);
-    Ext2Global->PerfStat.Unit.Vcb = sizeof(EXT2_VCB);
-    Ext2Global->PerfStat.Unit.Fcb = sizeof(EXT2_FCB);
-    Ext2Global->PerfStat.Unit.Ccb = sizeof(EXT2_CCB);
-    Ext2Global->PerfStat.Unit.Mcb = sizeof(EXT2_MCB);
-    Ext2Global->PerfStat.Unit.Extent = sizeof(EXT2_EXTENT);
-    Ext2Global->PerfStat.Unit.RwContext = sizeof(EXT2_RW_CONTEXT);
-    Ext2Global->PerfStat.Unit.Vpb = sizeof(VPB);
-    Ext2Global->PerfStat.Unit.DirEntry = sizeof(EXT2_DIR_ENTRY2);
+    Ext2Global->PerfStat.Unit.Slot[PS_IRP_CONTEXT] = sizeof(EXT2_IRP_CONTEXT);  /* 0 */
+    Ext2Global->PerfStat.Unit.Slot[PS_VCB] = sizeof(EXT2_VCB);                  /* 1 */
+    Ext2Global->PerfStat.Unit.Slot[PS_FCB] = sizeof(EXT2_FCB);                  /* 2 */
+    Ext2Global->PerfStat.Unit.Slot[PS_CCB] = sizeof(EXT2_CCB);                  /* 3 */
+    Ext2Global->PerfStat.Unit.Slot[PS_MCB] = sizeof(EXT2_MCB);                  /* 4 */
+    Ext2Global->PerfStat.Unit.Slot[PS_EXTENT] = sizeof(EXT2_EXTENT);            /* 5 */
+    Ext2Global->PerfStat.Unit.Slot[PS_RW_CONTEXT] = sizeof(EXT2_RW_CONTEXT);    /* 6 */
+    Ext2Global->PerfStat.Unit.Slot[PS_VPB] = sizeof(VPB);                       /* 7 */
+    Ext2Global->PerfStat.Unit.Slot[PS_FILE_NAME] = 1;                           /* 8 */
+    Ext2Global->PerfStat.Unit.Slot[PS_MCB_NAME] = 1;                            /* 9 */
+    Ext2Global->PerfStat.Unit.Slot[PS_INODE_NAME] = 1;                          /* a */
+    Ext2Global->PerfStat.Unit.Slot[PS_DIR_ENTRY] = sizeof(EXT2_DIR_ENTRY2);     /* b */
+    Ext2Global->PerfStat.Unit.Slot[PS_DIR_PATTERN] = 1;                         /* c */
+    Ext2Global->PerfStat.Unit.Slot[PS_DISK_EVENT] = sizeof(KEVENT);             /* d */
+    Ext2Global->PerfStat.Unit.Slot[PS_DISK_BUFFER] = 1;                         /* e */
+    Ext2Global->PerfStat.Unit.Slot[PS_BLOCK_DATA] = 1;                          /* f */
+    Ext2Global->PerfStat.Unit.Slot[PS_EXT2_INODE] = 1;                          /* 10 */
+    Ext2Global->PerfStat.Unit.Slot[PS_DENTRY] = sizeof(struct dentry);          /* 11 */
+    Ext2Global->PerfStat.Unit.Slot[PS_BUFF_HEAD] = sizeof(struct buffer_head);  /* 12 */
 
     switch ( MmQuerySystemSize() ) {
 

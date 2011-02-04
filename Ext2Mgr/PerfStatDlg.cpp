@@ -89,7 +89,7 @@ BOOL CPerfStatDlg::OnInitDialog()
 
     s.LoadString(IDS_PERFSTAT_TOTAL);
     m_MemList->InsertColumn(4, (LPCSTR)s, LVCFMT_RIGHT, 120);
-    for (i=0; i <= PS_MAX_TYPE; i++) {
+    for (i = 0; PerfStatStrings[i] != NULL ; i++) {
         m_MemList->InsertItem(i, PerfStatStrings[i]);
     }
 
@@ -131,6 +131,9 @@ void CPerfStatDlg::RefreshPerfStat()
     int i;
     CString s;
 
+    PEXT2_PERF_STATISTICS_V1   PerfV1 = NULL;
+    PEXT2_PERF_STATISTICS_V2   PerfV2 = NULL;
+
     NT::NTSTATUS status;
 
     if (m_Handle == 0) {
@@ -141,32 +144,69 @@ void CPerfStatDlg::RefreshPerfStat()
         }
     }
 
-    if (Ext2QueryPerfStat(m_Handle, &m_PerfStat)) {
+    if (Ext2QueryPerfStat(m_Handle, &m_PerfStat, &PerfV1, &PerfV2)) {
 
-        if (m_MemList) {
+        if (PerfV2) {
 
-            for (i = 0; i <= PS_MAX_TYPE; i++) {
+            if (m_MemList) {
+                for (i = 0; i < PS_MAX_TYPE_V2; i++) {
+                    if (PerfV2->Unit.Slot[i] == 0)
+                        break;
+                    else if (PerfV2->Unit.Slot[i] == 1)
+                        s = "*";
+                    else
+                        s.Format("%u", PerfV2->Unit.Slot[i]);
+                    m_MemList->SetItem(i, 1, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
 
-                s.Format("%u", m_PerfStat.Unit.Slot[i]);
-                m_MemList->SetItem(i, 1, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+                    s.Format("%u", PerfV2->Current.Slot[i]);
+                    m_MemList->SetItem(i, 2, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
 
-                s.Format("%u", m_PerfStat.Current.Slot[i]);
-                m_MemList->SetItem(i, 2, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+                    s.Format("%u", PerfV2->Size.Slot[i]);
+                    m_MemList->SetItem(i, 3, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
 
-                s.Format("%u", m_PerfStat.Size.Slot[i]);
-                m_MemList->SetItem(i, 3, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
-
-                s.Format("%u", m_PerfStat.Total.Slot[i]);
-                m_MemList->SetItem(i, 4, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+                    s.Format("%u", PerfV2->Total.Slot[i]);
+                    m_MemList->SetItem(i, 4, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+                }
             }
-        }
 
-        if (m_IrpList) {
-            for (i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; i++) {
-                s.Format("%u", m_PerfStat.Irps[i].Current);
-                m_IrpList->SetItem(i, 1, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
-                s.Format("%u", m_PerfStat.Irps[i].Processed);
-                m_IrpList->SetItem(i, 2, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+            if (m_IrpList) {
+                for (i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; i++) {
+                    s.Format("%u", PerfV2->Irps[i].Current);
+                    m_IrpList->SetItem(i, 1, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+                    s.Format("%u", PerfV2->Irps[i].Processed);
+                    m_IrpList->SetItem(i, 2, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+                }
+            }
+
+        } else if (PerfV1) {
+
+            if (m_MemList) {
+                for (i = 0; i < PS_MAX_TYPE_V1; i++) {
+
+                    if (PerfV1->Unit.Slot[i] == 0)
+                        s = "*";
+                    else
+                        s.Format("%u", PerfV1->Unit.Slot[i]);
+                    m_MemList->SetItem(i, 1, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+
+                    s.Format("%u", PerfV1->Current.Slot[i]);
+                    m_MemList->SetItem(i, 2, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+
+                    s.Format("%u", PerfV1->Size.Slot[i]);
+                    m_MemList->SetItem(i, 3, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+
+                    s.Format("%u", PerfV1->Total.Slot[i]);
+                    m_MemList->SetItem(i, 4, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+                }
+            }
+
+            if (m_IrpList) {
+                for (i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; i++) {
+                    s.Format("%u", PerfV1->Irps[i].Current);
+                    m_IrpList->SetItem(i, 1, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+                    s.Format("%u", PerfV1->Irps[i].Processed);
+                    m_IrpList->SetItem(i, 2, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
+                }
             }
         }
 

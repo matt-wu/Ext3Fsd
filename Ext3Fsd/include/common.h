@@ -32,12 +32,14 @@ CTL_CODE(FILE_DEVICE_UNKNOWN, 2002, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 #define PS_EXT2_INODE   0x10
 #define PS_DENTRY       0x11
+#define PS_BUFF_HEAD    0x12
 
-#define PS_MAX_TYPE     (0x10)
+#define PS_MAX_TYPE_V1  (0x10)
+#define PS_MAX_TYPE_V2  (0x30)
 
 typedef union {
 
-    ULONG           Slot[PS_MAX_TYPE];
+    ULONG           Slot[PS_MAX_TYPE_V1];
 
     struct {
         ULONG       IrpContext;
@@ -55,13 +57,40 @@ typedef union {
         ULONG       DirPattern;  /* Ccb-> in Ext2QeuryDir */
         ULONG       ReadDiskEvent;
         ULONG       ReadDiskBuffer;
-        ULONG       BlockData;  /* Ext2Expand&TruncateFile*/
+        ULONG       BlockData;   /* Ext2Expand&TruncateFile*/
     };
 
-} EXT2_STAT_ARRAY;
+} EXT2_STAT_ARRAY_V1;
 
+typedef union {
 
-typedef struct _EXT2_PERF_STATISTICS {
+    ULONG           Slot[PS_MAX_TYPE_V2];
+
+    struct {
+        ULONG       IrpContext;
+        ULONG       Vcb;
+        ULONG       Fcb;
+        ULONG       Ccb;
+        ULONG       Mcb;
+        ULONG       Extent;
+        ULONG       RwContext;  /* rw context */
+        ULONG       Vpb;
+        ULONG       FileName;
+        ULONG       McbName;
+        ULONG       InodeName;
+        ULONG       DirEntry;   /* pDir */
+        ULONG       DirPattern; /* Ccb-> in Ext2QeuryDir */
+        ULONG       ReadDiskEvent;
+        ULONG       ReadDiskBuffer;
+        ULONG       BlockData;  /* Ext2Expand&TruncateFile*/
+        ULONG       Inodes;     /* inodes */
+        ULONG       NameEntries;    /* name dentry */
+        ULONG       BufferHead; /* Buffer Header allocations */
+    };
+
+} EXT2_STAT_ARRAY_V2;
+
+typedef struct _EXT2_PERF_STATISTICS_V1 {
 
     /* totoal number of processed/being processed requests */
     struct {
@@ -70,18 +99,47 @@ typedef struct _EXT2_PERF_STATISTICS {
     } Irps [IRP_MJ_MAXIMUM_FUNCTION + 1];
 
     /* structure size */
-    EXT2_STAT_ARRAY     Unit;
+    EXT2_STAT_ARRAY_V1  Unit;
 
     /* current memory allocation statistics */
-    EXT2_STAT_ARRAY     Current;
+    EXT2_STAT_ARRAY_V1  Current;
 
     /* memory allocated in bytes */
-    EXT2_STAT_ARRAY     Size;
+    EXT2_STAT_ARRAY_V1  Size;
 
     /* totoal memory allocation statistics */
-    EXT2_STAT_ARRAY     Total;
+    EXT2_STAT_ARRAY_V1  Total;
 
-} EXT2_PERF_STATISTICS, *PEXT2_PERF_STATISTICS;
+} EXT2_PERF_STATISTICS_V1, *PEXT2_PERF_STATISTICS_V1;
+
+#define EXT2_PERF_STAT_MAGIC '2SPE'
+#define EXT2_PERF_STAT_VER2   2
+
+typedef struct _EXT2_PERF_STATISTICS_V2 {
+
+    ULONG               Magic;      /* EPS2 */
+    USHORT              Version;    /* 02 */
+    USHORT              Length;     /* sizeof(EXT2_PERF_STATISTICS_V2) */
+
+    /* totoal number of processed/being processed requests */
+    struct {
+        ULONG           Processed;
+        ULONG           Current;
+    } Irps [IRP_MJ_MAXIMUM_FUNCTION + 1];
+
+    /* structure size */
+    EXT2_STAT_ARRAY_V2  Unit;
+
+    /* current memory allocation statistics */
+    EXT2_STAT_ARRAY_V2  Current;
+
+    /* memory allocated in bytes */
+    EXT2_STAT_ARRAY_V2  Size;
+
+    /* totoal memory allocation statistics */
+    EXT2_STAT_ARRAY_V2  Total;
+
+} EXT2_PERF_STATISTICS_V2, *PEXT2_PERF_STATISTICS_V2;
 
 /* volume property ... */
 
@@ -162,12 +220,20 @@ typedef struct _EXT2_VOLUME_PROPERTY_VERSION {
 
 /* performance statistics */
 #define EXT2_QUERY_PERFSTAT_MAGIC 'EVPM'
+#define EXT2_QUERY_PERFSTAT_VER2  0x8000000
+
 typedef struct _EXT2_QUERY_PERFSTAT {
     ULONG                   Magic;
     ULONG                   Flags;
     ULONG                   Command;
-    EXT2_PERF_STATISTICS    PerfStat;
+    union {
+        EXT2_PERF_STATISTICS_V1 PerfStatV1;
+        EXT2_PERF_STATISTICS_V2 PerfStatV2;
+    };
 } EXT2_QUERY_PERFSTAT, *PEXT2_QUERY_PERFSTAT;
+
+#define EXT2_QUERY_PERFSTAT_SZV1 (FIELD_OFFSET(EXT2_QUERY_PERFSTAT, PerfStatV1) + sizeof(EXT2_PERF_STATISTICS_V1))
+#define EXT2_QUERY_PERFSTAT_SZV2 (FIELD_OFFSET(EXT2_QUERY_PERFSTAT, PerfStatV1) + sizeof(EXT2_PERF_STATISTICS_V2))
 
 /* mountpoint management  */
 #define EXT2_APP_MOUNTPOINT_MAGIC 'EAMM'

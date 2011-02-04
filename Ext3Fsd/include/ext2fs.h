@@ -487,7 +487,7 @@ typedef struct _EXT2_GLOBAL {
     /* global memory and i/o statistics and memory allocations
        of various sturctures */
 
-    EXT2_PERF_STATISTICS        PerfStat;
+    EXT2_PERF_STATISTICS_V2     PerfStat;
 
 } EXT2_GLOBAL, *PEXT2_GLOBAL;
 

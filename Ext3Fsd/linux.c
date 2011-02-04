@@ -331,6 +331,7 @@ struct buffer_head *
     if (bh) {
         memset(bh, 0, sizeof(struct buffer_head));
         DEBUG(DL_BH, ("bh=%p allocated.\n", bh));
+        INC_MEM_COUNT(PS_BUFF_HEAD, bh, sizeof(struct buffer_head));
     }
     return bh;
 }
@@ -353,6 +354,7 @@ free_buffer_head(struct buffer_head * bh)
             Ext2DestroyMdl(bh->b_mdl);
         }
         DEBUG(DL_BH, ("bh=%p freed.\n", bh));
+        DEC_MEM_COUNT(PS_BUFF_HEAD, bh, sizeof(struct buffer_head));
         kmem_cache_free(g_jbh.bh_cache, bh);
     }
 }

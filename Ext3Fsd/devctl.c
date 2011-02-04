@@ -512,11 +512,11 @@ Ex2ProcessUserPerfStat(
     IN ULONG                Length
 )
 {
-    NTSTATUS    Status = STATUS_SUCCESS;
     PEXT2_VCB   Vcb = NULL;
-    BOOLEAN     GlobalDataResourceAcquired = FALSE;
-
     PDEVICE_OBJECT  DeviceObject = NULL;
+
+    BOOLEAN     GlobalDataResourceAcquired = FALSE;
+    NTSTATUS    Status = STATUS_SUCCESS;
 
     __try {
 
@@ -537,15 +537,30 @@ Ex2ProcessUserPerfStat(
                 __leave;
             }
 
-            if (Length < sizeof(EXT2_QUERY_PERFSTAT)) {
-                Status = STATUS_BUFFER_OVERFLOW;
+            if (Length != EXT2_QUERY_PERFSTAT_SZV1 &&
+                    Length != EXT2_QUERY_PERFSTAT_SZV2) {
+                Status = STATUS_INVALID_PARAMETER;
                 __leave;
             }
 
             ExAcquireResourceSharedLite(&Ext2Global->Resource, TRUE);
             GlobalDataResourceAcquired = TRUE;
 
-            QueryPerf->PerfStat = Ext2Global->PerfStat;
+            if (Length == EXT2_QUERY_PERFSTAT_SZV2) {
+                QueryPerf->Flags = EXT2_QUERY_PERFSTAT_VER2;
+                QueryPerf->PerfStatV2 = Ext2Global->PerfStat;
+            } else {
+                memcpy(&QueryPerf->PerfStatV1.Irps[0], &Ext2Global->PerfStat.Irps[0],
+                       FIELD_OFFSET(EXT2_PERF_STATISTICS_V1, Unit));
+                memcpy(&QueryPerf->PerfStatV1.Unit, &Ext2Global->PerfStat.Unit,
+                       sizeof(EXT2_STAT_ARRAY_V1));
+                memcpy(&QueryPerf->PerfStatV1.Current, &Ext2Global->PerfStat.Current,
+                       sizeof(EXT2_STAT_ARRAY_V1));
+                memcpy(&QueryPerf->PerfStatV1.Size, &Ext2Global->PerfStat.Size,
+                       sizeof(EXT2_STAT_ARRAY_V1));
+                memcpy(&QueryPerf->PerfStatV1.Total, &Ext2Global->PerfStat.Total,
+                       sizeof(EXT2_STAT_ARRAY_V1));
+            }
 
         } else {
             Status = STATUS_INVALID_PARAMETER;
@@ -579,7 +594,7 @@ Ex2ProcessMountPoint(
 {
     UNICODE_STRING  Link;
     UNICODE_STRING  Target;
-    WCHAR           Buffer[] = L"\\DosDevices\\Z:";
+    WCHAR           Buffer[] = L"\\DosDevices\\Global\\Z:";
     NTSTATUS        status = STATUS_SUCCESS;
 
     PDEVICE_OBJECT  DeviceObject = NULL;
