@@ -2511,6 +2511,11 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
         }
 
+        if (EXT3_HAS_INCOMPAT_FEATURE(&Vcb->sb, EXT3_FEATURE_INCOMPAT_META_BG |
+                                                EXT4_FEATURE_INCOMPAT_FLEX_BG)) {
+           SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
+        }
+
         has_huge_files = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb,
                          EXT4_FEATURE_RO_COMPAT_HUGE_FILE);
 
@@ -2552,8 +2557,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         /* recovery journal since it's ext3 */
         if (Vcb->IsExt3fs) {
             Ext2RecoverJournal(IrpContext, Vcb);
-            if (IsFlagOn(Vcb->Flags, VCB_JOURNAL_RECOVER) ||
-                    IsFlagOn(sb->s_feature_incompat, EXT3_FEATURE_INCOMPAT_META_BG)) {
+            if (IsFlagOn(Vcb->Flags, VCB_JOURNAL_RECOVER)) {
                 SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
             }
         }

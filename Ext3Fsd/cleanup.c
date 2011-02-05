@@ -57,7 +57,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
         ASSERT((Vcb->Identifier.Type == EXT2VCB) &&
                (Vcb->Identifier.Size == sizeof(EXT2_VCB)));
 
-        if (!IsFlagOn(Vcb->Flags, VCB_INITIALIZED)) {
+        if (!IsVcbInited(Vcb)) {
             Status = STATUS_SUCCESS;
             __leave;
         }

@@ -698,8 +698,9 @@ typedef struct _EXT2_VCB {
 #define VCB_REMOVABLE_MEDIA     0x80000000
 
 
-#define IsMounted(Vcb)     (IsFlagOn(Vcb->Flags, VCB_MOUNTED))
-#define IsDispending(Vcb)  (IsFlagOn(Vcb->Flags, VCB_DISMOUNT_PENDING))
+#define IsVcbInited(Vcb)   (IsFlagOn((Vcb)->Flags, VCB_INITIALIZED))
+#define IsMounted(Vcb)     (IsFlagOn((Vcb)->Flags, VCB_MOUNTED))
+#define IsDispending(Vcb)  (IsFlagOn((Vcb)->Flags, VCB_DISMOUNT_PENDING))
 
 //
 // EXT2_FCB File Control Block

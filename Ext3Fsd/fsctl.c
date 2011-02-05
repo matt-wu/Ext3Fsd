@@ -1514,6 +1514,7 @@ Ext2MountVolume (IN PEXT2_IRP_CONTEXT IrpContext)
         Vcb->Identifier.Size = sizeof(EXT2_VCB);
         Vcb->TargetDeviceObject = TargetDeviceObject;
         Vcb->DiskGeometry = DiskGeometry;
+        InitializeListHead(&Vcb->Next);
 
         Status = Ext2LoadSuper(Vcb, FALSE, &Ext2Sb);
         if (!NT_SUCCESS(Status)) {
