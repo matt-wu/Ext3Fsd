@@ -195,45 +195,48 @@ Ext2FastIoWrite (
     OUT PIO_STATUS_BLOCK    IoStatus,
     IN PDEVICE_OBJECT       DeviceObject)
 {
-    PEXT2_FCB   Fcb;
-    BOOLEAN     Status = TRUE;
+    PEXT2_FCB   Fcb = NULL;
+    BOOLEAN     Status = FALSE;
     BOOLEAN     Locked = FALSE;
 
     Fcb = (PEXT2_FCB) FileObject->FsContext;
-    if (Fcb == NULL) {
+    if (Fcb == NULL)
         return FALSE;
-    }
 
-    ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
-           (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
+    __try {
 
-    if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY)) {
-        return FALSE;
-    }
+        FsRtlEnterFileSystem();
 
-    ExAcquireResourceExclusiveLite(&Fcb->MainResource, TRUE);
-    Locked = TRUE;
+        ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
+               (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
-    if (IsEndOfFile(*FileOffset) || (Fcb->Inode->i_size <=
-                                     (loff_t)FileOffset->QuadPart + Length) ) {
-    } else {
-        ExReleaseResourceLite(&Fcb->MainResource);
-        Locked = FALSE;
-    }
-
-    Status = FsRtlCopyWrite(FileObject, FileOffset, Length, Wait,
-                            LockKey, Buffer, IoStatus, DeviceObject);
-
-    if (Locked) {
-        if (Status) {
-            Fcb->Inode->i_size = Fcb->Header.FileSize.QuadPart;
-            Ext2SaveInode(NULL, Fcb->Vcb, Fcb->Inode);
+        if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY)) {
+            __leave;
         }
-        ExReleaseResourceLite(&Fcb->MainResource);
+
+        ExAcquireResourceSharedLite(&Fcb->MainResource, TRUE);
+        Locked = TRUE;
+
+        if (IsEndOfFile(*FileOffset) || ((LONGLONG)(Fcb->Inode->i_size) <
+                                         (FileOffset->QuadPart + Length)) ) {
+        } else {
+            ExReleaseResourceLite(&Fcb->MainResource);
+            Locked = FALSE;
+            Status = FsRtlCopyWrite(FileObject, FileOffset, Length, Wait,
+                                    LockKey, Buffer, IoStatus, DeviceObject);
+        }
+
+    } __finally {
+
+        if (Locked) {
+            ExReleaseResourceLite(&Fcb->MainResource);
+        }
+
+        FsRtlExitFileSystem();
     }
 
     DEBUG(DL_IO, ("Ext2FastIoWrite: %wZ Offset: %I64xh Length: %xh Key: %xh Status=%d\n",
-                  &Fcb->Mcb->ShortName,  FileOffset->QuadPart, Length, LockKey, Status));
+                   &Fcb->Mcb->ShortName,  FileOffset->QuadPart, Length, LockKey, Status));
 
     return Status;
 }
