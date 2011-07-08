@@ -436,7 +436,6 @@ again:
         goto errorout;
     }
 
-
     set_buffer_uptodate(bh);
     get_bh(bh);
 
@@ -489,7 +488,6 @@ int submit_bh(int rw, struct buffer_head *bh)
         }
 
         SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
-
         Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
         if (CcPreparePinWrite(
                     Vcb->Volume,
@@ -499,12 +497,13 @@ int submit_bh(int rw, struct buffer_head *bh)
                     TRUE,
                     &Bcb,
                     &Buffer )) {
-#if DBG
+#if 0
             if (memcmp(Buffer, bh->b_data, BLOCK_SIZE) != 0) {
                 DbgBreak();
                 memmove(Buffer, bh->b_data, BLOCK_SIZE);
             }
 #endif
+
             CcSetDirtyPinnedData(Bcb, NULL);
             CcUnpinData(Bcb);
         }

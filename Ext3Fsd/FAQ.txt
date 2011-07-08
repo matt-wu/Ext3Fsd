@@ -3,7 +3,7 @@
 ================
 
 -------------------------------------------------------------------------
-Q) What systems could Ext2Fsd 0.50 support
+Q) What systems could Ext2Fsd 0.51 support
 
 A) Windows 2000, xp, 2003, Vista, Win7 (X86, AMD64)
    Windows NT 4.0 is no longer supported.
@@ -12,9 +12,9 @@ A) Windows 2000, xp, 2003, Vista, Win7 (X86, AMD64)
    Win7 AMD64/X86, Vista AMD64, XP pro X86, Win2k SP4
 
 -------------------------------------------------------------------------
-Q) How to install ext2fsd version 0.50
+Q) How to install ext2fsd version 0.51
 
-A) Just click the file of ext2fsd-0.50.exe. It will guide you for all.
+A) Just click the file of ext2fsd-0.51.exe. It will guide you for all.
    and writing on ext3 partition:
 
    Senior users can try the setup.bat or registry manually editing.

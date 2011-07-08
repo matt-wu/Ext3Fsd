@@ -853,13 +853,17 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                     __leave;
                 }
 
-                if (EndOfFile.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
-                    EndOfFile.QuadPart = Fcb->Header.ValidDataLength.QuadPart;
+                if (EndOfFile.QuadPart > Fcb->Header.FileSize.QuadPart) {
+                    EndOfFile.QuadPart = Fcb->Header.FileSize.QuadPart;
                 }
 
-                if ((loff_t)EndOfFile.QuadPart <= Mcb->Inode.i_size) {
-                    __leave;
+                if (EndOfFile.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
+
+                    Fcb->Header.ValidDataLength.QuadPart = EndOfFile.QuadPart;
+                    NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
                 }
+
+                __leave;
             }
 
             NewSize.QuadPart = CEILING_ALIGNED(ULONGLONG,
@@ -924,7 +928,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             if (NT_SUCCESS(Status)) {
 
-                Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size = EndOfFile.QuadPart;
+                Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size = EndOfFile.QuadPart;
                 if (Fcb->Header.ValidDataLength.QuadPart > Fcb->Header.FileSize.QuadPart)
                     Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
 

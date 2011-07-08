@@ -231,94 +231,116 @@ extern CHAR gDate[];
 NTSTATUS
 Ext2ProcessGlobalProperty(
     IN  PDEVICE_OBJECT  DeviceObject,
-    IN  PEXT2_VOLUME_PROPERTY2 Property
+    IN  PEXT2_VOLUME_PROPERTY2 Property,
+    IN  ULONG Length
 )
 {
     NTSTATUS        Status = STATUS_SUCCESS;
     BOOLEAN         GlobalDataResourceAcquired = FALSE;
     struct nls_table * PageTable = NULL;
 
-    if (!IsFlagOn(Property->Flags, EXT2_FLAG_VP_SET_GLOBAL)) {
-        Status = STATUS_INVALID_PARAMETER;
-        goto errorout;
-    }
+    __try {
 
-    /* query Ext2Fsd's version and built date/time*/
-    if (Property->Command == APP_CMD_QUERY_VERSION) {
+        if (Length < 8 || !IsFlagOn(Property->Flags, EXT2_FLAG_VP_SET_GLOBAL)) {
+            Status = STATUS_INVALID_PARAMETER;
+            __leave;
+        }
 
-        PEXT2_VOLUME_PROPERTY_VERSION PVPV =
-            (PEXT2_VOLUME_PROPERTY_VERSION) Property;
-        RtlZeroMemory(&PVPV->Date[0],   0x20);
-        RtlZeroMemory(&PVPV->Time[0],   0x20);
-        RtlZeroMemory(&PVPV->Version[0],0x1C);
-        strncpy(&PVPV->Version[0], gVersion, 0x1B);
-        strncpy(&PVPV->Date[0], gDate, 0x1F);
-        strncpy(&PVPV->Time[0], gTime, 0x1F);
-        goto errorout;
-    }
+        /* query Ext2Fsd's version and built date/time*/
+        if (Property->Command == APP_CMD_QUERY_VERSION) {
+            PEXT2_VOLUME_PROPERTY_VERSION PVPV =
+                (PEXT2_VOLUME_PROPERTY_VERSION) Property;
 
-    /* must be property query/set commands */
-    if (Property->Command != APP_CMD_SET_PROPERTY &&
-            Property->Command != APP_CMD_SET_PROPERTY2 &&
-            Property->Command != APP_CMD_SET_PROPERTY3 ) {
-        Status = STATUS_INVALID_PARAMETER;
-        goto errorout;
-    }
+            if (Length < sizeof(EXT2_VOLUME_PROPERTY_VERSION)) {
+                Status = STATUS_INVALID_PARAMETER;
+                __leave;
+            }
 
-    ExAcquireResourceExclusiveLite(&Ext2Global->Resource, TRUE);
-    GlobalDataResourceAcquired = TRUE;
+            RtlZeroMemory(&PVPV->Date[0],   0x20);
+            RtlZeroMemory(&PVPV->Time[0],   0x20);
+            RtlZeroMemory(&PVPV->Version[0],0x1C);
+            strncpy(&PVPV->Version[0], gVersion, 0x1B);
+            strncpy(&PVPV->Date[0], gDate, 0x1F);
+            strncpy(&PVPV->Time[0], gTime, 0x1F);
+            __leave;
+        }
 
-    if (Property->bReadonly) {
-        ClearLongFlag(Ext2Global->Flags, EXT2_SUPPORT_WRITING);
-        ClearLongFlag(Ext2Global->Flags, EXT3_FORCE_WRITING);
-    } else {
-        SetLongFlag(Ext2Global->Flags, EXT2_SUPPORT_WRITING);
-        if (Property->bExt3Writable) {
-            SetLongFlag(Ext2Global->Flags, EXT3_FORCE_WRITING);
+        /* must be property query/set commands */
+        if (Property->Command == APP_CMD_SET_PROPERTY) {
+            if (Length < sizeof(EXT2_VOLUME_PROPERTY)) {
+                Status = STATUS_INVALID_PARAMETER;
+                __leave;
+            }
+        } else if (Property->Command == APP_CMD_SET_PROPERTY2) {
+            if (Length < sizeof(EXT2_VOLUME_PROPERTY2)) {
+                Status = STATUS_INVALID_PARAMETER;
+                __leave;
+            }
+        } else if (Property->Command == APP_CMD_SET_PROPERTY3) {
+            if (Length < sizeof(EXT2_VOLUME_PROPERTY3)) {
+                Status = STATUS_INVALID_PARAMETER;
+                __leave;
+            }
         } else {
+            Status = STATUS_INVALID_PARAMETER;
+            __leave;
+        }
+
+        ExAcquireResourceExclusiveLite(&Ext2Global->Resource, TRUE);
+        GlobalDataResourceAcquired = TRUE;
+
+        if (Property->bReadonly) {
+            ClearLongFlag(Ext2Global->Flags, EXT2_SUPPORT_WRITING);
             ClearLongFlag(Ext2Global->Flags, EXT3_FORCE_WRITING);
+        } else {
+            SetLongFlag(Ext2Global->Flags, EXT2_SUPPORT_WRITING);
+            if (Property->bExt3Writable) {
+                SetLongFlag(Ext2Global->Flags, EXT3_FORCE_WRITING);
+            } else {
+                ClearLongFlag(Ext2Global->Flags, EXT3_FORCE_WRITING);
+            }
         }
-    }
 
-    PageTable = load_nls(Property->Codepage);
-    if (PageTable) {
-        memcpy(Ext2Global->Codepage.AnsiName, Property->Codepage, CODEPAGE_MAXLEN);
-        Ext2Global->Codepage.PageTable = PageTable;
-    }
-
-    if (Property->Command == APP_CMD_SET_PROPERTY2 ||
-            Property->Command == APP_CMD_SET_PROPERTY3 ) {
-
-        RtlZeroMemory(Ext2Global->sHidingPrefix, HIDINGPAT_LEN);
-        if ((Ext2Global->bHidingPrefix = Property->bHidingPrefix)) {
-            RtlCopyMemory( Ext2Global->sHidingPrefix,
-                           Property->sHidingPrefix,
-                           HIDINGPAT_LEN - 1);
+        PageTable = load_nls(Property->Codepage);
+        if (PageTable) {
+            memcpy(Ext2Global->Codepage.AnsiName, Property->Codepage, CODEPAGE_MAXLEN);
+            Ext2Global->Codepage.PageTable = PageTable;
         }
-        RtlZeroMemory(Ext2Global->sHidingSuffix, HIDINGPAT_LEN);
-        if ((Ext2Global->bHidingSuffix = Property->bHidingSuffix)) {
-            RtlCopyMemory( Ext2Global->sHidingSuffix,
-                           Property->sHidingSuffix,
-                           HIDINGPAT_LEN - 1);
+
+        if (Property->Command == APP_CMD_SET_PROPERTY2 ||
+                Property->Command == APP_CMD_SET_PROPERTY3 ) {
+
+            RtlZeroMemory(Ext2Global->sHidingPrefix, HIDINGPAT_LEN);
+            if ((Ext2Global->bHidingPrefix = Property->bHidingPrefix)) {
+                RtlCopyMemory( Ext2Global->sHidingPrefix,
+                               Property->sHidingPrefix,
+                               HIDINGPAT_LEN - 1);
+            }
+            RtlZeroMemory(Ext2Global->sHidingSuffix, HIDINGPAT_LEN);
+            if ((Ext2Global->bHidingSuffix = Property->bHidingSuffix)) {
+                RtlCopyMemory( Ext2Global->sHidingSuffix,
+                               Property->sHidingSuffix,
+                               HIDINGPAT_LEN - 1);
+            }
         }
-    }
 
-    if (Property->Command == APP_CMD_SET_PROPERTY3) {
+        if (Property->Command == APP_CMD_SET_PROPERTY3) {
 
-        PEXT2_VOLUME_PROPERTY3 Prop3 = (PEXT2_VOLUME_PROPERTY3)Property;
+            PEXT2_VOLUME_PROPERTY3 Prop3 = (PEXT2_VOLUME_PROPERTY3)Property;
 
-        if (Prop3->Flags & EXT2_VPROP3_AUTOMOUNT) {
-            if (Prop3->AutoMount)
-                SetLongFlag(Ext2Global->Flags, EXT2_AUTO_MOUNT);
-            else
-                ClearLongFlag(Ext2Global->Flags, EXT2_AUTO_MOUNT);
+            if (Prop3->Flags & EXT2_VPROP3_AUTOMOUNT) {
+                if (Prop3->AutoMount)
+                    SetLongFlag(Ext2Global->Flags, EXT2_AUTO_MOUNT);
+                else
+                    ClearLongFlag(Ext2Global->Flags, EXT2_AUTO_MOUNT);
+            }
         }
-    }
 
-errorout:
+    } __finally {
 
-    if (GlobalDataResourceAcquired) {
-        ExReleaseResourceLite(&Ext2Global->Resource);
+        if (GlobalDataResourceAcquired) {
+            ExReleaseResourceLite(&Ext2Global->Resource);
+        }
     }
 
     return Status;
@@ -328,129 +350,143 @@ errorout:
 NTSTATUS
 Ext2ProcessVolumeProperty(
     IN  PEXT2_VCB              Vcb,
-    IN  PEXT2_VOLUME_PROPERTY2 Property
+    IN  PEXT2_VOLUME_PROPERTY2 Property,
+    IN  ULONG Length
 )
 {
     NTSTATUS        Status = STATUS_SUCCESS;
     BOOLEAN         VcbResourceAcquired = FALSE;
     struct nls_table * PageTable = NULL;
 
-    ExAcquireResourceExclusiveLite(&Vcb->MainResource, TRUE);
-    VcbResourceAcquired = TRUE;
+    __try {
 
-    if (Property->Command == APP_CMD_SET_PROPERTY ||
-            Property->Command == APP_CMD_SET_PROPERTY2) {
+        ExAcquireResourceExclusiveLite(&Vcb->MainResource, TRUE);
+        VcbResourceAcquired = TRUE;
 
-        if (Property->bReadonly) {
+        if (Property->Command == APP_CMD_SET_PROPERTY ||
+                Property->Command == APP_CMD_QUERY_PROPERTY) {
+            if (Length < sizeof(EXT2_VOLUME_PROPERTY)) {
+                Status = STATUS_INVALID_PARAMETER;
+                __leave;
+            }
+        } else if (Property->Command == APP_CMD_SET_PROPERTY2 ||
+                   Property->Command == APP_CMD_QUERY_PROPERTY2) {
+            if (Length < sizeof(EXT2_VOLUME_PROPERTY2)) {
+                Status = STATUS_INVALID_PARAMETER;
+                __leave;
+            }
+        }
 
-            Ext2FlushFiles(NULL, Vcb, FALSE);
-            Ext2FlushVolume(NULL, Vcb, FALSE);
-            SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
+        if (Property->Command == APP_CMD_SET_PROPERTY ||
+                Property->Command == APP_CMD_SET_PROPERTY2) {
 
-        } else {
+            if (Property->bReadonly) {
 
-            if (IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED)) {
+                Ext2FlushFiles(NULL, Vcb, FALSE);
+                Ext2FlushVolume(NULL, Vcb, FALSE);
                 SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
-            } else if (!Vcb->IsExt3fs) {
-                ClearLongFlag(Vcb->Flags, VCB_READ_ONLY);
-            } else if (!Property->bExt3Writable) {
-                SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
-            } else if (IsFlagOn(Vcb->SuperBlock->s_feature_incompat,
-                                EXT3_FEATURE_INCOMPAT_META_BG)) {
-                SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
-            } else if (IsFlagOn(Vcb->Flags, VCB_JOURNAL_RECOVER)) {
-                ClearLongFlag(Vcb->Flags, VCB_READ_ONLY);
-                Ext2RecoverJournal(NULL, Vcb);
-                if (IsFlagOn(Vcb->Flags, VCB_JOURNAL_RECOVER)) {
+
+            } else {
+
+                if (IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED)) {
                     SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
+                } else if (!Vcb->IsExt3fs) {
+                    ClearLongFlag(Vcb->Flags, VCB_READ_ONLY);
+                } else if (!Property->bExt3Writable) {
+                    SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
+                } else if (IsFlagOn(Vcb->Flags, VCB_JOURNAL_RECOVER)) {
+                    ClearLongFlag(Vcb->Flags, VCB_READ_ONLY);
+                    Ext2RecoverJournal(NULL, Vcb);
+                    if (IsFlagOn(Vcb->Flags, VCB_JOURNAL_RECOVER)) {
+                        SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
+                    } else {
+                        ClearLongFlag(Vcb->Flags, VCB_READ_ONLY);
+                    }
                 } else {
                     ClearLongFlag(Vcb->Flags, VCB_READ_ONLY);
                 }
+            }
+
+            PageTable = load_nls(Property->Codepage);
+            memcpy(Vcb->Codepage.AnsiName, Property->Codepage, CODEPAGE_MAXLEN);
+            Vcb->Codepage.PageTable = PageTable;
+            if (Vcb->Codepage.PageTable) {
+                Ext2InitializeLabel(Vcb, Vcb->SuperBlock);
+            }
+
+            if (Property->Command == APP_CMD_SET_PROPERTY2) {
+
+                RtlZeroMemory(Vcb->sHidingPrefix, HIDINGPAT_LEN);
+                if (Vcb->bHidingPrefix = Property->bHidingPrefix) {
+                    RtlCopyMemory( Vcb->sHidingPrefix,
+                                   Property->sHidingPrefix,
+                                   HIDINGPAT_LEN - 1);
+                }
+
+                RtlZeroMemory(Vcb->sHidingSuffix, HIDINGPAT_LEN);
+                if (Vcb->bHidingSuffix = Property->bHidingSuffix) {
+                    RtlCopyMemory( Vcb->sHidingSuffix,
+                                   Property->sHidingSuffix,
+                                   HIDINGPAT_LEN - 1);
+                }
+
+                Vcb->DrvLetter = Property->DrvLetter;
+            }
+
+        } else if (Property->Command == APP_CMD_QUERY_PROPERTY ||
+                   Property->Command == APP_CMD_QUERY_PROPERTY2 ) {
+
+            Property->bExt2 = TRUE;
+            Property->bExt3 = Vcb->IsExt3fs;
+            Property->bReadonly = IsFlagOn(Vcb->Flags, VCB_READ_ONLY);
+            if (!Property->bReadonly && Vcb->IsExt3fs) {
+                Property->bExt3Writable = TRUE;
             } else {
-                ClearLongFlag(Vcb->Flags, VCB_READ_ONLY);
-            }
-        }
-
-        PageTable = load_nls(Property->Codepage);
-        memcpy(Vcb->Codepage.AnsiName, Property->Codepage, CODEPAGE_MAXLEN);
-        Vcb->Codepage.PageTable = PageTable;
-        if (Vcb->Codepage.PageTable) {
-            Ext2InitializeLabel(Vcb, Vcb->SuperBlock);
-        }
-
-        if (Property->Command == APP_CMD_SET_PROPERTY2) {
-
-            RtlZeroMemory(Vcb->sHidingPrefix, HIDINGPAT_LEN);
-            if (Vcb->bHidingPrefix = Property->bHidingPrefix) {
-                RtlCopyMemory( Vcb->sHidingPrefix,
-                               Property->sHidingPrefix,
-                               HIDINGPAT_LEN - 1);
+                Property->bExt3Writable = FALSE;
             }
 
-            RtlZeroMemory(Vcb->sHidingSuffix, HIDINGPAT_LEN);
-            if (Vcb->bHidingSuffix = Property->bHidingSuffix) {
-                RtlCopyMemory( Vcb->sHidingSuffix,
-                               Property->sHidingSuffix,
-                               HIDINGPAT_LEN - 1);
+            RtlZeroMemory(Property->Codepage, CODEPAGE_MAXLEN);
+            if (Vcb->Codepage.PageTable) {
+                strcpy(Property->Codepage, Vcb->Codepage.PageTable->charset);
+            } else {
+                strcpy(Property->Codepage, "default");
             }
 
-            Vcb->DrvLetter = Property->DrvLetter;
-        }
+            if (Property->Command == APP_CMD_QUERY_PROPERTY2) {
 
-    } else if (Property->Command == APP_CMD_QUERY_PROPERTY ||
-               Property->Command == APP_CMD_QUERY_PROPERTY2 ) {
+                RtlCopyMemory(Property->UUID, Vcb->SuperBlock->s_uuid, 16);
 
-        Property->bExt2 = TRUE;
-        Property->bExt3 = Vcb->IsExt3fs;
-        Property->bReadonly = IsFlagOn(Vcb->Flags, VCB_READ_ONLY);
-        if (!Property->bReadonly && Vcb->IsExt3fs) {
-            Property->bExt3Writable = TRUE;
+                Property->DrvLetter = Vcb->DrvLetter;
+
+                if (Property->bHidingPrefix = Vcb->bHidingPrefix) {
+                    RtlCopyMemory( Property->sHidingPrefix,
+                                   Vcb->sHidingPrefix,
+                                   HIDINGPAT_LEN);
+                } else {
+                    RtlZeroMemory( Property->sHidingPrefix,
+                                   HIDINGPAT_LEN);
+                }
+
+                if (Property->bHidingSuffix = Vcb->bHidingSuffix) {
+                    RtlCopyMemory( Property->sHidingSuffix,
+                                   Vcb->sHidingSuffix,
+                                   HIDINGPAT_LEN);
+                } else {
+                    RtlZeroMemory( Property->sHidingSuffix,
+                                   HIDINGPAT_LEN);
+                }
+            }
+
         } else {
-            Property->bExt3Writable = FALSE;
+
+            Status = STATUS_INVALID_PARAMETER;
         }
 
-        RtlZeroMemory(Property->Codepage, CODEPAGE_MAXLEN);
-        if (Vcb->Codepage.PageTable) {
-            strcpy(Property->Codepage, Vcb->Codepage.PageTable->charset);
-        } else {
-            strcpy(Property->Codepage, "default");
+    } __finally {
+
+        if (VcbResourceAcquired) {
+            ExReleaseResourceLite(&Vcb->MainResource);
         }
-
-        if (Property->Command == APP_CMD_QUERY_PROPERTY2) {
-
-            RtlCopyMemory(Property->UUID, Vcb->SuperBlock->s_uuid, 16);
-
-            Property->DrvLetter = Vcb->DrvLetter;
-
-            if (Property->bHidingPrefix = Vcb->bHidingPrefix) {
-                RtlCopyMemory( Property->sHidingPrefix,
-                               Vcb->sHidingPrefix,
-                               HIDINGPAT_LEN);
-            } else {
-                RtlZeroMemory( Property->sHidingPrefix,
-                               HIDINGPAT_LEN);
-            }
-
-            if (Property->bHidingSuffix = Vcb->bHidingSuffix) {
-                RtlCopyMemory( Property->sHidingSuffix,
-                               Vcb->sHidingSuffix,
-                               HIDINGPAT_LEN);
-            } else {
-                RtlZeroMemory( Property->sHidingSuffix,
-                               HIDINGPAT_LEN);
-            }
-        }
-
-    } else {
-
-        Status = STATUS_INVALID_PARAMETER;
-        goto errorout;
-    }
-
-errorout:
-
-    if (VcbResourceAcquired) {
-        ExReleaseResourceLite(&Vcb->MainResource);
     }
 
     return Status;
@@ -480,7 +516,7 @@ Ext2ProcessUserProperty(
 
         DeviceObject = IrpContext->DeviceObject;
         if (IsExt2FsDevice(DeviceObject)) {
-            Status = Ext2ProcessGlobalProperty(DeviceObject, Property);
+            Status = Ext2ProcessGlobalProperty(DeviceObject, Property, Length);
         } else {
             Vcb = (PEXT2_VCB) DeviceObject->DeviceExtension;
             if (!((Vcb) && (Vcb->Identifier.Type == EXT2VCB) &&
@@ -488,7 +524,7 @@ Ext2ProcessUserProperty(
                 Status = STATUS_INVALID_PARAMETER;
                 __leave;
             }
-            Status = Ext2ProcessVolumeProperty(Vcb, Property);
+            Status = Ext2ProcessVolumeProperty(Vcb, Property, Length);
         }
 
         if (NT_SUCCESS(Status)) {

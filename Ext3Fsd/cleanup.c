@@ -250,9 +250,6 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                 if (!IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
 
                     Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &Size);
-                    Size.QuadPart = CEILING_ALIGNED(ULONGLONG,
-                                                    (ULONGLONG)Fcb->Mcb->Inode.i_size,
-                                                    (ULONGLONG)BLOCK_SIZE);
                     Fcb->Header.ValidDataLength.QuadPart =
                         Fcb->Header.FileSize.QuadPart = Fcb->Mcb->Inode.i_size;
                     Fcb->Header.AllocationSize = Size;

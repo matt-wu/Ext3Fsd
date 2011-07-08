@@ -2067,7 +2067,7 @@ Ext2PerformRegistryVolumeParams(IN PEXT2_VCB Vcb)
         /* set Vcb settings from registery */
         EXT2_VOLUME_PROPERTY2  Property;
         Ext2ParseRegistryVolumeParams(&VolumeParams, &Property);
-        Ext2ProcessVolumeProperty(Vcb, &Property);
+        Ext2ProcessVolumeProperty(Vcb, &Property, sizeof(Property));
 
     } else {
 
@@ -2509,11 +2509,6 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
                    "unsupported optional features (%x).\n",
                    Vcb->sb.s_id, le32_to_cpu(features));
             SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
-        }
-
-        if (EXT3_HAS_INCOMPAT_FEATURE(&Vcb->sb, EXT3_FEATURE_INCOMPAT_META_BG |
-                                                EXT4_FEATURE_INCOMPAT_FLEX_BG)) {
-           SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
         }
 
         has_huge_files = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb,

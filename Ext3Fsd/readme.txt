@@ -29,6 +29,17 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
  Revision history
 ======================
 
+42, V0.51:   2011-07-10
+
+Modifications from V0.48:
+
+    1, FIXME: Data corruption issue, especially for multiple-thread
+       writing on XP system
+    2, FIXME: Set ValidDataLength only for FileEndOfFileInformation
+       w/ AdvanceOnly    
+    3, Support writing to ext4 volumes w/ flex_bg
+    4, Code cleanup and enhancement for global/volume property settings
+
 41, V0.50:   2011-02-01
 
 Modifications from V0.48:

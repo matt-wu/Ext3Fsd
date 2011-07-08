@@ -201,11 +201,9 @@ typedef struct _EXT2_VOLUME_PROPERTY2 {
 typedef struct _EXT2_VOLUME_PROPERTY3 {
     EXT2_VOLUME_PROPERTY2  Prop2;
     unsigned __int64       Flags;
-int                    AutoMount:
-    1;
-int                    Noused1:
-    31;
-    int                    Noused2[31];
+    int                    AutoMount:1;
+    int                    Reserved1:31;
+    int                    Reserved2[31];
 } EXT2_VOLUME_PROPERTY3, *PEXT2_VOLUME_PROPERTY3;
 
 /* Ext2Fsd driver version and built time */

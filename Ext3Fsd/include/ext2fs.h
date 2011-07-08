@@ -40,7 +40,7 @@
 
 /* STRUCTS & CONSTS******************************************************/
 
-#define EXT2FSD_VERSION  "0.50"
+#define EXT2FSD_VERSION  "0.51"
 
 
 //
@@ -1386,13 +1386,15 @@ Ext2FreePool(
 NTSTATUS
 Ext2ProcessGlobalProperty(
     IN  PDEVICE_OBJECT  DeviceObject,
-    IN  PEXT2_VOLUME_PROPERTY2 Property
+    IN  PEXT2_VOLUME_PROPERTY2 Property,
+    IN  ULONG Length
 );
 
 NTSTATUS
 Ext2ProcessVolumeProperty(
     IN  PEXT2_VCB              Vcb,
-    IN  PEXT2_VOLUME_PROPERTY2 Property
+    IN  PEXT2_VOLUME_PROPERTY2 Property,
+    IN  ULONG Length
 );
 
 NTSTATUS

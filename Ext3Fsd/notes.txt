@@ -1,31 +1,18 @@
 
 ==================================
-Release Notes for Ext2Fsd V0.50
+Release Notes for Ext2Fsd V0.51
 ==================================
 
-Features implemented and bugfix from V0.48:
+Features implemented or bugfix since V0.50:
 
-    1, Ext4 extent readonly support by Bo Branten. Writing is
-       possible but with no size-extending
-    2, Ext3 directory index (hash-tree) support
-    3, Fast fsck (uninit_bg) and group block checksum support
-    4, Ext4 64k block size support
-    5, Symlink/special inodes open/read/deletion support
-    6, Buffer head implemented over cache pages
-    7, Memory allocation optimization for flexible-size inodes
-    8, Improve file deletion: don't grab global lock when deleting
-    9, FIXME: return zero-content for sparse file gaps
-   10, FIXME: check available spaces before blocks allocation
-   11, FIXME: refresh stale root dir content after journal replay
-   12, FIXME: incompatible dentry management for 64k block size
-   13, FIXME: don't do journal replay for devices set as readonly
-   14, FIXME: Win7 cmd.exe always reports file sizes as zero
-   15, FIXME: Win7 memory throttling issue calling CcPinRead
-   16, FIXME: Ext3Fsd Build issues (SLIST/div64 for Win2k, browser files)
-   17, FIXME: Compiling test failure (fastio doesn't update i_size)
-   18, FIXME: Possible Mcb memory leak for symbolic links
+    1, FIXME: Data corruption issue, especially for multiple-thread
+       writing on XP system
+    2, FIXME: Set ValidDataLength only for FileEndOfFileInformation
+       w/ AdvanceOnly    
+    3, Support writing to ext4 volumes w/ flex_bg
+    4, Code cleanup and enhancement for global/volume property settings
 
-Supported Ext3/4 features by 0.50:
+Supported Ext3/4 features by 0.51:
 
     1, flexible inode size: > 128 bytes, up to block size
     2, dir_index:    htree directory index
@@ -35,11 +22,11 @@ Supported Ext3/4 features by 0.50:
     6, uninit_bg:    fast fsck and group checksum
     7, extent:       reading, writing with no extending.
     8, journal:      only support replay for internal journal
+    9, flex_bg:      first flexible metadata group
 
 Unsupported Ext3/4 features:
     1, journal: log-based operations, external journal
     2, extent: size truncating & expanding, file deletion
-    2, flex_bg: first metadata group
     3, EA (extended attributes), ACL support
 
 Features to be implemented in future:
