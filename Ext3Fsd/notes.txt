@@ -31,7 +31,7 @@ Unsupported Ext3/4 features:
 
 Features to be implemented in future:
 
-    1, EXT3/4 features support (extents, journal, flex_bg,)
+    1, EXT3/4 features support (extents, journal)
     2, Documents improvement: clear and elaborate
     3, Performance improvement, code optimization
     4, Automatic check & update of new versions

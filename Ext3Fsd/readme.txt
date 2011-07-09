@@ -31,7 +31,7 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
 
 42, V0.51:   2011-07-10
 
-Modifications from V0.48:
+Modifications from V0.50:
 
     1, FIXME: Data corruption issue, especially for multiple-thread
        writing on XP system
