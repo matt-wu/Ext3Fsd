@@ -1,7 +1,5 @@
 //Microsoft Developer Studio generated resource script.
 //
-#include "resource.h"
-
 #define APSTUDIO_READONLY_SYMBOLS
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -14,11 +12,6 @@
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
 
-/////////////////////////////////////////////////////////////////////////////
-// Chinese (P.R.C.) resources
-
-#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
-
 #ifndef _MAC
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -26,8 +19,8 @@
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,51,7,10
- PRODUCTVERSION 0,51,7,10
+ FILEVERSION 0,52,5,12
+ PRODUCTVERSION 0,52,5,12
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -45,14 +38,14 @@ BEGIN
             VALUE "Comments", "Matt Wu <matt@ext2fsd.com>\0"
             VALUE "CompanyName", "www.ext2fsd.com\0"
             VALUE "FileDescription", "Ext2 File System Driver for Windows\0"
-            VALUE "FileVersion", "0.51\0"
+            VALUE "FileVersion", "0.52\0"
             VALUE "InternalName", "Ext2Fsd.sys\0"
-            VALUE "LegalCopyright", "GPL V2\0"
+            VALUE "LegalCopyright", "GPLv2\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "Ext2Fsd.sys\0"
             VALUE "PrivateBuild", "\0"
             VALUE "ProductName", "Ext2 File System Driver\0"
-            VALUE "ProductVersion", "0.51\0"
+            VALUE "ProductVersion", "0.52\0"
             VALUE "SpecialBuild", "\0"
         END
     END
@@ -91,11 +84,6 @@ BEGIN
 END
 
 #endif    // APSTUDIO_INVOKED
-
-#endif    // Chinese (P.R.C.) resources
-/////////////////////////////////////////////////////////////////////////////
-
-
 
 #ifndef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
