@@ -17,21 +17,6 @@ extern PEXT2_GLOBAL Ext2Global;
 
 /* DEFINITIONS *************************************************************/
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, Ext2AcquireForLazyWrite)
-#pragma alloc_text(PAGE, Ext2ReleaseFromLazyWrite)
-#pragma alloc_text(PAGE, Ext2AcquireForReadAhead)
-#pragma alloc_text(PAGE, Ext2ReleaseFromReadAhead)
-#pragma alloc_text(PAGE, Ext2NoOpAcquire)
-#pragma alloc_text(PAGE, Ext2NoOpRelease)
-#pragma alloc_text(PAGE, Ext2AcquireForCreateSection)
-#pragma alloc_text(PAGE, Ext2ReleaseForCreateSection)
-#pragma alloc_text(PAGE, Ext2AcquireFileForModWrite)
-#pragma alloc_text(PAGE, Ext2ReleaseFileForModWrite)
-#pragma alloc_text(PAGE, Ext2AcquireFileForCcFlush)
-#pragma alloc_text(PAGE, Ext2ReleaseFileForCcFlush)
-#endif
-
 #define CMCB_DEBUG_LEVEL DL_NVR
 
 BOOLEAN
@@ -173,8 +158,8 @@ Ext2AcquireForCreateSection (
 {
     PEXT2_FCB Fcb = FileObject->FsContext;
 
-    if (Fcb->Header.PagingIoResource != NULL) {
-        ExAcquireResourceExclusiveLite(Fcb->Header.PagingIoResource, TRUE);
+    if (Fcb->Header.Resource != NULL) {
+        ExAcquireResourceExclusiveLite(Fcb->Header.Resource, TRUE);
     }
 
     DEBUG(CMCB_DEBUG_LEVEL, ("Ext2AcquireForCreateSection:  Fcb=%p\n", Fcb));
@@ -190,8 +175,8 @@ Ext2ReleaseForCreateSection (
 
     DEBUG(CMCB_DEBUG_LEVEL, ("Ext2ReleaseForCreateSection:  Fcb=%p\n", Fcb));
 
-    if (Fcb->Header.PagingIoResource != NULL) {
-        ExReleaseResourceLite(Fcb->Header.PagingIoResource);
+    if (Fcb->Header.Resource != NULL) {
+        ExReleaseResourceLite(Fcb->Header.Resource);
     }
 }
 

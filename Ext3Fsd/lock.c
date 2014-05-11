@@ -25,12 +25,14 @@ NTSTATUS
 Ext2LockControl (IN PEXT2_IRP_CONTEXT IrpContext)
 {
     PDEVICE_OBJECT  DeviceObject;
-    BOOLEAN         CompleteContext = TRUE;
-    BOOLEAN         CompleteIrp = TRUE;
-    NTSTATUS        Status = STATUS_UNSUCCESSFUL;
     PFILE_OBJECT    FileObject;
     PEXT2_FCB       Fcb;
     PIRP            Irp;
+
+    NTSTATUS        Status = STATUS_UNSUCCESSFUL;
+    BOOLEAN         CompleteContext = TRUE;
+    BOOLEAN         CompleteIrp = TRUE;
+    BOOLEAN         bFcbAcquired = FALSE;
 
     __try {
 
@@ -49,9 +51,7 @@ Ext2LockControl (IN PEXT2_IRP_CONTEXT IrpContext)
         FileObject = IrpContext->FileObject;
 
         Fcb = (PEXT2_FCB) FileObject->FsContext;
-
         ASSERT(Fcb != NULL);
-
         if (Fcb->Identifier.Type == EXT2VCB) {
             Status = STATUS_INVALID_PARAMETER;
             __leave;
@@ -64,6 +64,9 @@ Ext2LockControl (IN PEXT2_IRP_CONTEXT IrpContext)
             Status = STATUS_INVALID_PARAMETER;
             __leave;
         }
+
+        ExAcquireResourceSharedLite(&Fcb->MainResource, TRUE);
+        bFcbAcquired = TRUE;
 
         Irp = IrpContext->Irp;
 
@@ -101,6 +104,10 @@ Ext2LockControl (IN PEXT2_IRP_CONTEXT IrpContext)
         Fcb->Header.IsFastIoPossible = Ext2IsFastIoPossible(Fcb);
 
     } __finally {
+
+        if (bFcbAcquired) {
+            ExReleaseResourceLite(&Fcb->MainResource);
+        }
 
         if (!IrpContext->ExceptionInProgress) {
 

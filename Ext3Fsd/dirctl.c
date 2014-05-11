@@ -184,7 +184,7 @@ Ext2ProcessEntry(
             FileAttributes = FILE_ATTRIBUTE_NORMAL;
         }
 
-        if (Ext2IsReadOnly(Inode.i_mode)) {
+        if (Ext2IsOwnerReadOnly(Inode.i_mode)) {
             SetFlag(FileAttributes, FILE_ATTRIBUTE_READONLY);
         }
     }
@@ -364,7 +364,7 @@ Ext2IsWearingCloak(
     /* checking name prefix */
     if (Vcb->bHidingPrefix) {
         PatLen = strlen(&Vcb->sHidingPrefix[0]);
-        if (PatLen <= OemName->Length) {
+        if (PatLen > 0 && PatLen <= OemName->Length) {
             if ( _strnicmp( OemName->Buffer,
                             Vcb->sHidingPrefix,
                             PatLen ) == 0) {
@@ -376,7 +376,7 @@ Ext2IsWearingCloak(
     /* checking name suffix */
     if (Vcb->bHidingSuffix) {
         PatLen = strlen(&Vcb->sHidingSuffix[0]);
-        if (PatLen <= OemName->Length) {
+        if (PatLen > 0 && PatLen <= OemName->Length) {
             if ( _strnicmp(&OemName->Buffer[OemName->Length - PatLen],
                            Vcb->sHidingSuffix, PatLen ) == 0) {
                 return TRUE;

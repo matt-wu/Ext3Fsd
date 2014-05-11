@@ -18,7 +18,6 @@ extern PEXT2_GLOBAL Ext2Global;
 /* DEFINITIONS *************************************************************/
 
 #ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, Ext2Close)
 #pragma alloc_text(PAGE, Ext2QueueCloseRequest)
 #pragma alloc_text(PAGE, Ext2DeQueueCloseRequest)
 #endif

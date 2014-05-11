@@ -40,9 +40,6 @@ Ext2IsBlockEmpty(PULONG BlockArray, ULONG SizeArray);
 #pragma alloc_text(PAGE, Ext2SaveBuffer)
 
 #pragma alloc_text(PAGE, Ext2GetBlock)
-#pragma alloc_text(PAGE, Ext2BlockMap)
-#pragma alloc_text(PAGE, Ext2ExtentMap)
-#pragma alloc_text(PAGE, Ext2ExtentSearch)
 
 #pragma alloc_text(PAGE, Ext2UpdateVcbStat)
 #pragma alloc_text(PAGE, Ext2NewBlock)

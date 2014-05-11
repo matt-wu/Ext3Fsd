@@ -17,12 +17,6 @@ extern PEXT2_GLOBAL Ext2Global;
 
 /* DEFINITIONS *************************************************************/
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, Ext2ExceptionFilter)
-#pragma alloc_text(PAGE, Ext2ExceptionHandler)
-#endif
-
-
 NTSTATUS
 Ext2ExceptionFilter (
     IN PEXT2_IRP_CONTEXT    IrpContext,
@@ -50,14 +44,16 @@ Ext2ExceptionFilter (
 
     if (IrpContext) {
         if ((IrpContext->Identifier.Type != EXT2ICX) ||
-                (IrpContext->Identifier.Size != sizeof(EXT2_IRP_CONTEXT))) {
+            (IrpContext->Identifier.Size != sizeof(EXT2_IRP_CONTEXT))) {
             DbgBreak();
             IrpContext = NULL;
         } else if (IrpContext->DeviceObject) {
             PEXT2_VCB Vcb = NULL;
             Vcb = (PEXT2_VCB) IrpContext->DeviceObject->DeviceExtension;
-            if (Vcb->Identifier.Type == EXT2VCB) {
-                if (!IsMounted(Vcb)) {
+            if (NULL == Vcb) {
+                Status = EXCEPTION_EXECUTE_HANDLER;
+            } else {
+                if (Vcb->Identifier.Type == EXT2VCB && !IsMounted(Vcb)) {
                     Status = EXCEPTION_EXECUTE_HANDLER;
                 }
             }
@@ -77,13 +73,13 @@ Ext2ExceptionFilter (
     }
 
     if ( Status == EXCEPTION_EXECUTE_HANDLER ||
-            FsRtlIsNtstatusExpected(ExceptionCode)) {
+         FsRtlIsNtstatusExpected(ExceptionCode)) {
         //
         // If the exception is expected execute our handler
         //
 
         DEBUG(DL_ERR, ( "Ext2ExceptionFilter: Catching exception %xh\n",
-                        ExceptionCode));
+                         ExceptionCode));
 
         Status = EXCEPTION_EXECUTE_HANDLER;
 
@@ -140,7 +136,9 @@ Ext2ExceptionHandler (IN PEXT2_IRP_CONTEXT IrpContext)
             IrpSp = IoGetCurrentIrpStackLocation(Irp);
             Vcb = (PEXT2_VCB) IrpContext->DeviceObject->DeviceExtension;
 
-            if (Vcb->Identifier.Type != EXT2VCB) {
+            if (NULL == Vcb) {
+                Status = STATUS_INVALID_PARAMETER;
+            } else if (Vcb->Identifier.Type != EXT2VCB) {
                 Status = STATUS_INVALID_PARAMETER;
             } else if (!IsMounted(Vcb)) {
                 if (IsFlagOn(Vcb->Flags, VCB_DEVICE_REMOVED)) {

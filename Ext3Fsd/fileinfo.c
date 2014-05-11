@@ -684,7 +684,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 NotifyFilter |= FILE_NOTIFY_CHANGE_ATTRIBUTES;
 
                 if (IsFlagOn(FBI->FileAttributes, FILE_ATTRIBUTE_READONLY)) {
-                    Ext2SetReadOnly(Inode->i_mode);
+                    Ext2SetOwnerReadOnly(Inode->i_mode);
                 } else {
                     Ext2SetOwnerWritable(Inode->i_mode);
                 }

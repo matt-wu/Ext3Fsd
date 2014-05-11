@@ -1,18 +1,20 @@
 
 ==================================
-Release Notes for Ext2Fsd V0.51
+Release Notes for Ext2Fsd V0.52
 ==================================
 
-Features implemented or bugfix since V0.50:
+Features implemented or bugfix since V0.51:
 
-    1, FIXME: Data corruption issue, especially for multiple-thread
-       writing on XP system
-    2, FIXME: Set ValidDataLength only for FileEndOfFileInformation
-       w/ AdvanceOnly    
-    3, Support writing to ext4 volumes w/ flex_bg
-    4, Code cleanup and enhancement for global/volume property settings
+    1, Feature: Windows 8 supported
+    2, Feature: Force-writing supported
+    3, FIXME: data loss with TeraCopy when moving directories
+    4, FIXME: ATTO Disk Benchnmark fails with direct i/o tests
+    5, FIXME: files become invisible with empty hidden pattens
+    6, FIXME: possible hang with concurrent access attempts
+              upon the same file
+    7, FIXME: BSOD due to pagable code sections
 
-Supported Ext3/4 features by 0.51:
+Supported Ext3/4 features by 0.52:
 
     1, flexible inode size: > 128 bytes, up to block size
     2, dir_index:    htree directory index
@@ -25,9 +27,11 @@ Supported Ext3/4 features by 0.51:
     9, flex_bg:      first flexible metadata group
 
 Unsupported Ext3/4 features:
+
     1, journal: log-based operations, external journal
     2, extent: size truncating & expanding, file deletion
     3, EA (extended attributes), ACL support
+    4, symlink creation
 
 Features to be implemented in future:
 
@@ -36,11 +40,6 @@ Features to be implemented in future:
     3, Performance improvement, code optimization
     4, Automatic check & update of new versions
     5, LVM support, e2fsprogs porting for Windows
-
-    Since 0.38, Ext2fsd is much stable even under heavy i/o loads,
-    both for reading and writing. Performance and stability are
-    highly, improved especially stability. A new and strong era of
-    Ext2Fsd in product shape is coming :)
 
 WARNINGS:
  

@@ -56,16 +56,6 @@ Ext2WriteVolume (IN PEXT2_IRP_CONTEXT IrpContext);
 VOID
 Ext2DeferWrite(IN PEXT2_IRP_CONTEXT, PIRP Irp);
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, Ext2FloppyFlush)
-#pragma alloc_text(PAGE, Ext2StartFloppyFlushDpc)
-#pragma alloc_text(PAGE, Ext2ZeroHoles)
-#pragma alloc_text(PAGE, Ext2Write)
-#pragma alloc_text(PAGE, Ext2WriteVolume)
-#pragma alloc_text(PAGE, Ext2WriteInode)
-#pragma alloc_text(PAGE, Ext2WriteFile)
-#pragma alloc_text(PAGE, Ext2WriteComplete)
-#endif
 
 /* FUNCTIONS *************************************************************/
 
@@ -220,9 +210,9 @@ Ext2WriteVolume (IN PEXT2_IRP_CONTEXT IrpContext)
     ULONG               Length;
     LARGE_INTEGER       ByteOffset;
 
-    BOOLEAN             PagingIo;
-    BOOLEAN             Nocache;
-    BOOLEAN             SynchronousIo;
+    BOOLEAN             PagingIo = FALSE;
+    BOOLEAN             Nocache = FALSE;
+    BOOLEAN             SynchronousIo = FALSE;
     BOOLEAN             MainResourceAcquired = FALSE;
 
     BOOLEAN             bDeferred = FALSE;
@@ -756,15 +746,16 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
     ULONG               ReturnedLength = 0;
 
     BOOLEAN             OpPostIrp = FALSE;
-    BOOLEAN             PagingIo;
-    BOOLEAN             Nocache;
-    BOOLEAN             SynchronousIo;
+    BOOLEAN             PagingIo = FALSE;
+    BOOLEAN             Nocache = FALSE;
+    BOOLEAN             SynchronousIo = FALSE;
 
     BOOLEAN             RecursiveWriteThrough = FALSE;
     BOOLEAN             MainResourceAcquired = FALSE;
     BOOLEAN             PagingIoResourceAcquired = FALSE;
 
     BOOLEAN             bDeferred = FALSE;
+    BOOLEAN             UpdateFileSize = FALSE;
     BOOLEAN             FileSizesChanged = FALSE;
 
     PUCHAR              Buffer;
@@ -1156,9 +1147,18 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             Irp = IrpContext->Irp;
         }
 
+        if (NT_SUCCESS(Status) && !PagingIo) {
+            if (CcIsFileCached(FileObject)) {
+                if (!RecursiveWriteThrough &&
+                    Fcb->LazyWriterThread != PsGetCurrentThread())
+                    UpdateFileSize = TRUE;
+            } else {
+               UpdateFileSize = TRUE;
+            }
+        }
+
         /* Update files's ValidDateLength */
-        if (NT_SUCCESS(Status) && !PagingIo && CcIsFileCached(FileObject) &&
-                !RecursiveWriteThrough && Fcb->LazyWriterThread != PsGetCurrentThread()) {
+        if (UpdateFileSize) {
 
             if (Fcb->Header.ValidDataLength.QuadPart < ByteOffset.QuadPart + Length) {
                 Fcb->Header.ValidDataLength.QuadPart = ByteOffset.QuadPart + Length;

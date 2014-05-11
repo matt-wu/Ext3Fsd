@@ -450,7 +450,7 @@ Ext2LookupFile (
                         }
 
                         /* set inode attribute */
-                        if (Ext2IsReadOnly(Mcb->Inode.i_mode)) {
+                        if (Ext2IsOwnerReadOnly(Mcb->Inode.i_mode)) {
                             SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_READONLY);
                         }
 
@@ -857,8 +857,7 @@ McbExisting:
                     PathName.Length -=2;
                     PathName.Buffer[PathName.Length/2] = 0;
                 } else {
-                    Status = STATUS_NOT_A_DIRECTORY;
-                    __leave;
+                    DirectoryFile = TRUE;
                 }
             }
 
@@ -958,6 +957,11 @@ Dissecting:
                     Status = STATUS_MEDIA_WRITE_PROTECTED;
                     __leave;
                 }
+
+                if (Ext2IsOwnerReadOnly(ParentFcb->Mcb->Inode.i_mode)) {
+                    Status = STATUS_ACCESS_DENIED;
+                    __leave;
+				}
 
                 if (IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED)) {
                     IoSetHardErrorOrVerifyDevice( IrpContext->Irp,
@@ -1139,6 +1143,18 @@ Openit:
                     Mcb = Mcb->Target;
                     Ext2ReferMcb(Mcb);
                     ASSERT (!IsMcbSymLink(Mcb));
+                }
+            }
+
+            // Check readonly flag
+            if (Ext2IsOwnerReadOnly(Mcb->Inode.i_mode)) {
+                if (BooleanFlagOn(DesiredAccess,  FILE_WRITE_DATA | FILE_APPEND_DATA |
+                                                  FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)) {
+                    Status = STATUS_ACCESS_DENIED;
+                    __leave;
+                } else if (IsFlagOn(Options, FILE_DELETE_ON_CLOSE )) {
+                    Status = STATUS_CANNOT_DELETE;
+                    __leave;
                 }
             }
 
@@ -1387,6 +1403,7 @@ Openit:
             if (!IsDirectory(Fcb)) {
                 if (NoIntermediateBuffering) {
                     Fcb->NonCachedOpenCount++;
+                    SetFlag(IrpSp->FileObject->Flags, FO_CACHE_SUPPORTED);
                 } else {
                     SetFlag(IrpSp->FileObject->Flags, FO_CACHE_SUPPORTED);
                 }

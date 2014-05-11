@@ -29,18 +29,14 @@ extern PEXT2_GLOBAL Ext2Global;
 #pragma alloc_text(PAGE, Ext2CountExtents)
 #pragma alloc_text(PAGE, Ext2JointExtents)
 #pragma alloc_text(PAGE, Ext2DestroyExtentChain)
-#pragma alloc_text(PAGE, Ext2BuildExtents)
 #pragma alloc_text(PAGE, Ext2ListExtents)
 #pragma alloc_text(PAGE, Ext2CheckExtent)
 #pragma alloc_text(PAGE, Ext2AddVcbExtent)
 #pragma alloc_text(PAGE, Ext2RemoveVcbExtent)
-#pragma alloc_text(PAGE, Ext2LookupVcbExtent)
 #pragma alloc_text(PAGE, Ext2ClearAllExtents)
 #pragma alloc_text(PAGE, Ext2AddMcbExtent)
 #pragma alloc_text(PAGE, Ext2RemoveMcbExtent)
-#pragma alloc_text(PAGE, Ext2LookupMcbExtent)
 #pragma alloc_text(PAGE, Ext2AddBlockExtent)
-#pragma alloc_text(PAGE, Ext2LookupBlockExtent)
 #pragma alloc_text(PAGE, Ext2RemoveBlockExtent)
 #pragma alloc_text(PAGE, Ext2BuildName)
 #pragma alloc_text(PAGE, Ext2AllocateMcb)
@@ -1955,9 +1951,9 @@ Ext2ParseRegistryVolumeParams(
     UCHAR       DrvLetter[4];
 
     BOOLEAN     bWriteSupport = FALSE,
-                                bCheckBitmap = FALSE,
-                                               bCodeName = FALSE,
-                                                           bMountPoint = FALSE;
+                bCheckBitmap = FALSE,
+                bCodeName = FALSE,
+                bMountPoint = FALSE;
     struct {
         PWCHAR   Name;      /* parameters name */
         PBOOLEAN bExist;    /* is it contained in params */
@@ -2503,12 +2499,16 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             Status = STATUS_UNRECOGNIZED_VOLUME;
             __leave;
         }
+
         features = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb, ~EXT3_FEATURE_RO_COMPAT_SUPP);
         if (features) {
             printk(KERN_ERR "EXT3-fs: %s: couldn't mount RDWR because of "
                    "unsupported optional features (%x).\n",
                    Vcb->sb.s_id, le32_to_cpu(features));
-            SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
+            if (IsFlagOn(Ext2Global->Flags, EXT3_FORCE_WRITING)) {
+            } else {
+                SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
+            }
         }
 
         has_huge_files = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb,

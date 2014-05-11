@@ -26,16 +26,6 @@ Ext2ReadFile (IN PEXT2_IRP_CONTEXT IrpContext);
 NTSTATUS
 Ext2ReadVolume (IN PEXT2_IRP_CONTEXT IrpContext);
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, Ext2CompleteIrpContext)
-#pragma alloc_text(PAGE, Ext2Read)
-#pragma alloc_text(PAGE, Ext2ReadVolume)
-#pragma alloc_text(PAGE, Ext2ReadInode)
-#pragma alloc_text(PAGE, Ext2ReadFile)
-#pragma alloc_text(PAGE, Ext2ReadComplete)
-
-#endif
-
 /* FUNCTIONS *************************************************************/
 
 NTSTATUS

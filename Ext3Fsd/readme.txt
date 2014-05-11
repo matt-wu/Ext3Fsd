@@ -2,10 +2,9 @@
  About Ext2Fsd
 ======================
 
-The Ext2Fsd project is an ext2 file system driver for WinNT/2000/XP.
+Ext2Fsd project is an ext2 file system driver for Windows (2000/2003/XP/7/8).
 
-It's a free software and everyone can distribute and modify it under
-GNU GPL.
+It's a free software. Everyone can distribute and modify it under GNU GPLv2.
 
 ======================
  Author & Homepage
@@ -28,6 +27,19 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
 ======================
  Revision history
 ======================
+
+43, V0.52:   2014-05-10
+
+Modifications from V0.51:
+
+    1, Feature: Windows 8 supported
+    2, Feature: Force-writing supported
+    3, FIXME: data loss with TeraCopy when moving directories
+    4, FIXME: ATTO Disk Benchnmark fails with direct i/o tests
+    5, FIXME: files become invisible with empty hidden pattens
+    6, FIXME: possible hang with concurrent access attempts
+              upon the same file
+    7, FIXME: BSOD due to pagable code sections
 
 42, V0.51:   2011-07-10
 

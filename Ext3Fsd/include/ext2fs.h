@@ -355,12 +355,14 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 #define S_ISREADABLE(m)    (((m) & S_IPERMISSION_MASK) == (S_IRUSR | S_IRGRP | S_IROTH))
 #define S_ISWRITABLE(m)    (((m) & S_IPERMISSION_MASK) == (S_IWUSR | S_IWGRP | S_IWOTH))
 
-#define Ext2SetReadable(m) (m) = ((m) | (S_IRUSR | S_IRGRP | S_IROTH))
-#define Ext2SetWritable(m) (m) = ((m) | (S_IWUSR | S_IWGRP | S_IWOTH))
-#define Ext2SetOwnerWritable(m) (m) = ((m) | (S_IWUSR))
+#define Ext2SetReadable(m) do {(m) = (m) | (S_IRUSR | S_IRGRP | S_IROTH);} while(0)
+#define Ext2SetWritable(m) do {(m) = (m) | (S_IWUSR | S_IWGRP | S_IWOTH);} while(0)
 
-#define Ext2SetReadOnly(m) (m) = ((m) & (~(S_IWUSR | S_IWGRP | S_IWOTH)))
-#define Ext2IsReadOnly(m)  (!((m) & (S_IWUSR | S_IWGRP | S_IWOTH)))
+#define Ext2SetOwnerWritable(m) do {(m) |= S_IWUSR;} while(0)
+#define Ext2SetOwnerReadOnly(m) do {(m) &= ~S_IWUSR;} while(0)
+#define Ext2IsOwnerReadOnly(m)  (!((m) & S_IWUSR))
+
+#define Ext2SetReadOnly(m) do {(m) &= ~(S_IWUSR | S_IWGRP | S_IWOTH);} while(0)
 
 /*
  * We need 8-bytes aligned for all the sturctures

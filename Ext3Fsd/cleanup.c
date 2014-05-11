@@ -17,11 +17,6 @@ extern PEXT2_GLOBAL Ext2Global;
 
 /* DEFINITIONS *************************************************************/
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, Ext2Cleanup)
-#endif
-
-
 NTSTATUS
 Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
 {

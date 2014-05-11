@@ -1573,6 +1573,7 @@ Ext2MountVolume (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             SetLongFlag(Vcb->Flags, VCB_MOUNTED);
+            SetFlag(Vcb->Vpb->Flags, VPB_MOUNTED);
             Ext2InsertVcb(Vcb);
             Vcb = NULL;
             Vpb = NULL;
@@ -1794,7 +1795,6 @@ Ext2VerifyVolume (IN PEXT2_IRP_CONTEXT IrpContext)
         }
 
         ASSERT(NULL != ext2_sb);
-
         if ((ext2_sb->s_magic == EXT2_SUPER_MAGIC) &&
                 (memcmp(ext2_sb->s_uuid, SUPER_BLOCK->s_uuid, 16) == 0) &&
                 (memcmp(ext2_sb->s_volume_name, SUPER_BLOCK->s_volume_name, 16) ==0)) {
