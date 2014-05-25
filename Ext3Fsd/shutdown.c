@@ -27,7 +27,6 @@ Ext2ShutDown (IN PEXT2_IRP_CONTEXT IrpContext)
     NTSTATUS                Status;
 
     PIRP                    Irp;
-    PIO_STACK_LOCATION      IrpSp;
 
     PEXT2_VCB               Vcb;
     PLIST_ENTRY             ListEntry;
@@ -43,7 +42,6 @@ Ext2ShutDown (IN PEXT2_IRP_CONTEXT IrpContext)
                (IrpContext->Identifier.Size == sizeof(EXT2_IRP_CONTEXT)));
 
         Irp = IrpContext->Irp;
-        IrpSp = IoGetCurrentIrpStackLocation(Irp);
 
         if (!ExAcquireResourceExclusiveLite(
                     &Ext2Global->Resource,

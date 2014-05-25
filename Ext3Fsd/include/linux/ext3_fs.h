@@ -912,9 +912,13 @@ static inline __le16 ext3_rec_len_to_disk(unsigned len)
 
 /* Legal values for the dx_root hash_version field: */
 
-#define DX_HASH_LEGACY      0
-#define DX_HASH_HALF_MD4    1
-#define DX_HASH_TEA         2
+#define DX_HASH_LEGACY              0
+#define DX_HASH_HALF_MD4            1
+#define DX_HASH_TEA                 2
+#define DX_HASH_LEGACY_UNSIGNED     3
+#define DX_HASH_HALF_MD4_UNSIGNED   4
+#define DX_HASH_TEA_UNSIGNED        5
+
 
 #ifdef __KERNEL__
 
@@ -928,6 +932,10 @@ struct dx_hash_info
 };
 
 #define EXT3_HTREE_EOF	0x7fffffff
+
+/* 32 and 64 bit signed EOF for dx directories */
+#define EXT4_HTREE_EOF_32BIT   ((1UL  << (32 - 1)) - 1)
+#define EXT4_HTREE_EOF_64BIT   ((1ULL << (64 - 1)) - 1
 
 /*
  * Control parameters used by ext3_htree_next_block

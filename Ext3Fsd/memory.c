@@ -2502,10 +2502,9 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
 
         features = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb, ~EXT3_FEATURE_RO_COMPAT_SUPP);
         if (features) {
-            printk(KERN_ERR "EXT3-fs: %s: couldn't mount RDWR because of "
-                   "unsupported optional features (%x).\n",
+            printk(KERN_ERR "EXT3-fs: %s: unsupported optional features in this volume: (%x).\n",
                    Vcb->sb.s_id, le32_to_cpu(features));
-            if (IsFlagOn(Ext2Global->Flags, EXT3_FORCE_WRITING)) {
+            if (CanIWrite(Vcb)) {
             } else {
                 SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
             }

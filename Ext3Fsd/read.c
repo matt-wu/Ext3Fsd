@@ -479,7 +479,7 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
     PIO_STACK_LOCATION  IoStackLocation;
 
     ULONG               Length;
-    ULONG               ReturnedLength;
+    ULONG               ReturnedLength = 0;
     LARGE_INTEGER       ByteOffset;
 
     BOOLEAN             OpPostIrp = FALSE;

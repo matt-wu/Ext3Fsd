@@ -40,7 +40,7 @@
 
 /* STRUCTS & CONSTS******************************************************/
 
-#define EXT2FSD_VERSION  "0.52"
+#define EXT2FSD_VERSION  "0.53"
 
 
 //
@@ -360,7 +360,9 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 
 #define Ext2SetOwnerWritable(m) do {(m) |= S_IWUSR;} while(0)
 #define Ext2SetOwnerReadOnly(m) do {(m) &= ~S_IWUSR;} while(0)
-#define Ext2IsOwnerReadOnly(m)  (!((m) & S_IWUSR))
+
+#define Ext2IsOwnerWritable(m)  (((m) & S_IWUSR) == S_IWUSR)
+#define Ext2IsOwnerReadOnly(m)  (!(Ext2IsOwnerWritable(m)))
 
 #define Ext2SetReadOnly(m) do {(m) &= ~(S_IWUSR | S_IWGRP | S_IWOTH);} while(0)
 
@@ -690,6 +692,7 @@ typedef struct _EXT2_VCB {
 #define VCB_NEW_VPB             0x00000010
 #define VCB_BEING_CLOSED        0x00000020
 
+#define VCB_FORCE_WRITING       0x00004000
 #define VCB_DEVICE_REMOVED      0x00008000
 #define VCB_JOURNAL_RECOVER     0x00080000
 #define VCB_ARRIVAL_NOTIFIED    0x00800000
@@ -703,6 +706,12 @@ typedef struct _EXT2_VCB {
 #define IsVcbInited(Vcb)   (IsFlagOn((Vcb)->Flags, VCB_INITIALIZED))
 #define IsMounted(Vcb)     (IsFlagOn((Vcb)->Flags, VCB_MOUNTED))
 #define IsDispending(Vcb)  (IsFlagOn((Vcb)->Flags, VCB_DISMOUNT_PENDING))
+#define IsVcbReadOnly(Vcb) (IsFlagOn((Vcb)->Flags, VCB_READ_ONLY))
+
+
+#define IsExt3ForceWrite()   (IsFlagOn(Ext2Global->Flags, EXT3_FORCE_WRITING))
+#define IsVcbForceWrite(Vcb) (IsFlagOn((Vcb)->Flags, VCB_FORCE_WRITING))
+#define CanIWrite(Vcb)       (IsExt3ForceWrite() || (!IsVcbReadOnly(Vcb) && IsVcbForceWrite(Vcb)))
 
 //
 // EXT2_FCB File Control Block

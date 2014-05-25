@@ -734,7 +734,7 @@ Ext2QueryExtentMappings(
             MappedRuns = PartialRuns;
 
             /* walk all the Mcb runs in Extent */
-            for (;Extent != NULL; Extent = Extent->Next) {
+            for (; Extent != NULL; Extent = Extent->Next) {
                 MappedRuns[i*2 + 0].QuadPart = Vbn + Extent->Offset;
                 MappedRuns[i*2 + 1].QuadPart = Extent->Lba;
                 i = i+1;
@@ -1729,7 +1729,6 @@ Ext2VerifyVolume (IN PEXT2_IRP_CONTEXT IrpContext)
     PEXT2_VCB               Vcb = NULL;
     BOOLEAN                 VcbResourceAcquired = FALSE;
     PIRP                    Irp;
-    PIO_STACK_LOCATION      IoStackLocation;
     ULONG                   ChangeCount = 0;
     ULONG                   dwBytes;
 
@@ -1786,7 +1785,6 @@ Ext2VerifyVolume (IN PEXT2_IRP_CONTEXT IrpContext)
         }
 
         Irp = IrpContext->Irp;
-        IoStackLocation = IoGetCurrentIrpStackLocation(Irp);
 
         Status = Ext2LoadSuper(Vcb, TRUE, &ext2_sb);
 

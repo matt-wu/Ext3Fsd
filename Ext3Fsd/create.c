@@ -450,7 +450,7 @@ Ext2LookupFile (
                         }
 
                         /* set inode attribute */
-                        if (Ext2IsOwnerReadOnly(Mcb->Inode.i_mode)) {
+                        if (!CanIWrite(Vcb) && Ext2IsOwnerReadOnly(Mcb->Inode.i_mode)) {
                             SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_READONLY);
                         }
 
@@ -958,10 +958,10 @@ Dissecting:
                     __leave;
                 }
 
-                if (Ext2IsOwnerReadOnly(ParentFcb->Mcb->Inode.i_mode)) {
+                if (!CanIWrite(Vcb) && Ext2IsOwnerReadOnly(ParentFcb->Mcb->Inode.i_mode)) {
                     Status = STATUS_ACCESS_DENIED;
                     __leave;
-				}
+                }
 
                 if (IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED)) {
                     IoSetHardErrorOrVerifyDevice( IrpContext->Irp,
@@ -1147,7 +1147,7 @@ Openit:
             }
 
             // Check readonly flag
-            if (Ext2IsOwnerReadOnly(Mcb->Inode.i_mode)) {
+            if (!CanIWrite(Vcb) && Ext2IsOwnerReadOnly(Mcb->Inode.i_mode)) {
                 if (BooleanFlagOn(DesiredAccess,  FILE_WRITE_DATA | FILE_APPEND_DATA |
                                                   FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)) {
                     Status = STATUS_ACCESS_DENIED;

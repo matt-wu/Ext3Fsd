@@ -388,6 +388,10 @@ Ext2ProcessVolumeProperty(
 
             } else {
 
+                if (Property->bExt3Writable) {
+                    SetLongFlag(Vcb->Flags, VCB_FORCE_WRITING);
+                }
+
                 if (IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED)) {
                     SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
                 } else if (!Vcb->IsExt3fs) {
@@ -447,9 +451,9 @@ Ext2ProcessVolumeProperty(
 
             RtlZeroMemory(Property->Codepage, CODEPAGE_MAXLEN);
             if (Vcb->Codepage.PageTable) {
-                strcpy(Property->Codepage, Vcb->Codepage.PageTable->charset);
+                strncpy(Property->Codepage, Vcb->Codepage.PageTable->charset, CODEPAGE_MAXLEN);
             } else {
-                strcpy(Property->Codepage, "default");
+                strncpy(Property->Codepage, "default", CODEPAGE_MAXLEN);
             }
 
             if (Property->Command == APP_CMD_QUERY_PROPERTY2) {

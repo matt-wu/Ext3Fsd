@@ -184,7 +184,7 @@ Ext2ProcessEntry(
             FileAttributes = FILE_ATTRIBUTE_NORMAL;
         }
 
-        if (Ext2IsOwnerReadOnly(Inode.i_mode)) {
+        if (!CanIWrite(Vcb) && Ext2IsOwnerReadOnly(Inode.i_mode)) {
             SetFlag(FileAttributes, FILE_ATTRIBUTE_READONLY);
         }
     }
