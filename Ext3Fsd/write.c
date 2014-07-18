@@ -1313,11 +1313,6 @@ Ext2Write (IN PEXT2_IRP_CONTEXT IrpContext)
                 __leave;
             }
 
-            if (IsFlagOn(Vcb->Flags, VCB_DISMOUNT_PENDING)) {
-                Status = STATUS_TOO_LATE;
-                __leave;
-            }
-
             if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
                 Status = STATUS_MEDIA_WRITE_PROTECTED;
                 __leave;
@@ -1337,6 +1332,11 @@ Ext2Write (IN PEXT2_IRP_CONTEXT IrpContext)
 
                 bCompleteRequest = FALSE;
             } else if (FcbOrVcb->Identifier.Type == EXT2FCB) {
+
+                if (IsFlagOn(Vcb->Flags, VCB_DISMOUNT_PENDING)) {
+                    Status = STATUS_TOO_LATE;
+                    __leave;
+                }
 
                 Status = Ext2WriteFile(IrpContext);
                 if (!NT_SUCCESS(Status)) {

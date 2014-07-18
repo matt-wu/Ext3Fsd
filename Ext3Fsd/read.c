@@ -921,21 +921,23 @@ Ext2Read (IN PEXT2_IRP_CONTEXT IrpContext)
                 __leave;
             }
 
-            if (IsFlagOn(Vcb->Flags, VCB_DISMOUNT_PENDING)) {
-
-                Status = STATUS_TOO_LATE;
-                bCompleteRequest = TRUE;
-                __leave;
-            }
-
             FileObject = IrpContext->FileObject;
 
             FcbOrVcb = (PEXT2_FCBVCB) FileObject->FsContext;
 
             if (FcbOrVcb->Identifier.Type == EXT2VCB) {
+
                 Status = Ext2ReadVolume(IrpContext);
                 bCompleteRequest = FALSE;
+
             } else if (FcbOrVcb->Identifier.Type == EXT2FCB) {
+
+                if (IsFlagOn(Vcb->Flags, VCB_DISMOUNT_PENDING)) {
+                    Status = STATUS_TOO_LATE;
+                    bCompleteRequest = TRUE;
+                    __leave;
+                }
+
                 Status = Ext2ReadFile(IrpContext);
                 bCompleteRequest = FALSE;
             } else {
