@@ -1,20 +1,17 @@
 
 ==================================
-Release Notes for Ext2Fsd V0.52
+Release Notes for Ext2Fsd V0.53
 ==================================
 
-Features implemented or bugfix since V0.51:
+Features implemented or bugfix since V0.52:
 
-    1, Feature: Windows 8 supported
-    2, Feature: Force-writing supported
-    3, FIXME: data loss with TeraCopy when moving directories
-    4, FIXME: ATTO Disk Benchnmark fails with direct i/o tests
-    5, FIXME: files become invisible with empty hidden pattens
-    6, FIXME: possible hang with concurrent access attempts
-              upon the same file
-    7, FIXME: BSOD due to pagable code sections
+    1, FIXME: BSOD with VHD/VHDX mounting on Win8 or layered FSD
+    2, FIXME: Mke2fs failed to format mounted EXT2 volumes
+    3, Enable writing with global or volume ext3-force-writi
+    4, Support ext4 dir hash (UNSIGNED cases for legacy/half
+    5, Fixed several warnings reported by scan.coverity.com
 
-Supported Ext3/4 features by 0.52:
+Supported Ext3/4 features by 0.53:
 
     1, flexible inode size: > 128 bytes, up to block size
     2, dir_index:    htree directory index
@@ -33,13 +30,10 @@ Unsupported Ext3/4 features:
     3, EA (extended attributes), ACL support
     4, symlink creation
 
-Features to be implemented in future:
+Features to be implemented in next release:
 
-    1, EXT3/4 features support (extents, journal)
-    2, Documents improvement: clear and elaborate
-    3, Performance improvement, code optimization
-    4, Automatic check & update of new versions
-    5, LVM support, e2fsprogs porting for Windows
+    1, full EXT4 extent feature support (extending, shrinking)
+    2, mounted as user: privilege checking with given uid & gid
 
 WARNINGS:
  

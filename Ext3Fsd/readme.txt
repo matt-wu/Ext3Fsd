@@ -28,6 +28,17 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
  Revision history
 ======================
 
+44, V0.53:   2014-08-25
+
+Modifications from V0.52:
+
+    1, FIXME: BSOD with VHD/VHDX mounting on Win8
+    2, FIXME: Mke2fs failed to format mounted EXT2 volumes
+    3, Enable writing with global or volume ext3-force-writi
+    4, Support ext4 dir hash (UNSIGNED cases for legacy/half
+    5, Fixed several warnings reported by scan.coverity.com
+
+
 43, V0.52:   2014-05-10
 
 Modifications from V0.51:
