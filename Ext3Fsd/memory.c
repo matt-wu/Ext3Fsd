@@ -65,13 +65,13 @@ PEXT2_IRP_CONTEXT
 Ext2AllocateIrpContext (IN PDEVICE_OBJECT   DeviceObject,
                         IN PIRP             Irp )
 {
-    PIO_STACK_LOCATION   IoStackLocation;
+    PIO_STACK_LOCATION   irpSp;
     PEXT2_IRP_CONTEXT    IrpContext;
 
     ASSERT(DeviceObject != NULL);
     ASSERT(Irp != NULL);
 
-    IoStackLocation = IoGetCurrentIrpStackLocation(Irp);
+    irpSp = IoGetCurrentIrpStackLocation(Irp);
 
     IrpContext = (PEXT2_IRP_CONTEXT) (
                      ExAllocateFromNPagedLookasideList(
@@ -87,10 +87,10 @@ Ext2AllocateIrpContext (IN PDEVICE_OBJECT   DeviceObject,
     IrpContext->Identifier.Size = sizeof(EXT2_IRP_CONTEXT);
 
     IrpContext->Irp = Irp;
-    IrpContext->MajorFunction = IoStackLocation->MajorFunction;
-    IrpContext->MinorFunction = IoStackLocation->MinorFunction;
+    IrpContext->MajorFunction = irpSp->MajorFunction;
+    IrpContext->MinorFunction = irpSp->MinorFunction;
     IrpContext->DeviceObject = DeviceObject;
-    IrpContext->FileObject = IoStackLocation->FileObject;
+    IrpContext->FileObject = irpSp->FileObject;
     if (NULL != IrpContext->FileObject) {
         IrpContext->Fcb = (PEXT2_FCB)IrpContext->FileObject->FsContext;
         IrpContext->Ccb = (PEXT2_CCB)IrpContext->FileObject->FsContext2;
@@ -99,22 +99,29 @@ Ext2AllocateIrpContext (IN PDEVICE_OBJECT   DeviceObject,
     if (IrpContext->FileObject != NULL) {
         IrpContext->RealDevice = IrpContext->FileObject->DeviceObject;
     } else if (IrpContext->MajorFunction == IRP_MJ_FILE_SYSTEM_CONTROL) {
-        if (IoStackLocation->Parameters.MountVolume.Vpb) {
-            IrpContext->RealDevice =
-                IoStackLocation->Parameters.MountVolume.Vpb->RealDevice;
+        if (irpSp->Parameters.MountVolume.Vpb) {
+            IrpContext->RealDevice = irpSp->Parameters.MountVolume.Vpb->RealDevice;
         }
     }
 
-    if ( IrpContext->MajorFunction == IRP_MJ_CLEANUP ||
-            IrpContext->MajorFunction == IRP_MJ_CLOSE ||
-            IrpContext->MajorFunction == IRP_MJ_SHUTDOWN ||
-            IrpContext->MajorFunction == IRP_MJ_FILE_SYSTEM_CONTROL ||
-            IrpContext->MajorFunction == IRP_MJ_PNP ) {
+    if (IsFlagOn(irpSp->Flags, SL_WRITE_THROUGH)) {
+        SetFlag(IrpContext->Flags, IRP_CONTEXT_FLAG_WRITE_THROUGH);
+    }
 
-        if ( IrpContext->MajorFunction == IRP_MJ_FILE_SYSTEM_CONTROL ||
-                IrpContext->MajorFunction == IRP_MJ_PNP) {
+    if (IsFlagOn(irpSp->Flags, SL_OVERRIDE_VERIFY_VOLUME)) {
+        SetFlag(IrpContext->Flags, IRP_CONTEXT_FLAG_VERIFY_READ);
+    }
+
+    if (IrpContext->MajorFunction == IRP_MJ_CLEANUP ||
+        IrpContext->MajorFunction == IRP_MJ_CLOSE ||
+        IrpContext->MajorFunction == IRP_MJ_SHUTDOWN ||
+        IrpContext->MajorFunction == IRP_MJ_FILE_SYSTEM_CONTROL ||
+        IrpContext->MajorFunction == IRP_MJ_PNP ) {
+
+        if (IrpContext->MajorFunction == IRP_MJ_FILE_SYSTEM_CONTROL ||
+            IrpContext->MajorFunction == IRP_MJ_PNP) {
             if (IoGetCurrentIrpStackLocation(Irp)->FileObject == NULL ||
-                    IoIsOperationSynchronous(Irp)) {
+                IoIsOperationSynchronous(Irp)) {
                 SetFlag(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT);
             }
         } else {
@@ -307,7 +314,7 @@ Ext2AllocateCcb (PEXT2_MCB  SymLink)
 {
     PEXT2_CCB Ccb;
 
-    Ccb = (PEXT2_CCB) (ExAllocateFromPagedLookasideList(
+    Ccb = (PEXT2_CCB) (ExAllocateFromNPagedLookasideList(
                            &(Ext2Global->Ext2CcbLookasideList)));
     if (!Ccb) {
         return NULL;
@@ -365,7 +372,7 @@ Ext2FreeCcb (IN PEXT2_VCB Vcb, IN PEXT2_CCB Ccb)
         Ext2FreePool(Ccb->DirectorySearchPattern.Buffer, EXT2_DIRSP_MAGIC);
     }
 
-    ExFreeToPagedLookasideList(&(Ext2Global->Ext2CcbLookasideList), Ccb);
+    ExFreeToNPagedLookasideList(&(Ext2Global->Ext2CcbLookasideList), Ccb);
     DEC_MEM_COUNT(PS_CCB, Ccb, sizeof(EXT2_CCB));
 }
 
@@ -403,7 +410,7 @@ struct dentry * Ext2AllocateEntry()
 {
     struct dentry *de;
 
-    de = (struct dentry *)ExAllocateFromPagedLookasideList(
+    de = (struct dentry *)ExAllocateFromNPagedLookasideList(
              &(Ext2Global->Ext2DentryLookasideList));
     if (!de) {
         return NULL;
@@ -422,7 +429,7 @@ VOID Ext2FreeEntry (IN struct dentry *de)
     if (de->d_name.name)
         ExFreePool(de->d_name.name);
 
-    ExFreeToPagedLookasideList(&(Ext2Global->Ext2DentryLookasideList), de);
+    ExFreeToNPagedLookasideList(&(Ext2Global->Ext2DentryLookasideList), de);
     DEC_MEM_COUNT(PS_DENTRY, de, sizeof(struct dentry));
 }
 
@@ -475,7 +482,7 @@ Ext2AllocateExtent ()
 {
     PEXT2_EXTENT Extent;
 
-    Extent = (PEXT2_EXTENT)ExAllocateFromPagedLookasideList(
+    Extent = (PEXT2_EXTENT)ExAllocateFromNPagedLookasideList(
                  &(Ext2Global->Ext2ExtLookasideList));
     if (!Extent) {
         return NULL;
@@ -497,7 +504,7 @@ VOID
 Ext2FreeExtent (IN PEXT2_EXTENT Extent)
 {
     ASSERT(Extent != NULL);
-    ExFreeToPagedLookasideList(&(Ext2Global->Ext2ExtLookasideList), Extent);
+    ExFreeToNPagedLookasideList(&(Ext2Global->Ext2ExtLookasideList), Extent);
     DEC_MEM_COUNT(PS_EXTENT, Extent, sizeof(EXT2_EXTENT));
 }
 
@@ -1352,7 +1359,7 @@ Ext2AllocateMcb (
     }
 
     /* allocate Mcb from LookasideList */
-    Mcb = (PEXT2_MCB) (ExAllocateFromPagedLookasideList(
+    Mcb = (PEXT2_MCB) (ExAllocateFromNPagedLookasideList(
                            &(Ext2Global->Ext2McbLookasideList)));
 
     if (Mcb == NULL) {
@@ -1405,7 +1412,7 @@ Ext2AllocateMcb (
 
     /* initialize Mcb Extents, it will raise an expcetion if failed */
     __try {
-        FsRtlInitializeLargeMcb(&(Mcb->Extents), PagedPool);
+        FsRtlInitializeLargeMcb(&(Mcb->Extents), NonPagedPool);
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         Status = STATUS_INSUFFICIENT_RESOURCES;
         DbgBreak();
@@ -1436,7 +1443,7 @@ errorout:
             Ext2FreePool(Mcb->FullName.Buffer, EXT2_FNAME_MAGIC);
         }
 
-        ExFreeToPagedLookasideList(&(Ext2Global->Ext2McbLookasideList), Mcb);
+        ExFreeToNPagedLookasideList(&(Ext2Global->Ext2McbLookasideList), Mcb);
     }
 
     return NULL;
@@ -1488,7 +1495,7 @@ Ext2FreeMcb (IN PEXT2_VCB Vcb, IN PEXT2_MCB Mcb)
     Mcb->Identifier.Type = 0;
     Mcb->Identifier.Size = 0;
 
-    ExFreeToPagedLookasideList(&(Ext2Global->Ext2McbLookasideList), Mcb);
+    ExFreeToNPagedLookasideList(&(Ext2Global->Ext2McbLookasideList), Mcb);
     DEC_MEM_COUNT(PS_MCB, Mcb, sizeof(EXT2_MCB));
 }
 

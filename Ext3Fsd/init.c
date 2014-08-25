@@ -651,7 +651,7 @@ DriverEntry (
                                      'BCFE',
                                      0 );
 
-    ExInitializePagedLookasideList( &(Ext2Global->Ext2CcbLookasideList),
+    ExInitializeNPagedLookasideList( &(Ext2Global->Ext2CcbLookasideList),
                                     NULL,
                                     NULL,
                                     0,
@@ -659,7 +659,7 @@ DriverEntry (
                                     'BCCE',
                                     0 );
 
-    ExInitializePagedLookasideList( &(Ext2Global->Ext2McbLookasideList),
+    ExInitializeNPagedLookasideList( &(Ext2Global->Ext2McbLookasideList),
                                     NULL,
                                     NULL,
                                     0,
@@ -667,7 +667,7 @@ DriverEntry (
                                     'BCME',
                                     0 );
 
-    ExInitializePagedLookasideList( &(Ext2Global->Ext2ExtLookasideList),
+    ExInitializeNPagedLookasideList( &(Ext2Global->Ext2ExtLookasideList),
                                     NULL,
                                     NULL,
                                     0,
@@ -675,7 +675,7 @@ DriverEntry (
                                     'STXE',
                                     0 );
 
-    ExInitializePagedLookasideList( &(Ext2Global->Ext2DentryLookasideList),
+    ExInitializeNPagedLookasideList( &(Ext2Global->Ext2DentryLookasideList),
                                     NULL,
                                     NULL,
                                     0,

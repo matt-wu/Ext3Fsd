@@ -467,10 +467,10 @@ typedef struct _EXT2_GLOBAL {
     /* Look Aside table of IRP_CONTEXT, FCB, MCB, CCB */
     NPAGED_LOOKASIDE_LIST       Ext2IrpContextLookasideList;
     NPAGED_LOOKASIDE_LIST       Ext2FcbLookasideList;
-    PAGED_LOOKASIDE_LIST        Ext2CcbLookasideList;
-    PAGED_LOOKASIDE_LIST        Ext2McbLookasideList;
-    PAGED_LOOKASIDE_LIST        Ext2ExtLookasideList;
-    PAGED_LOOKASIDE_LIST        Ext2DentryLookasideList;
+    NPAGED_LOOKASIDE_LIST       Ext2CcbLookasideList;
+    NPAGED_LOOKASIDE_LIST       Ext2McbLookasideList;
+    NPAGED_LOOKASIDE_LIST       Ext2ExtLookasideList;
+    NPAGED_LOOKASIDE_LIST       Ext2DentryLookasideList;
     USHORT                      MaxDepth;
 
     /* User specified global codepage name */

@@ -38,11 +38,9 @@ Ext2MediaEjectControlCompletion (
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, Ext2LockUserBuffer)
-#pragma alloc_text(PAGE, Ext2GetUserBuffer)
 #pragma alloc_text(PAGE, Ext2ReadSync)
 #pragma alloc_text(PAGE, Ext2ReadDisk)
 #pragma alloc_text(PAGE, Ext2DiskIoControl)
-#pragma alloc_text(PAGE, Ext2ReadWriteBlocks)
 #pragma alloc_text(PAGE, Ext2MediaEjectControl)
 #pragma alloc_text(PAGE, Ext2DiskShutDown)
 #endif
@@ -158,12 +156,15 @@ Ext2ReadWriteBlockSyncCompletionRoutine (
 {
     PEXT2_RW_CONTEXT pContext = (PEXT2_RW_CONTEXT)Context;
 
-    if (!NT_SUCCESS(Irp->IoStatus.Status)) {
-        pContext->MasterIrp->IoStatus = Irp->IoStatus;
-    }
+    if (Irp != pContext->MasterIrp) {
 
-    IoFreeMdl(Irp->MdlAddress);
-    IoFreeIrp(Irp );
+        if (!NT_SUCCESS(Irp->IoStatus.Status)) {
+            pContext->MasterIrp->IoStatus = Irp->IoStatus;
+        }
+
+        IoFreeMdl(Irp->MdlAddress);
+        IoFreeIrp(Irp );
+    }
 
     if (InterlockedDecrement(&pContext->Blocks) == 0) {
 
@@ -191,7 +192,7 @@ Ext2ReadWriteBlockAsyncCompletionRoutine (
 
     ASSERT(FALSE == pContext->Wait);
 
-    if (!NT_SUCCESS(Irp->IoStatus.Status)) {
+    if (Irp != pContext->MasterIrp && !NT_SUCCESS(Irp->IoStatus.Status)) {
         pContext->MasterIrp->IoStatus = Irp->IoStatus;
     }
 
@@ -215,12 +216,12 @@ Ext2ReadWriteBlockAsyncCompletionRoutine (
             pContext->MasterIrp->IoStatus.Information = 0;
         }
 
-        /* release the PagingIo resource */
+        /* release the locked resource acquired by the caller */
         if (pContext->Resource) {
             ExReleaseResourceForThread(pContext->Resource, pContext->ThreadId);
         }
 
-        /* mark current Irp StackLocation as pending */
+        /* mark MasterIrp pending */
         IoMarkIrpPending(pContext->MasterIrp);
 
         Ext2FreePool(pContext, EXT2_RWC_MAGIC);
@@ -238,14 +239,15 @@ Ext2ReadWriteBlocks(
     IN ULONG                Length,
     IN BOOLEAN              bVerify )
 {
-    PMDL                Mdl;
     PIRP                Irp;
     PIRP                MasterIrp = IrpContext->Irp;
     PIO_STACK_LOCATION  IrpSp;
-    NTSTATUS            Status = STATUS_SUCCESS;
+    PMDL                Mdl;
     PEXT2_RW_CONTEXT    pContext = NULL;
-    BOOLEAN             bBugCheck = FALSE;
     PEXT2_EXTENT        Extent;
+    KEVENT              Wait;
+    NTSTATUS            Status = STATUS_SUCCESS;
+    BOOLEAN             bBugCheck = FALSE;
 
     ASSERT(MasterIrp);
 
@@ -285,68 +287,109 @@ Ext2ReadWriteBlocks(
             pContext->ThreadId = ExGetCurrentResourceThread();
         }
 
-        for (Extent = Chain; Extent != NULL; Extent = Extent->Next) {
 
-            Irp = IoMakeAssociatedIrp(
-                      MasterIrp,
-                      (CCHAR)(Vcb->TargetDeviceObject->StackSize + 1) );
+        if (NULL == Chain->Next) {
 
-            if (!Irp) {
-                Status = STATUS_INSUFFICIENT_RESOURCES;
-                __leave;
-            }
+            /* we get only 1 extent to dispatch, then don't bother allocating new irps */
 
-            Mdl = IoAllocateMdl( (PCHAR)MasterIrp->UserBuffer +
-                                 Extent->Offset,
-                                 Extent->Length,
-                                 FALSE,
-                                 FALSE,
-                                 Irp );
-
-            if (!Mdl)  {
-                Status = STATUS_INSUFFICIENT_RESOURCES;
-                __leave;
-            }
-
-            IoBuildPartialMdl( MasterIrp->MdlAddress,
-                               Mdl,
-                               (PCHAR)MasterIrp->UserBuffer +Extent->Offset,
-                               Extent->Length );
-
-            IoSetNextIrpStackLocation( Irp );
-            IrpSp = IoGetCurrentIrpStackLocation( Irp );
-
+            /* setup the Stack location to do a read from the disk driver. */
+            IrpSp = IoGetNextIrpStackLocation(MasterIrp);
             IrpSp->MajorFunction = IrpContext->MajorFunction;
-            IrpSp->Parameters.Read.Length = Extent->Length;
-            IrpSp->Parameters.Read.ByteOffset.QuadPart = Extent->Lba;
+            IrpSp->Parameters.Read.Length = Chain->Length;
+            IrpSp->Parameters.Read.ByteOffset.QuadPart = Chain->Lba;
+            if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WRITE_THROUGH)) {
+                SetFlag(IrpSp->Flags, SL_WRITE_THROUGH);
+            }
+            if (bVerify || IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_VERIFY_READ)) {
+                SetFlag(IrpSp->Flags, SL_OVERRIDE_VERIFY_VOLUME);
+            }
 
             IoSetCompletionRoutine(
-                Irp,
-                IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) ?
-                &Ext2ReadWriteBlockSyncCompletionRoutine :
-                &Ext2ReadWriteBlockAsyncCompletionRoutine,
-                (PVOID) pContext,
-                TRUE,
-                TRUE,
-                TRUE );
+                    MasterIrp,
+                    IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) ?
+                    &Ext2ReadWriteBlockSyncCompletionRoutine :
+                    &Ext2ReadWriteBlockAsyncCompletionRoutine,
+                    (PVOID) pContext,
+                    TRUE,
+                    TRUE,
+                    TRUE );
 
-            IrpSp = IoGetNextIrpStackLocation( Irp );
+            /* intialize context block */
+            Chain->Irp = MasterIrp;
+            pContext->Blocks = 1;
 
-            IrpSp->MajorFunction = IrpContext->MajorFunction;
-            IrpSp->Parameters.Read.Length =Extent->Length;
-            IrpSp->Parameters.Read.ByteOffset.QuadPart = Extent->Lba;
+        } else {
 
-            if (bVerify) {
-                SetFlag( IrpSp->Flags, SL_OVERRIDE_VERIFY_VOLUME );
+
+            for (Extent = Chain; Extent != NULL; Extent = Extent->Next) {
+
+                Irp = IoMakeAssociatedIrp(
+                          MasterIrp,
+                          (CCHAR)(Vcb->TargetDeviceObject->StackSize + 1) );
+
+                if (!Irp) {
+                    Status = STATUS_INSUFFICIENT_RESOURCES;
+                    __leave;
+                }
+
+                Mdl = IoAllocateMdl( (PCHAR)MasterIrp->UserBuffer +
+                                     Extent->Offset,
+                                     Extent->Length,
+                                     FALSE,
+                                     FALSE,
+                                     Irp );
+
+                if (!Mdl)  {
+                    Status = STATUS_INSUFFICIENT_RESOURCES;
+                    __leave;
+                }
+
+                IoBuildPartialMdl( MasterIrp->MdlAddress,
+                                   Mdl,
+                                   (PCHAR)MasterIrp->UserBuffer +Extent->Offset,
+                                   Extent->Length );
+
+                IoSetNextIrpStackLocation(Irp);
+                IrpSp = IoGetCurrentIrpStackLocation(Irp);
+
+                IrpSp->MajorFunction = IrpContext->MajorFunction;
+                IrpSp->Parameters.Read.Length = Extent->Length;
+                IrpSp->Parameters.Read.ByteOffset.QuadPart = Extent->Lba;
+
+                IoSetCompletionRoutine(
+                    Irp,
+                    IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) ?
+                    &Ext2ReadWriteBlockSyncCompletionRoutine :
+                    &Ext2ReadWriteBlockAsyncCompletionRoutine,
+                    (PVOID) pContext,
+                    TRUE,
+                    TRUE,
+                    TRUE );
+
+                IrpSp = IoGetNextIrpStackLocation(Irp);
+
+                IrpSp->MajorFunction = IrpContext->MajorFunction;
+                IrpSp->Parameters.Read.Length =Extent->Length;
+                IrpSp->Parameters.Read.ByteOffset.QuadPart = Extent->Lba;
+
+                /* set write through flag */
+                if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WRITE_THROUGH)) {
+                    SetFlag( IrpSp->Flags, SL_WRITE_THROUGH );
+                }
+
+                /* set verify flag */
+                if (bVerify ||IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_VERIFY_READ)) {
+                    SetFlag(IrpSp->Flags, SL_OVERRIDE_VERIFY_VOLUME);
+                }
+
+                Extent->Irp = Irp;
+                pContext->Blocks += 1;
             }
 
-            Extent->Irp = Irp;
-            pContext->Blocks += 1;
-        }
-
-        MasterIrp->AssociatedIrp.IrpCount = pContext->Blocks;
-        if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
-            MasterIrp->AssociatedIrp.IrpCount += 1;
+            MasterIrp->AssociatedIrp.IrpCount = pContext->Blocks;
+            if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
+                MasterIrp->AssociatedIrp.IrpCount += 1;
+            }
         }
 
         bBugCheck = TRUE;
@@ -356,6 +399,7 @@ Ext2ReadWriteBlocks(
                                     Extent->Irp);
             Extent->Irp = NULL;
         }
+
 
         if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
             KeWaitForSingleObject( &(pContext->Event),
