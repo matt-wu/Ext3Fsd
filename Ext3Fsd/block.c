@@ -221,9 +221,6 @@ Ext2ReadWriteBlockAsyncCompletionRoutine (
             ExReleaseResourceForThread(pContext->Resource, pContext->ThreadId);
         }
 
-        /* mark MasterIrp pending */
-        IoMarkIrpPending(pContext->MasterIrp);
-
         Ext2FreePool(pContext, EXT2_RWC_MAGIC);
         DEC_MEM_COUNT(PS_RW_CONTEXT, pContext, sizeof(EXT2_RW_CONTEXT));
     }
@@ -288,7 +285,7 @@ Ext2ReadWriteBlocks(
         }
 
 
-        if (NULL == Chain->Next) {
+        if (NULL == Chain->Next && 0 == Chain->Offset) {
 
             /* we get only 1 extent to dispatch, then don't bother allocating new irps */
 
@@ -307,8 +304,8 @@ Ext2ReadWriteBlocks(
             IoSetCompletionRoutine(
                     MasterIrp,
                     IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) ?
-                    &Ext2ReadWriteBlockSyncCompletionRoutine :
-                    &Ext2ReadWriteBlockAsyncCompletionRoutine,
+                    Ext2ReadWriteBlockSyncCompletionRoutine :
+                    Ext2ReadWriteBlockAsyncCompletionRoutine,
                     (PVOID) pContext,
                     TRUE,
                     TRUE,
@@ -359,8 +356,8 @@ Ext2ReadWriteBlocks(
                 IoSetCompletionRoutine(
                     Irp,
                     IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) ?
-                    &Ext2ReadWriteBlockSyncCompletionRoutine :
-                    &Ext2ReadWriteBlockAsyncCompletionRoutine,
+                    Ext2ReadWriteBlockSyncCompletionRoutine :
+                    Ext2ReadWriteBlockAsyncCompletionRoutine,
                     (PVOID) pContext,
                     TRUE,
                     TRUE,
@@ -392,6 +389,11 @@ Ext2ReadWriteBlocks(
             }
         }
 
+        if (!IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
+            /* mark MasterIrp pending */
+            IoMarkIrpPending(pContext->MasterIrp);
+        }
+
         bBugCheck = TRUE;
 
         for (Extent = Chain; Extent != NULL; Extent = Extent->Next) {
@@ -404,7 +406,6 @@ Ext2ReadWriteBlocks(
         if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
             KeWaitForSingleObject( &(pContext->Event),
                                    Executive, KernelMode, FALSE, NULL );
-
             KeClearEvent( &(pContext->Event) );
         }
 
