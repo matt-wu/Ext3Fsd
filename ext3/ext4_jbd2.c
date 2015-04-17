@@ -55,6 +55,6 @@ int __ext4_handle_dirty_metadata(const char *where, unsigned int line,
 {
 	int err = 0;
 
-	mark_buffer_dirty(bh);
+	extents_mark_buffer_dirty(bh);
 	return err;
 }
