@@ -173,7 +173,7 @@ static int __ext4_ext_check(const char *function, unsigned int line,
 /*
  * ext4_read_block_buffer: @inode, @block, @err
  *
- * Get a buffer_head by sb_getblk, and read fresh data from the storage.
+ * Get a buffer_head by extents_bread, and read fresh data from the storage.
  */
 static struct buffer_head *
 __read_extent_tree_block(const char *function, unsigned int line,
@@ -183,14 +183,13 @@ __read_extent_tree_block(const char *function, unsigned int line,
 	struct buffer_head		*bh;
 	int				err;
 
-	bh = sb_getblk(inode->i_sb, pblk);
+	bh = extents_bread(inode->i_sb, pblk);
 	if (!bh)
 		return ERR_PTR(-ENOMEM);
 
 	if (!buffer_uptodate(bh)) {
-		err = bh_submit_read(bh);
-		if (err < 0)
-			goto errout;
+		err = -EIO;
+		goto errout;
 	}
 	if (buffer_verified(bh))
 		return bh;
@@ -201,7 +200,7 @@ __read_extent_tree_block(const char *function, unsigned int line,
 	set_buffer_verified(bh);
 	return bh;
 errout:
-	put_bh(bh);
+	extents_brelse(bh);
 	return ERR_PTR(err);
 
 }
@@ -328,8 +327,7 @@ int __ext4_ext_dirty(const char *where, unsigned int line,
 	if (path->p_bh) {
 		ext4_extent_block_csum_set(inode, ext_block_hdr(path->p_bh));
 		/* path points to block */
-		err = __ext4_handle_dirty_metadata(where, line, icb, handle,
-				inode, path->p_bh);
+		err = __ext4_handle_dirty_metadata(where, line, icb, handle, inode, path->p_bh);
 	} else {
 		/* path points to leaf/index in inode body */
 		err = ext4_mark_inode_dirty(icb, handle, inode);
@@ -346,7 +344,7 @@ void ext4_ext_drop_refs(struct ext4_ext_path *path)
 	depth = path->p_depth;
 	for (i = 0; i <= depth; i++, path++)
 		if (path->p_bh) {
-			brelse(path->p_bh);
+			extents_brelse(path->p_bh);
 			path->p_bh = NULL;
 		}
 }
@@ -599,7 +597,7 @@ static void ext4_ext_show_move(struct inode *inode, struct ext4_ext_path *path,
 #define ext4_ext_show_move(inode, path, newblock, level)
 #endif
 
-	struct ext4_ext_path *
+struct ext4_ext_path *
 ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 		struct ext4_ext_path **orig_path, int flags)
 {
@@ -651,7 +649,7 @@ ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 		eh = ext_block_hdr(bh);
 		ppos++;
 		if (unlikely(ppos > depth)) {
-			put_bh(bh);
+			extents_brelse(bh);
 			EXT4_ERROR_INODE(inode,
 					"ppos %d > depth %d", ppos, depth);
 			ret = -EIO;
@@ -835,7 +833,7 @@ static int ext4_ext_split(void *icb, handle_t *handle, struct inode *inode,
 		err = -EIO;
 		goto cleanup;
 	}
-	bh = sb_getblk(inode->i_sb, newblock);
+	bh = extents_bwrite(inode->i_sb, newblock);
 	if (unlikely(!bh)) {
 		err = -ENOMEM;
 		goto cleanup;
@@ -878,7 +876,7 @@ static int ext4_ext_split(void *icb, handle_t *handle, struct inode *inode,
 	err = ext4_handle_dirty_metadata(icb, handle, inode, bh);
 	if (err)
 		goto cleanup;
-	brelse(bh);
+	extents_brelse(bh);
 	bh = NULL;
 
 	/* correct old leaf */
@@ -908,7 +906,7 @@ static int ext4_ext_split(void *icb, handle_t *handle, struct inode *inode,
 	while (k--) {
 		oldblock = newblock;
 		newblock = ablocks[--a];
-		bh = sb_getblk(inode->i_sb, newblock);
+		bh = extents_bwrite(inode->i_sb, newblock);
 		if (unlikely(!bh)) {
 			err = -ENOMEM;
 			goto cleanup;
@@ -957,7 +955,7 @@ static int ext4_ext_split(void *icb, handle_t *handle, struct inode *inode,
 		err = ext4_handle_dirty_metadata(icb, handle, inode, bh);
 		if (err)
 			goto cleanup;
-		brelse(bh);
+		extents_brelse(bh);
 		bh = NULL;
 
 		/* correct old index */
@@ -982,7 +980,7 @@ cleanup:
 	if (bh) {
 		if (buffer_locked(bh))
 			unlock_buffer(bh);
-		brelse(bh);
+		extents_brelse(bh);
 	}
 
 	if (err) {
@@ -1024,7 +1022,7 @@ static int ext4_ext_grow_indepth(void *icb, handle_t *handle, struct inode *inod
 	if (newblock == 0)
 		return err;
 
-	bh = sb_getblk(inode->i_sb, newblock);
+	bh = extents_bwrite(inode->i_sb, newblock);
 	if (!bh)
 		return -ENOMEM;
 	lock_buffer(bh);
@@ -1074,7 +1072,7 @@ static int ext4_ext_grow_indepth(void *icb, handle_t *handle, struct inode *inod
 	neh->eh_depth += 1;
 	ext4_mark_inode_dirty(icb, handle, inode);
 out:
-	brelse(bh);
+	extents_brelse(bh);
 
 	return err;
 }
@@ -1310,7 +1308,7 @@ got_index:
 		eh = ext_block_hdr(bh);
 		ix = EXT_FIRST_INDEX(eh);
 		block = ext4_idx_pblock(ix);
-		put_bh(bh);
+		extents_brelse(bh);
 	}
 
 	bh = read_extent_tree_block(inode, block, path->p_depth - depth, 0);
@@ -1324,7 +1322,7 @@ found_extent:
 	*phys = ext4_ext_pblock(ex);
 	*ret_ex = ex;
 	if (bh)
-		put_bh(bh);
+		extents_brelse(bh);
 	return 0;
 }
 
@@ -1577,7 +1575,7 @@ static void ext4_ext_try_to_merge_up(void *icb, handle_t *handle,
 		(path[1].p_ext - EXT_FIRST_EXTENT(path[1].p_hdr));
 	path[0].p_hdr->eh_max = cpu_to_le16(max_root);
 
-	brelse(path[1].p_bh);
+	extents_brelse(path[1].p_bh);
 	ext4_free_blocks(icb, handle, inode, NULL, blk, 1,
 			EXT4_FREE_BLOCKS_METADATA | EXT4_FREE_BLOCKS_FORGET);
 }
@@ -1886,7 +1884,6 @@ static int ext4_remove_blocks(void *icb, handle_t *handle, struct inode *inode,
 int ext4_ext_rm_idx(void *icb, handle_t *handle, struct inode *inode,
 		struct ext4_ext_path *path)
 {
-	struct buffer_head *bh;
 	int err;
 	ext4_fsblk_t leaf;
 
@@ -1899,8 +1896,6 @@ int ext4_ext_rm_idx(void *icb, handle_t *handle, struct inode *inode,
 	path->p_hdr->eh_entries = cpu_to_le16(le16_to_cpu(path->p_hdr->eh_entries)-1);
 	if ((err = ext4_ext_dirty(icb, handle, inode, path)))
 		return err;
-	bh = sb_getblk(inode->i_sb, leaf);
-	ext4_forget(icb, handle, 1, inode, bh, leaf);
 	ext4_free_blocks(icb, handle, inode, NULL, leaf, 1, 0);
 	return err;
 }
@@ -2219,8 +2214,8 @@ int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start)
 		if (i == depth) {
 			/* this is leaf block */
 			err = ext4_ext_rm_leaf(icb, handle, inode, path, start);
-			/* root level have p_bh == NULL, brelse() eats this */
-			brelse(path[i].p_bh);
+			/* root level have p_bh == NULL, extents_brelse() eats this */
+			extents_brelse(path[i].p_bh);
 			path[i].p_bh = NULL;
 			i--;
 			continue;
@@ -2245,7 +2240,7 @@ int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start)
 			/* go to the next level */
 			memset(path + i + 1, 0, sizeof(*path));
 			bh = read_extent_tree_block(inode, ext4_idx_pblock(path[i].p_idx), path[0].p_depth - (i + 1), 0);
-			if (!bh) {
+			if (IS_ERR(bh)) {
 				/* should we reset i_size? */
 				err = -EIO;
 				break;
@@ -2264,8 +2259,8 @@ int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start)
 				 * truncatei_leaf() */
 				err = ext4_ext_rm_idx(icb, handle, inode, path + i);
 			}
-			/* root level have p_bh == NULL, brelse() eats this */
-			brelse(path[i].p_bh);
+			/* root level have p_bh == NULL, extents_brelse() eats this */
+			extents_brelse(path[i].p_bh);
 			path[i].p_bh = NULL;
 			i--;
 		}
