@@ -109,7 +109,10 @@ static inline int ext4_ext_space_block(struct inode *inode, int check)
 
 	size = (inode->i_sb->s_blocksize - sizeof(struct ext4_extent_header))
 		/ sizeof(struct ext4_extent);
-
+#ifdef AGGRESSIVE_TEST
+	if (!check && size > 6)
+		size = 6;
+#endif
 	return size;
 }
 
@@ -119,7 +122,10 @@ static inline int ext4_ext_space_block_idx(struct inode *inode, int check)
 
 	size = (inode->i_sb->s_blocksize - sizeof(struct ext4_extent_header))
 		/ sizeof(struct ext4_extent_idx);
-
+#ifdef AGGRESSIVE_TEST
+	if (!check && size > 5)
+		size = 5;
+#endif
 	return size;
 }
 
@@ -130,7 +136,10 @@ static inline int ext4_ext_space_root(struct inode *inode, int check)
 	size = sizeof(EXT4_I(inode)->i_block);
 	size -= sizeof(struct ext4_extent_header);
 	size /= sizeof(struct ext4_extent);
-
+#ifdef AGGRESSIVE_TEST
+	if (!check && size > 3)
+		size = 3;
+#endif
 	return size;
 }
 
@@ -141,7 +150,10 @@ static inline int ext4_ext_space_root_idx(struct inode *inode, int check)
 	size = sizeof(EXT4_I(inode)->i_block);
 	size -= sizeof(struct ext4_extent_header);
 	size /= sizeof(struct ext4_extent_idx);
-
+#ifdef AGGRESSIVE_TEST
+	if (!check && size > 4)
+		size = 4;
+#endif
 	return size;
 }
 
@@ -1454,7 +1466,7 @@ static int ext4_ext_correct_indexes(void *icb, handle_t *handle, struct inode *i
 	return err;
 }
 
-	int
+int
 ext4_can_extents_be_merged(struct inode *inode, struct ext4_extent *ex1,
 		struct ext4_extent *ex2)
 {
@@ -1486,6 +1498,10 @@ ext4_can_extents_be_merged(struct inode *inode, struct ext4_extent *ex1,
 	if (ext4_ext_is_unwritten(ex1) &&
 			(ext1_ee_len + ext2_ee_len > EXT_UNWRITTEN_MAX_LEN))
 		return 0;
+#ifdef AGGRESSIVE_TEST
+	if (ext1_ee_len >= 4)
+		return 0;
+#endif
 
 	if (ext4_ext_pblock(ex1) + ext1_ee_len == ext4_ext_pblock(ex2))
 		return 1;
