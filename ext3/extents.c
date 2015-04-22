@@ -316,7 +316,7 @@ static ext4_fsblk_t ext4_ext_find_goal(struct inode *inode,
 /*
  * Allocation for a meta data block
  */
-	static ext4_fsblk_t
+static ext4_fsblk_t
 ext4_ext_new_meta_block(void *icb, handle_t *handle, struct inode *inode,
 		struct ext4_ext_path *path,
 		struct ext4_extent *ex, int *err, unsigned int flags)
@@ -410,7 +410,7 @@ corrupted:
  * binary search for the closest index of the given block
  * the header must be checked before calling this
  */
-	static void
+static void
 ext4_ext_binsearch_idx(struct inode *inode,
 		struct ext4_ext_path *path, ext4_lblk_t block)
 {
@@ -469,7 +469,7 @@ ext4_ext_binsearch_idx(struct inode *inode,
  * binary search for closest extent of the given block
  * the header must be checked before calling this
  */
-	static void
+static void
 ext4_ext_binsearch(struct inode *inode,
 		struct ext4_ext_path *path, ext4_lblk_t block)
 {
@@ -1345,7 +1345,7 @@ found_extent:
  * allocated block. Thus, index entries have to be consistent
  * with leaves.
  */
-	ext4_lblk_t
+ext4_lblk_t
 ext4_ext_next_allocated_block(struct ext4_ext_path *path)
 {
 	int depth;
