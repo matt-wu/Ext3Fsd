@@ -763,8 +763,6 @@ struct buffer_head *alloc_page_buffers(struct page *page, unsigned long size,
                                                    int retry);
 void create_empty_buffers(struct page *, unsigned long,
                           unsigned long b_state);
-void end_buffer_read_sync(struct buffer_head *bh, int uptodate);
-void end_buffer_write_sync(struct buffer_head *bh, int uptodate);
 
 /* Things to do with buffers at mapping->private_list */
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode);
@@ -804,7 +802,6 @@ void write_boundary_block(struct block_device *bdev,
                           sector_t bblock, unsigned blocksize);
 int bh_uptodate_or_lock(struct buffer_head *bh);
 int bh_submit_read(struct buffer_head *bh);
-void write_dirty_buffer(struct buffer_head *bh, int rw);
 /* They are separately managed  */
 struct buffer_head *extents_bread(struct super_block *sb, sector_t block);
 struct buffer_head *extents_bwrite(struct super_block *sb, sector_t block);

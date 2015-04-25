@@ -340,8 +340,18 @@ void
 free_buffer_head(struct buffer_head * bh)
 {
     if (bh) {
-        if (bh->b_data) {
-            kfree(bh->b_data);
+        if (bh->b_mdl) {
+
+            DEBUG(DL_BH, ("bh=%p mdl=%p (Flags:%xh VA:%p) released.\n", bh, bh->b_mdl,
+                          bh->b_mdl->MdlFlags, bh->b_mdl->MappedSystemVa));
+            if (IsFlagOn(bh->b_mdl->MdlFlags, MDL_PAGES_LOCKED)) {
+                /* MmUnlockPages will release it's VA */
+                MmUnlockPages(bh->b_mdl);
+            } else if (IsFlagOn(bh->b_mdl->MdlFlags, MDL_MAPPED_TO_SYSTEM_VA)) {
+                MmUnmapLockedPages(bh->b_mdl->MappedSystemVa, bh->b_mdl);
+            }
+
+            Ext2DestroyMdl(bh->b_mdl);
         }
         DEBUG(DL_BH, ("bh=%p freed.\n", bh));
         DEC_MEM_COUNT(PS_BUFF_HEAD, bh, sizeof(struct buffer_head));
@@ -358,6 +368,7 @@ struct buffer_head *
 {
     PEXT2_VCB Vcb = bdev->bd_priv;
     LARGE_INTEGER offset;
+    PVOID         bcb = NULL;
     PVOID         ptr;
 
     KIRQL irql = 0;
@@ -397,20 +408,39 @@ struct buffer_head *
     atomic_inc(&g_jbh.bh_count);
     atomic_inc(&g_jbh.bh_acount);
 
+again:
+
     offset.QuadPart = (s64) bh->b_blocknr;
     offset.QuadPart <<= BLOCK_BITS;
+    if (!CcPinRead( Vcb->Volume,
+                    &offset,
+                    bh->b_size,
+                    PIN_WAIT,
+                    &bcb,
+                    &ptr)) {
+        goto again;
+    }
 
-    bh->b_data = kmalloc(size, GFP_KERNEL);
+    bh->b_mdl = Ext2CreateMdl(ptr, TRUE, bh->b_size, IoModifyAccess);
+    if (bh->b_mdl) {
+        /* muse map the PTE to NonCached zone. journal recovery will
+           access the PTE under spinlock: DISPATCH_LEVEL IRQL */
+        bh->b_data = MmMapLockedPagesSpecifyCache(
+                         bh->b_mdl, KernelMode, MmNonCached,
+                         NULL,FALSE, HighPagePriority);
+    }
 
-    if (!bh->b_data) {
-        DbgPrint("Insufficient memory resources!\n");
+    if (!bh->b_mdl || !bh->b_data) {
         free_buffer_head(bh);
         bh = NULL;
         goto errorout;
     }
 
-    set_buffer_new(bh);
+    set_buffer_uptodate(bh);
     get_bh(bh);
+
+    DEBUG(DL_BH, ("getblk: Vcb=%p bhcount=%u block=%u bh=%p mdl=%p (Flags:%xh VA:%p)\n",
+                  Vcb, atomic_read(&g_jbh.bh_count), block, bh, bh->b_mdl, bh->b_mdl->MdlFlags, bh->b_data));
 
     spin_lock_irqsave(&bdev->bd_bh_lock, irql);
 
@@ -434,46 +464,19 @@ struct buffer_head *
     /* we get it */
 errorout:
 
+    if (bcb)
+        CcUnpinData(bcb);
+
     return bh;
-}
-
-/*
- * Default synchronous end-of-IO handler..  Just mark it up-to-date and
- * unlock the buffer. This is what ll_rw_block uses too.
- */
-void end_buffer_read_sync(struct buffer_head *bh, int uptodate)
-{
-    if (uptodate) {
-        set_buffer_uptodate(bh);
-    } else {
-        /* This happens, due to failed READA attempts. */
-        clear_buffer_uptodate(bh);
-    }
-    clear_buffer_dirty(bh);
-    unlock_buffer(bh);
-    put_bh(bh);
-}
-
-void end_buffer_write_sync(struct buffer_head *bh, int uptodate)
-{
-    if (uptodate) {
-        set_buffer_uptodate(bh);
-    } else {
-        set_buffer_write_io_error(bh);
-        clear_buffer_uptodate(bh);
-    }
-    clear_buffer_dirty(bh);
-    unlock_buffer(bh);
-    put_bh(bh);
 }
 
 int submit_bh(int rw, struct buffer_head *bh)
 {
     struct block_device *bdev = bh->b_bdev;
     PEXT2_VCB            Vcb  = bdev->bd_priv;
+    PBCB                 Bcb;
     PVOID                Buffer;
     LARGE_INTEGER        Offset;
-    int			ret = 0;
 
     ASSERT(Vcb->Identifier.Type == EXT2VCB);
     ASSERT(bh->b_data);
@@ -481,60 +484,44 @@ int submit_bh(int rw, struct buffer_head *bh)
     if (rw == WRITE) {
 
         if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
-            ret = -EINVAL;
             goto errorout;
         }
 
         SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
         Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
-        if (CcCopyWrite(Vcb->Volume,
-                        &Offset,
-                        BLOCK_SIZE,
-                        TRUE,
-                        bh->b_data)) {
-                bh->b_end_io(bh, 1);
-        } else
-                bh->b_end_io(bh, 0);
+        if (CcPreparePinWrite(
+                    Vcb->Volume,
+                    &Offset,
+                    BLOCK_SIZE,
+                    FALSE,
+                    TRUE,
+                    &Bcb,
+                    &Buffer )) {
+#if 0
+            if (memcmp(Buffer, bh->b_data, BLOCK_SIZE) != 0) {
+                DbgBreak();
+                memmove(Buffer, bh->b_data, BLOCK_SIZE);
+            }
+#endif
+
+            CcSetDirtyPinnedData(Bcb, NULL);
+            CcUnpinData(Bcb);
+        }
 
         Ext2AddBlockExtent( Vcb, NULL,
                             (ULONG)bh->b_blocknr,
                             (ULONG)bh->b_blocknr,
                             (bh->b_size >> BLOCK_BITS));
     } else {
-        IO_STATUS_BLOCK IoStatus;
-        Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
-        CcCopyRead(Vcb->Volume,
-                   &Offset,
-                   BLOCK_SIZE,
-                   TRUE, bh->b_data, &IoStatus);
-        ret = Ext2LinuxError(IoStatus.Status);
-        if (ret) {
-                bh->b_end_io(bh, 0);
-                goto errorout;
-        }
-        bh->b_end_io(bh, 1);
+
+        DbgBreak();
     }
 
 errorout:
 
-    return ret;
-}
-
-int bh_submit_read(struct buffer_head *bh)
-{
-    int ret;
-
-    lock_buffer(bh);
-    if (buffer_uptodate(bh)) {
-        unlock_buffer(bh);
-        return 0;
-    }
-
-    get_bh(bh);
-    bh->b_end_io = end_buffer_read_sync;
-    ret = submit_bh(READ, bh);
-    wait_on_buffer(bh);
-    return ret;
+    unlock_buffer(bh);
+    put_bh(bh);
+    return 0;
 }
 
 void __brelse(struct buffer_head *bh)
@@ -601,14 +588,12 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
         if (rw == WRITE || rw == SWRITE) {
             if (test_clear_buffer_dirty(bh)) {
                 get_bh(bh);
-                bh->b_end_io = end_buffer_write_sync;
                 submit_bh(WRITE, bh);
                 continue;
             }
         } else {
             if (!buffer_uptodate(bh)) {
                 get_bh(bh);
-                bh->b_end_io = end_buffer_read_sync;
                 submit_bh(rw, bh);
                 continue;
             }
@@ -617,16 +602,10 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
     }
 }
 
-void write_dirty_buffer(struct buffer_head *bh, int rw)
+int bh_submit_read(struct buffer_head *bh)
 {
-    lock_buffer(bh);
-    if (!test_clear_buffer_dirty(bh)) {
-        unlock_buffer(bh);
-        return;
-    }
-    get_bh(bh);
-    bh->b_end_io = end_buffer_write_sync;
-    submit_bh(rw, bh);
+	ll_rw_block(READ, 1, &bh);
+    return 0;
 }
 
 int sync_dirty_buffer(struct buffer_head *bh)
@@ -637,7 +616,6 @@ int sync_dirty_buffer(struct buffer_head *bh)
     lock_buffer(bh);
     if (test_clear_buffer_dirty(bh)) {
         get_bh(bh);
-        bh->b_end_io = end_buffer_write_sync;
         ret = submit_bh(WRITE, bh);
         wait_on_buffer(bh);
     } else {
@@ -731,168 +709,6 @@ void iput(struct inode *inode)
     if (atomic_dec_and_test(&inode->i_count)) {
         kfree(inode);
     }
-}
-
-static struct buffer_head *extents_new_buffer_head()
-{
-    struct buffer_head * bh = NULL;
-    bh = kmem_cache_alloc(g_jbh.bh_cache, GFP_NOFS);
-    if (bh) {
-        memset(bh, 0, sizeof(struct buffer_head));
-        DEBUG(DL_BH, ("bh=%p allocated.\n", bh));
-        INC_MEM_COUNT(PS_BUFF_HEAD, bh, sizeof(struct buffer_head));
-        atomic_inc(&g_jbh.bh_count);
-        atomic_inc(&g_jbh.bh_acount);
-    }
-    return bh;
-}
-
-static void extents_free_buffer_head(struct buffer_head * bh)
-{
-    if (bh) {
-        DEBUG(DL_BH, ("bh=%p freed.\n", bh));
-        DEC_MEM_COUNT(PS_BUFF_HEAD, bh, sizeof(struct buffer_head));
-        kmem_cache_free(g_jbh.bh_cache, bh);
-        atomic_dec(&g_jbh.bh_count);
-    }
-}
-
-struct buffer_head *
-extents_bread(struct super_block *sb, sector_t block)
-{
-    PEXT2_VCB Vcb = sb->s_bdev->bd_priv;
-    LARGE_INTEGER offset;
-    PVOID         ptr;
-    unsigned long size = sb->s_blocksize;
-    BOOLEAN       ret;
-
-    /* allocate buffer_head and initialize it */
-    struct buffer_head *bh = NULL;
-
-    /* check the block is valid or not */
-    if (block >= TOTAL_BLOCKS) {
-        DbgBreak();
-        goto errorout;
-    }
-
-    bh = extents_new_buffer_head();
-    if (!bh) {
-        goto errorout;
-    }
-    bh->b_bdev = sb->s_bdev;
-    bh->b_blocknr = block;
-    bh->b_size = size;
-    bh->b_data = NULL;
-
-    offset.QuadPart = (s64)block;
-    offset.QuadPart <<= BLOCK_BITS;
-
-    ret = CcPinRead(Vcb->Volume,
-                    &offset,
-                    size,
-                    PIN_WAIT,
-                    &bh->b_bcb,
-                    &bh->b_data);
-
-    if (!ret) {
-        DbgPrint("Insufficient memory resources!\n");
-        extents_free_buffer_head(bh);
-        bh = NULL;
-        goto errorout;
-    }
-
-    set_buffer_new(bh);
-    set_buffer_uptodate(bh);
-    get_bh(bh);
-
-    /* we get it */
-errorout:
-    return bh;
-}
-
-struct buffer_head *
-extents_bwrite(struct super_block *sb, sector_t block)
-{
-    PEXT2_VCB Vcb = sb->s_bdev->bd_priv;
-    LARGE_INTEGER offset;
-    PVOID         ptr;
-    unsigned long size = sb->s_blocksize;
-    BOOLEAN       ret;
-
-    /* allocate buffer_head and initialize it */
-    struct buffer_head *bh = NULL;
-
-    /* check the block is valid or not */
-    if (block >= TOTAL_BLOCKS) {
-        DbgBreak();
-        goto errorout;
-    }
-
-    bh = extents_new_buffer_head();
-    if (!bh) {
-        goto errorout;
-    }
-    bh->b_bdev = sb->s_bdev;
-    bh->b_blocknr = block;
-    bh->b_size = size;
-    bh->b_data = NULL;
-
-    offset.QuadPart = (s64)block;
-    offset.QuadPart <<= BLOCK_BITS;
-
-    SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
-    ret = CcPreparePinWrite(Vcb->Volume,
-                            &offset,
-                            size,
-                            FALSE,
-                            PIN_WAIT,
-                            &bh->b_bcb,
-                            &bh->b_data);
-
-    if (!ret) {
-        DbgPrint("Insufficient memory resources!\n");
-        extents_free_buffer_head(bh);
-        bh = NULL;
-        goto errorout;
-    }
-
-    set_buffer_new(bh);
-    get_bh(bh);
-
-    /* we get it */
-errorout:
-    return bh;
-}
-
-void extents_mark_buffer_dirty(struct buffer_head *bh)
-{
-    set_buffer_dirty(bh);
-}
-
-void extents_brelse(struct buffer_head *bh)
-{
-    struct block_device *bdev;
-    PEXT2_VCB Vcb;
-
-    if (bh == NULL)
-        return;
-
-    bdev = bh->b_bdev;
-    Vcb = (PEXT2_VCB)bdev->bd_priv;
-
-    ASSERT(Vcb->Identifier.Type == EXT2VCB);
-
-    if (buffer_dirty(bh)) {
-        Ext2AddBlockExtent(Vcb, NULL,
-                            (ULONG)bh->b_blocknr,
-                            (ULONG)bh->b_blocknr,
-                            (bh->b_size >> BLOCK_BITS));
-        CcSetDirtyPinnedData(bh->b_bcb, NULL);
-    }
-    if (bh->b_bcb)
-        CcUnpinData(bh->b_bcb);
-
-    extents_free_buffer_head(bh);
 }
 
 //

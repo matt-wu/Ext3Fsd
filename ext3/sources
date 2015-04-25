@@ -25,4 +25,4 @@ DRIVERTYPE=FS
 INCLUDES=.;..;..\include;$(DRIVER_INC_PATH);
 
 # The source code:
-SOURCES= generic.c htree.c recover.c extents.c ext4_jbd2.c
+SOURCES= generic.c htree.c recover.c extents.c ext4_jbd2.c extents-buffer.c
