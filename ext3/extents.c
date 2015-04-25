@@ -2380,13 +2380,6 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 		goto out2;
 	}
 
-	/*
-	 * Okay, we need to do block allocation.  Lazily initialize the block
-	 * allocation info here if necessary
-	 */
-	/*if (S_ISREG(inode->i_mode) && (!ext4_I(inode)->i_block_alloc_info))*/
-	/*ext4_init_block_alloc_info(inode);*/
-
 	/* find next allocated block so that we know how many
 	 * blocks we can allocate without ovelapping next extent */
 	/*BUG_ON(iblock < le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len));*/
