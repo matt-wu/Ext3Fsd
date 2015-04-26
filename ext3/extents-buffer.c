@@ -48,6 +48,7 @@ static struct buffer_head *extents_new_buffer_head()
         memset(bh, 0, BUFFER_SIZE);
         DEBUG(DL_BH, ("bh=%p allocated.\n", bh));
         atomic_inc(&extents_cache_alloc_count);
+        INC_MEM_COUNT(PS_EXTENTS_BUFF, bh, BUFFER_SIZE);
     }
     return bh;
 }
@@ -61,6 +62,7 @@ static void extents_free_buffer_head(struct buffer_head * bh)
         DEBUG(DL_BH, ("bh=%p freed.\n", bh));
         ExFreeToNPagedLookasideList(&extents_cache, bh);
         atomic_dec(&extents_cache_alloc_count);
+        DEC_MEM_COUNT(PS_EXTENTS_BUFF, bh, BUFFER_SIZE);
     }
 }
 
