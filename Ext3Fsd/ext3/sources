@@ -25,4 +25,4 @@ DRIVERTYPE=FS
 INCLUDES=.;..;..\include;$(DRIVER_INC_PATH);
 
 # The source code:
-SOURCES= generic.c htree.c recover.c
+SOURCES= generic.c htree.c recover.c indirect.c

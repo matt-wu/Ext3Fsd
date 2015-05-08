@@ -10,6 +10,7 @@
 /* INCLUDES *****************************************************************/
 
 #include "ext2fs.h"
+#include "linux\ext4.h"
 
 /* GLOBALS ***************************************************************/
 
@@ -157,7 +158,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             FSI->NumberOfLinks = Mcb->Inode.i_nlink;
 
-            if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY))
+            if (IsVcbReadOnly(Fcb->Vcb))
                 FSI->DeletePending = FALSE;
             else
                 FSI->DeletePending = IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING);
@@ -315,7 +316,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             FSI->NumberOfLinks = Mcb->Inode.i_nlink;
 
-            if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY))
+            if (IsVcbReadOnly(Fcb->Vcb))
                 FSI->DeletePending = FALSE;
             else
                 FSI->DeletePending = IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING);
@@ -618,8 +619,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             FcbMainResourceAcquired = TRUE;
         }
 
-        if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
-
+        if (IsVcbReadOnly(Vcb)) {
             if (FileInformationClass != FilePositionInformation) {
                 Status = STATUS_MEDIA_WRITE_PROTECTED;
                 __leave;
@@ -857,8 +857,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                     EndOfFile.QuadPart = Fcb->Header.FileSize.QuadPart;
                 }
 
-                if (EndOfFile.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
-
+                if (Fcb->Header.ValidDataLength.QuadPart > EndOfFile.QuadPart) {
                     Fcb->Header.ValidDataLength.QuadPart = EndOfFile.QuadPart;
                     NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
                 }
@@ -928,7 +927,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             if (NT_SUCCESS(Status)) {
 
-                Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size = EndOfFile.QuadPart;
+                Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size = EndOfFile.QuadPart;
                 if (Fcb->Header.ValidDataLength.QuadPart > Fcb->Header.FileSize.QuadPart)
                     Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
 
@@ -1112,6 +1111,31 @@ errorout:
 }
 
 NTSTATUS
+Ext2BlockMap(
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_MCB            Mcb,
+    IN ULONG                Index,
+    IN BOOLEAN              bAlloc,
+    OUT PULONG              pBlock,
+    OUT PULONG              Number
+)
+{
+	NTSTATUS status;
+
+	if (INODE_HAS_EXTENT(&Mcb->Inode)) {
+        status = Ext2MapExtent(IrpContext, Vcb, Mcb, Index,
+                               bAlloc, pBlock, Number );
+	} else {
+        status = Ext2MapIndirect(IrpContext, Vcb, Mcb, Index,
+                                 bAlloc, pBlock, Number );
+    }
+
+	return status;
+}
+
+
+NTSTATUS
 Ext2ExpandFile(
     PEXT2_IRP_CONTEXT IrpContext,
     PEXT2_VCB         Vcb,
@@ -1119,98 +1143,29 @@ Ext2ExpandFile(
     PLARGE_INTEGER    Size
 )
 {
-    NTSTATUS Status = STATUS_SUCCESS;
-
-    ULONG    Layer = 0;
     ULONG    Start = 0;
     ULONG    End = 0;
-    ULONG    Extra = 0;
-    ULONG    Hint = 0;
-    ULONG    Slot = 0;
-    ULONG    Base = 0;
 
     Start = (ULONG)((Mcb->Inode.i_size + BLOCK_SIZE - 1) >> BLOCK_BITS);
     End = (ULONG)((Size->QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS);
 
-    /* should be a truncate operation */
+    /* it's a truncate operation, not expanding */
     if (Start >= End) {
         Size->QuadPart = ((LONGLONG) Start) << BLOCK_BITS;
         return STATUS_SUCCESS;
     }
 
-    if (INODE_HAS_EXTENT(&Mcb->Inode)) {
-
-        /* We don't support extending files with extents */
-        return STATUS_NOT_IMPLEMENTED;
-
-    } else if (IsMcbSpecialFile(Mcb)) {
-
+	/* ignore special files */
+	if (IsMcbSpecialFile(Mcb)) {
         return STATUS_INVALID_DEVICE_REQUEST;
-
-    } else {
-
-        if (End > Vcb->max_bitmap_bytes)
-            return STATUS_INVALID_PARAMETER;
     }
 
-    Extra = End - Start;
-
-    for (Layer = 0; Layer < EXT2_BLOCK_TYPES && Extra; Layer++) {
-
-        if (Start >= Vcb->max_blocks_per_layer[Layer]) {
-
-            Base  += Vcb->max_blocks_per_layer[Layer];
-            Start -= Vcb->max_blocks_per_layer[Layer];
-
-        } else {
-
-            /* get the slot in i_block array */
-            if (Layer == 0) {
-                Base = Slot = Start;
-            } else {
-                Slot = Layer + EXT2_NDIR_BLOCKS - 1;
-            }
-
-            /* set block hint to avoid fragments */
-            if (Hint == 0) {
-                if (Mcb->Inode.i_block[Slot] != 0) {
-                    Hint = Mcb->Inode.i_block[Slot];
-                } else if (Slot > 1) {
-                    Hint = Mcb->Inode.i_block[Slot-1];
-                }
-            }
-
-            /* now expand this slot */
-            Status = Ext2ExpandBlock(
-                         IrpContext,
-                         Vcb,
-                         Mcb,
-                         Base,
-                         Layer,
-                         Start,
-                         (Layer == 0) ? (Vcb->max_blocks_per_layer[Layer] - Start) : 1,
-                         &Mcb->Inode.i_block[Slot],
-                         &Hint,
-                         &Extra
-                     );
-            if (!NT_SUCCESS(Status)) {
-                break;
-            }
-
-            Start = 0;
-            if (Layer == 0) {
-                Base = 0;
-            }
-            Base += Vcb->max_blocks_per_layer[Layer];
-        }
+	/* expandind file extents */ 
+    if (INODE_HAS_EXTENT(&Mcb->Inode)) {
+        return Ext2ExpandExtent(IrpContext, Vcb, Mcb, Start, End, Size);
     }
 
-    Size->QuadPart = ((LONGLONG)(End - Extra)) << BLOCK_BITS;
-
-    /* save inode whatever it succeeds to expand or not */
-    Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
-
-    return Status;
+	return Ext2ExpandIndirect(IrpContext, Vcb, Mcb, Start, End, Size);
 }
 
 NTSTATUS
@@ -1221,83 +1176,15 @@ Ext2TruncateFile(
     PLARGE_INTEGER    Size
 )
 {
-    NTSTATUS Status = STATUS_SUCCESS;
-
-    ULONG    Layer = 0;
-
-    ULONG    Extra = 0;
-    ULONG    Wanted = 0;
-    ULONG    End;
-    ULONG    Base;
-
-    ULONG    SizeArray = 0;
-    PULONG   BlockArray = NULL;
-
-    /* translate file size to block */
-    End = Base = Vcb->max_data_blocks;
-    Wanted = (ULONG)((Size->QuadPart + BLOCK_SIZE - 1) >> BLOCK_BITS);
+    NTSTATUS status = STATUS_SUCCESS;
 
     if (INODE_HAS_EXTENT(&Mcb->Inode)) {
+		status = Ext2TruncateExtent(IrpContext, Vcb, Mcb, Size);
+    } else {
+		status = Ext2TruncateIndirect(IrpContext, Vcb, Mcb, Size);
+	}
 
-        /* We don't support extending files with extents */
-        return STATUS_NOT_IMPLEMENTED;
-    }
-
-    /* calculate blocks to be freed */
-    Extra = End - Wanted;
-
-    for (Layer = EXT2_BLOCK_TYPES; Layer > 0 && Extra; Layer--) {
-
-        if (Vcb->max_blocks_per_layer[Layer - 1] == 0) {
-            continue;
-        }
-
-        Base -= Vcb->max_blocks_per_layer[Layer - 1];
-
-        if (Layer - 1 == 0) {
-            BlockArray = &Mcb->Inode.i_block[0];
-            SizeArray = End;
-            ASSERT(End == EXT2_NDIR_BLOCKS && Base == 0);
-        } else {
-            BlockArray = &Mcb->Inode.i_block[EXT2_NDIR_BLOCKS - 1 + Layer - 1];
-            SizeArray = 1;
-        }
-
-        Status = Ext2TruncateBlock(
-                     IrpContext,
-                     Vcb,
-                     Mcb,
-                     Base,
-                     End - Base - 1,
-                     Layer - 1,
-                     SizeArray,
-                     BlockArray,
-                     &Extra
-                 );
-        if (!NT_SUCCESS(Status)) {
-            break;
-        }
-
-        End = Base;
-    }
-
-    if (!NT_SUCCESS(Status)) {
-        Size->QuadPart += ((ULONGLONG)Extra << BLOCK_BITS);
-    }
-
-    if (Size->QuadPart == 0) {
-        if (Ext2ListExtents(&Mcb->Extents)) {
-            DbgBreak();
-        }
-        Ext2ClearAllExtents(&Mcb->Extents);
-    }
-
-    /* save inode */
-    if (Mcb->Inode.i_size > (loff_t)(Size->QuadPart))
-        Mcb->Inode.i_size = (loff_t)(Size->QuadPart);
-    Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
-
-    return Status;
+    return status;
 }
 
 NTSTATUS
@@ -1311,10 +1198,6 @@ Ext2IsFileRemovable(
     PEXT2_MCB Mcb = Fcb->Mcb;
 
     if (Mcb->Inode.i_ino == EXT2_ROOT_INO) {
-        return STATUS_CANNOT_DELETE;
-    }
-
-    if (INODE_HAS_EXTENT(&Mcb->Inode)) {
         return STATUS_CANNOT_DELETE;
     }
 
@@ -1791,9 +1674,6 @@ Ext2DeleteFile(
         }
     }
 
-    if (INODE_HAS_EXTENT(&Mcb->Inode)) {
-        return STATUS_CANNOT_DELETE;
-    }
 
     __try {
 
@@ -1861,13 +1741,9 @@ Ext2DeleteFile(
 
                 /* for symlink, we should do differenctly  */
                 if (Mcb->Inode.i_size > EXT2_LINKLEN_IN_INODE) {
-                    ASSERT(Mcb->Inode.i_block[0]);
-                    ASSERT(Mcb->Inode.i_blocks == (BLOCK_SIZE >> 9));
-                    Status = Ext2FreeBlock(IrpContext, Vcb, Mcb->Inode.i_block[0], 1);
+                    Size.QuadPart = (LONGLONG)0;
+                    Status = Ext2TruncateFile(IrpContext, Vcb, Mcb, &Size);
                     if (NT_SUCCESS(Status)) {
-                        Mcb->Inode.i_block[0] = 0;
-                        Mcb->Inode.i_size = 0;
-                        Mcb->Inode.i_blocks = 0;
                     }
                 }
 
@@ -1883,7 +1759,7 @@ Ext2DeleteFile(
                     DbgBreak();
                 }
                 Ext2ClearAllExtents(&Mcb->Extents);
-                ClearLongFlag(Mcb->Flags, MCB_ZONE_INIT);
+                ClearLongFlag(Mcb->Flags, MCB_ZONE_INITED);
 
                 if (Fcb) {
                     Fcb->Header.AllocationSize.QuadPart = Size.QuadPart;

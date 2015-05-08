@@ -19,7 +19,7 @@
 #include <linux/ext2_fs.h>
 #include <linux/ext3_fs.h>
 #include <linux/ext3_fs_i.h>
-#include <linux/ext4_ext.h>
+#include <linux/ext4.h>
 
 /* DEBUG ****************************************************************/
 #if DBG
@@ -706,7 +706,8 @@ typedef struct _EXT2_VCB {
 #define IsVcbInited(Vcb)   (IsFlagOn((Vcb)->Flags, VCB_INITIALIZED))
 #define IsMounted(Vcb)     (IsFlagOn((Vcb)->Flags, VCB_MOUNTED))
 #define IsDispending(Vcb)  (IsFlagOn((Vcb)->Flags, VCB_DISMOUNT_PENDING))
-#define IsVcbReadOnly(Vcb) (IsFlagOn((Vcb)->Flags, VCB_READ_ONLY))
+#define IsVcbReadOnly(Vcb) (IsFlagOn((Vcb)->Flags, VCB_READ_ONLY) ||    \
+                            IsFlagOn((Vcb)->Flags, VCB_WRITE_PROTECTED))
 
 
 #define IsExt3ForceWrite()   (IsFlagOn(Ext2Global->Flags, EXT3_FORCE_WRITING))
@@ -818,6 +819,9 @@ struct _EXT2_MCB {
     // Extents zone
     LARGE_MCB                       Extents;
 
+	// Metablocks
+    LARGE_MCB                       MetaExts;
+
     // Time stamps
     LARGE_INTEGER                   CreationTime;
     LARGE_INTEGER                   LastWriteTime;
@@ -839,13 +843,13 @@ struct _EXT2_MCB {
 #define MCB_ENTRY_TREE              0x00000004
 #define MCB_FILE_DELETED            0x00000008
 
-#define MCB_ZONE_INIT               0x20000000
+#define MCB_ZONE_INITED             0x20000000
 #define MCB_TYPE_SPECIAL            0x40000000  /* unresolved symlink + device node */
 #define MCB_TYPE_SYMLINK            0x80000000
 
 #define IsMcbUsed(Mcb)          ((Mcb)->Refercount > 0)
 #define IsMcbSymLink(Mcb)       IsFlagOn((Mcb)->Flags, MCB_TYPE_SYMLINK)
-#define IsZoneInited(Mcb)       IsFlagOn((Mcb)->Flags, MCB_ZONE_INIT)
+#define IsZoneInited(Mcb)       IsFlagOn((Mcb)->Flags, MCB_ZONE_INITED)
 #define IsMcbSpecialFile(Mcb)   IsFlagOn((Mcb)->Flags, MCB_TYPE_SPECIAL)
 #define IsMcbRoot(Mcb)          ((Mcb)->Inode.i_ino == EXT2_ROOT_INO)
 #define IsMcbReadonly(Mcb)      IsFlagOn((Mcb)->FileAttr, FILE_ATTRIBUTE_READONLY)
@@ -1094,8 +1098,8 @@ Ext2ReadWriteBlocks(
     IN PEXT2_IRP_CONTEXT IrpContext,
     IN PEXT2_VCB        Vcb,
     IN PEXT2_EXTENT     Extent,
-    IN ULONG            Length,
-    IN BOOLEAN          bVerify );
+    IN ULONG            Length
+    );
 
 NTSTATUS
 Ext2ReadSync(
@@ -1539,7 +1543,42 @@ Ext2ExceptionHandler (IN PEXT2_IRP_CONTEXT IrpContext);
 
 
 //
-// ext3\generic.c
+// Extents.c
+//
+
+
+NTSTATUS
+Ext2MapExtent(
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_MCB            Mcb,
+    IN ULONG                Index,
+    IN BOOLEAN              Alloc,
+    OUT PULONG              Block,
+    OUT PULONG              Number
+    );
+
+NTSTATUS
+Ext2ExpandExtent(
+    PEXT2_IRP_CONTEXT IrpContext,
+    PEXT2_VCB         Vcb,
+    PEXT2_MCB         Mcb,
+    ULONG             Start,
+    ULONG             End,
+    PLARGE_INTEGER    Size
+    );
+
+NTSTATUS
+Ext2TruncateExtent(
+    PEXT2_IRP_CONTEXT IrpContext,
+    PEXT2_VCB         Vcb,
+    PEXT2_MCB         Mcb,
+    PLARGE_INTEGER    Size
+    );
+
+
+//
+// generic.c
 //
 
 static inline ext3_fsblk_t ext3_blocks_count(struct ext3_super_block *es)
@@ -1754,31 +1793,6 @@ Ext2BlockMap(
     OUT PULONG              Number
 );
 
-NTSTATUS
-Ext2ExtentMap(
-    IN PEXT2_IRP_CONTEXT    IrpContext,
-    IN PEXT2_VCB            Vcb,
-    IN PEXT2_MCB            Mcb,
-    IN ULONG                Index,
-    IN BOOLEAN              Alloc,
-    OUT PULONG              Block,
-    OUT PULONG              Number
-);
-
-NTSTATUS
-Ext2ExtentSearch(
-    IN PEXT2_IRP_CONTEXT    IrpContext,
-    IN PEXT2_VCB            Vcb,
-    IN PEXT2_MCB            Mcb,
-    IN ULONG                Index,
-    IN BOOLEAN              Alloc,
-    IN PVOID                ExtentHeader,
-    IN BOOLEAN              UnpinBcb,
-    IN PBCB                 BcbToUnpin,
-    OUT PULONG              Block,
-    OUT PULONG              Number
-);
-
 VOID
 Ext2UpdateVcbStat(
     IN PEXT2_IRP_CONTEXT    IrpContext,
@@ -1803,32 +1817,6 @@ Ext2FreeBlock(
     IN ULONG                Number
 );
 
-NTSTATUS
-Ext2ExpandLast(
-    IN PEXT2_IRP_CONTEXT    IrpContext,
-    IN PEXT2_VCB            Vcb,
-    IN PEXT2_MCB            Mcb,
-    IN ULONG                Base,
-    IN ULONG                Layer,
-    IN PULONG *             Data,
-    IN PULONG               Hint,
-    IN PULONG               Block,
-    IN OUT PULONG           Number
-);
-
-NTSTATUS
-Ext2ExpandBlock(
-    IN PEXT2_IRP_CONTEXT IrpContext,
-    IN PEXT2_VCB         Vcb,
-    IN PEXT2_MCB         Mcb,
-    IN ULONG             Base,
-    IN ULONG             Layer,
-    IN ULONG             Start,
-    IN ULONG             SizeArray,
-    IN PULONG            BlockArray,
-    IN PULONG            Hint,
-    IN PULONG            Extra
-);
 
 NTSTATUS
 Ext2NewInode(
@@ -2274,6 +2262,7 @@ int ext3_delete_entry(struct ext2_icb *icb, struct inode *dir,
                       struct buffer_head *bh);
 
 int ext3_is_dir_empty(struct ext2_icb *icb, struct inode *inode);
+
 //
 // Init.c
 //
@@ -2284,6 +2273,38 @@ Ext2QueryGlobalParameters (IN PUNICODE_STRING  RegistryPath);
 VOID
 DriverUnload (IN PDRIVER_OBJECT DriverObject);
 
+//
+// Indirect.c
+//
+
+NTSTATUS
+Ext2MapIndirect(
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_MCB            Mcb,
+    IN ULONG                Index,
+    IN BOOLEAN              bAlloc,
+    OUT PULONG              pBlock,
+    OUT PULONG              Number
+);
+
+NTSTATUS
+Ext2ExpandIndirect(
+    PEXT2_IRP_CONTEXT IrpContext,
+    PEXT2_VCB         Vcb,
+    PEXT2_MCB         Mcb,
+    ULONG             Start,
+    ULONG             End,
+    PLARGE_INTEGER    Size
+);
+
+NTSTATUS
+Ext2TruncateIndirect(
+    PEXT2_IRP_CONTEXT IrpContext,
+    PEXT2_VCB         Vcb,
+    PEXT2_MCB         Mcb,
+    PLARGE_INTEGER    Size
+);
 
 
 //
@@ -2295,6 +2316,16 @@ ext2_init_linux();
 
 void
 ext2_destroy_linux();
+
+//
+// extents-buffer.c: Extents buffer cache wrapper.
+//
+
+int
+ext4_init_extents_bh();
+
+void
+ext4_destroy_extents_bh();
 
 
 //
@@ -2444,6 +2475,22 @@ Ext2LookupMcbExtent (
     IN LONGLONG     Vbn,
     OUT PLONGLONG   Lbn,
     OUT PLONGLONG   Length
+);
+
+BOOLEAN
+Ext2AddMcbMetaExts (
+    IN PEXT2_VCB Vcb,
+    IN PEXT2_MCB Mcb,
+    IN ULONG     Block,
+    IN ULONG     Length
+);
+
+BOOLEAN
+Ext2RemoveMcbMetaExts (
+    IN PEXT2_VCB Vcb,
+    IN PEXT2_MCB Mcb,
+    IN ULONG     Block,
+    IN ULONG     Length
 );
 
 BOOLEAN
@@ -2750,15 +2797,15 @@ Ext2SetVolumeInformation (IN PEXT2_IRP_CONTEXT IrpContext);
 //
 
 typedef struct _EXT2_RW_CONTEXT {
-    ULONG               Flags;
     PIRP                MasterIrp;
     KEVENT              Event;
-    BOOLEAN             Wait;
     ULONG               Blocks;
     ULONG               Length;
     PERESOURCE          Resource;
     ERESOURCE_THREAD    ThreadId;
     PFILE_OBJECT        FileObject;
+    ULONG               Flags;
+    BOOLEAN             Wait;
 
 } EXT2_RW_CONTEXT, *PEXT2_RW_CONTEXT;
 

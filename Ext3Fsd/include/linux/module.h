@@ -623,6 +623,7 @@ extern void truncate_inode_pages(struct address_space *, loff_t);
 enum bh_state_bits {
     BH_Uptodate,	        /* Contains valid data */
     BH_Dirty,	            /* Is dirty */
+    BH_Verified,	 /* Is verified */
     BH_Lock,	            /* Is locked */
     BH_Req,		            /* Has been submitted for I/O */
     BH_Uptodate_Lock,       /* Used by the first bh in a page, to serialise
@@ -664,6 +665,7 @@ struct buffer_head {
     unsigned long b_state;		            /* buffer state bitmap (see above) */
     struct page *b_page;                    /* the page this bh is mapped to */
     PMDL         b_mdl;                     /* MDL of the locked buffer */
+    void	*b_bcb;			    /* BCB of the buffer */
 
     // kdev_t b_dev;                        /* device (B_FREE = free) */
     struct block_device *b_bdev;            /* block device object */
@@ -671,7 +673,7 @@ struct buffer_head {
     blkcnt_t b_blocknr;		        /* start block number */
     size_t        b_size;			        /* size of mapping */
     char *        b_data;			        /* pointer to data within the page */
-    // bh_end_io_t *b_end_io;		        /* I/O completion */
+    bh_end_io_t *b_end_io;		        /* I/O completion */
     void *b_private;		                /* reserved for b_end_io */
     // struct list_head b_assoc_buffers;    /* associated with another mapping */
     // struct address_space *b_assoc_map;   /* mapping this buffer is associated with */
@@ -719,6 +721,7 @@ static inline int test_clear_buffer_##name(struct buffer_head *bh)	\
 BUFFER_FNS(Uptodate, uptodate)
 BUFFER_FNS(Dirty, dirty)
 TAS_BUFFER_FNS(Dirty, dirty)
+BUFFER_FNS(Verified, verified)
 BUFFER_FNS(Lock, locked)
 TAS_BUFFER_FNS(Lock, locked)
 BUFFER_FNS(Req, req)
@@ -760,8 +763,6 @@ struct buffer_head *alloc_page_buffers(struct page *page, unsigned long size,
                                                    int retry);
 void create_empty_buffers(struct page *, unsigned long,
                           unsigned long b_state);
-void end_buffer_read_sync(struct buffer_head *bh, int uptodate);
-void end_buffer_write_sync(struct buffer_head *bh, int uptodate);
 
 /* Things to do with buffers at mapping->private_list */
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode);
@@ -801,6 +802,11 @@ void write_boundary_block(struct block_device *bdev,
                           sector_t bblock, unsigned blocksize);
 int bh_uptodate_or_lock(struct buffer_head *bh);
 int bh_submit_read(struct buffer_head *bh);
+/* They are separately managed  */
+struct buffer_head *extents_bread(struct super_block *sb, sector_t block);
+struct buffer_head *extents_bwrite(struct super_block *sb, sector_t block);
+void extents_mark_buffer_dirty(struct buffer_head *bh);
+void extents_brelse(struct buffer_head *bh);
 
 extern int buffer_heads_over_limit;
 
@@ -898,7 +904,14 @@ static inline struct buffer_head *
 static inline struct buffer_head *
             sb_bread(struct super_block *sb, sector_t block)
 {
-    return __getblk(sb->s_bdev, block, sb->s_blocksize);
+    struct buffer_head *bh = __getblk(sb->s_bdev, block, sb->s_blocksize);
+    if (!bh)
+	    return NULL;
+    if (!buffer_uptodate(bh) && (bh_submit_read(bh) < 0)) {
+        brelse(bh);
+	return NULL;
+    }
+    return bh;
 }
 
 static inline struct buffer_head *

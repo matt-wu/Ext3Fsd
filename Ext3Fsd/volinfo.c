@@ -164,8 +164,7 @@ Ext2QueryVolumeInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             FsDevInfo->Characteristics =
                 Vcb->TargetDeviceObject->Characteristics;
 
-            if (FlagOn(Vcb->Flags, VCB_READ_ONLY)) {
-
+            if (IsVcbReadOnly(Vcb)) {
                 SetFlag( FsDevInfo->Characteristics,
                          FILE_READ_ONLY_DEVICE   );
             }
@@ -189,6 +188,9 @@ Ext2QueryVolumeInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 (PFILE_FS_ATTRIBUTE_INFORMATION) Buffer;
             FsAttrInfo->FileSystemAttributes =
                 FILE_CASE_SENSITIVE_SEARCH | FILE_CASE_PRESERVED_NAMES;
+            if (IsVcbReadOnly(Vcb)) {
+                FsAttrInfo->FileSystemAttributes |= FILE_READ_ONLY_VOLUME;
+            }
             FsAttrInfo->MaximumComponentNameLength = EXT2_NAME_LEN;
             FsAttrInfo->FileSystemNameLength = 8;
 
@@ -202,7 +204,9 @@ Ext2QueryVolumeInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 __leave;
             }
 
-            if (Vcb->IsExt3fs) {
+            if (IsFlagOn(SUPER_BLOCK->s_feature_incompat, EXT4_FEATURE_INCOMPAT_EXTENTS)) {
+                RtlCopyMemory(FsAttrInfo->FileSystemName,  L"EXT4\0", 10);
+            } else if (Vcb->IsExt3fs) {
                 RtlCopyMemory(FsAttrInfo->FileSystemName,  L"EXT3\0", 10);
             } else {
                 RtlCopyMemory(FsAttrInfo->FileSystemName,  L"EXT2\0", 10);
@@ -317,7 +321,7 @@ Ext2SetVolumeInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                (Vcb->Identifier.Size == sizeof(EXT2_VCB)));
         ASSERT(IsMounted(Vcb));
 
-        if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+        if (IsVcbReadOnly(Vcb)) {
             Status = STATUS_MEDIA_WRITE_PROTECTED;
             __leave;
         }

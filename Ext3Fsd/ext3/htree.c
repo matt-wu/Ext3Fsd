@@ -246,13 +246,13 @@ struct buffer_head *ext3_bread(struct ext2_icb *icb, struct inode *inode,
 
     /* mapping file offset to ext2 block */
     if (INODE_HAS_EXTENT(&Mcb->Inode)) {
-        status = Ext2ExtentMap(icb, inode->i_sb->s_priv,
+        status = Ext2MapExtent(icb, inode->i_sb->s_priv,
                                Mcb, block, FALSE,
                                &lbn, &num);
     } else {
-        status = Ext2BlockMap(icb, inode->i_sb->s_priv,
-                              Mcb, block, FALSE,
-                              &lbn, &num);
+        status = Ext2MapIndirect(icb, inode->i_sb->s_priv,
+                                 Mcb, block, FALSE,
+                                 &lbn, &num);
     }
 
     if (!NT_SUCCESS(status)) {
@@ -267,9 +267,13 @@ struct buffer_head *ext3_bread(struct ext2_icb *icb, struct inode *inode,
     }
     if (buffer_uptodate(bh))
         return bh;
-    put_bh(bh);
-    *err = -EIO;
-    return NULL;
+
+    *err = bh_submit_read(bh);
+    if (*err) {
+	    brelse(bh);
+	    return NULL;
+    }
+    return bh;
 }
 
 struct buffer_head *ext3_append(struct ext2_icb *icb, struct inode *inode,

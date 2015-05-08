@@ -377,8 +377,10 @@ Ext2ProcessVolumeProperty(
             }
         }
 
-        if (Property->Command == APP_CMD_SET_PROPERTY ||
-                Property->Command == APP_CMD_SET_PROPERTY2) {
+        switch (Property->Command) {
+
+        case APP_CMD_SET_PROPERTY:
+        case APP_CMD_SET_PROPERTY2:
 
             if (Property->bReadonly) {
 
@@ -392,9 +394,7 @@ Ext2ProcessVolumeProperty(
                     SetLongFlag(Vcb->Flags, VCB_FORCE_WRITING);
                 }
 
-                if (IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED)) {
-                    SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
-                } else if (!Vcb->IsExt3fs) {
+                if (!Vcb->IsExt3fs) {
                     ClearLongFlag(Vcb->Flags, VCB_READ_ONLY);
                 } else if (!Property->bExt3Writable) {
                     SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
@@ -437,8 +437,10 @@ Ext2ProcessVolumeProperty(
                 Vcb->DrvLetter = Property->DrvLetter;
             }
 
-        } else if (Property->Command == APP_CMD_QUERY_PROPERTY ||
-                   Property->Command == APP_CMD_QUERY_PROPERTY2 ) {
+            break;
+
+        case APP_CMD_QUERY_PROPERTY:
+        case APP_CMD_QUERY_PROPERTY2:
 
             Property->bExt2 = TRUE;
             Property->bExt3 = Vcb->IsExt3fs;
@@ -481,9 +483,11 @@ Ext2ProcessVolumeProperty(
                 }
             }
 
-        } else {
+            break;
 
+        default:
             Status = STATUS_INVALID_PARAMETER;
+            break;
         }
 
     } __finally {
@@ -578,7 +582,7 @@ Ex2ProcessUserPerfStat(
             }
 
             if (Length != EXT2_QUERY_PERFSTAT_SZV1 &&
-                    Length != EXT2_QUERY_PERFSTAT_SZV2) {
+                Length != EXT2_QUERY_PERFSTAT_SZV2) {
                 Status = STATUS_INVALID_PARAMETER;
                 __leave;
             }
@@ -652,7 +656,7 @@ Ex2ProcessMountPoint(
         }
 
         if (Length != sizeof(EXT2_MOUNT_POINT) ||
-                MountPoint->Magic != EXT2_APP_MOUNTPOINT_MAGIC) {
+            MountPoint->Magic != EXT2_APP_MOUNTPOINT_MAGIC) {
             status = STATUS_INVALID_PARAMETER;
             __leave;
         }

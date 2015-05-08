@@ -44,7 +44,7 @@ Ext2IsFastIoPossible(
     IsPossible = FastIoIsQuestionable;
 
     if (!FsRtlAreThereCurrentFileLocks(&Fcb->FileLockAnchor)) {
-        if (!IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY)) {
+        if (!IsVcbReadOnly(Fcb->Vcb)) {
             IsPossible = FastIoIsPossible;
         }
     }
@@ -111,8 +111,7 @@ Ext2FastIoCheckIfPossible (
 
             } else {
 
-                if (!(IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY) ||
-                        IsFlagOn(Fcb->Vcb->Flags, VCB_WRITE_PROTECTED))) {
+                if (!IsVcbReadOnly(Fcb->Vcb)) {
                     bPossible = FsRtlFastCheckLockForWrite(
                                     &Fcb->FileLockAnchor,
                                     FileOffset,
@@ -210,7 +209,7 @@ Ext2FastIoWrite (
         ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
-        if (IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY)) {
+        if (IsVcbReadOnly(Fcb->Vcb)) {
             __leave;
         }
 
@@ -219,6 +218,7 @@ Ext2FastIoWrite (
 
         if (IsEndOfFile(*FileOffset) || ((LONGLONG)(Fcb->Inode->i_size) <
                                          (FileOffset->QuadPart + Length)) ) {
+            Status = FALSE;
         } else {
             ExReleaseResourceLite(&Fcb->MainResource);
             Locked = FALSE;
@@ -236,7 +236,7 @@ Ext2FastIoWrite (
     }
 
     DEBUG(DL_IO, ("Ext2FastIoWrite: %wZ Offset: %I64xh Length: %xh Key: %xh Status=%d\n",
-                   &Fcb->Mcb->ShortName,  FileOffset->QuadPart, Length, LockKey, Status));
+                  &Fcb->Mcb->ShortName,  FileOffset->QuadPart, Length, LockKey, Status));
 
     return Status;
 }

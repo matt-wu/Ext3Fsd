@@ -189,6 +189,7 @@ Ext2ReadWriteBlockAsyncCompletionRoutine (
 )
 {
     PEXT2_RW_CONTEXT pContext = (PEXT2_RW_CONTEXT)Context;
+    PIO_STACK_LOCATION iosp;
 
     ASSERT(FALSE == pContext->Wait);
 
@@ -201,18 +202,25 @@ Ext2ReadWriteBlockAsyncCompletionRoutine (
         if (NT_SUCCESS(pContext->MasterIrp->IoStatus.Status)) {
 
             /* set written bytes to status information */
-            pContext->MasterIrp->IoStatus.Information =
-                pContext->Length;
+            pContext->MasterIrp->IoStatus.Information = pContext->Length;
 
-            /* modify FileObject flags, skip this for volume direct access */
-            if (pContext->FileObject != NULL &&
-                    !IsFlagOn(pContext->MasterIrp->Flags, IRP_PAGING_IO)) {
+            if (pContext->FileObject != NULL && !IsFlagOn(pContext->MasterIrp->Flags, IRP_PAGING_IO)) {
+
+                /* modify FileObject flags, skip this for volume direct access */
                 SetFlag( pContext->FileObject->Flags,
                          IsFlagOn(pContext->Flags, EXT2_RW_CONTEXT_WRITE) ?
                          FO_FILE_MODIFIED : FO_FILE_FAST_IO_READ);
+
+                /* update Current Byteoffset */
+                if (IsFlagOn(pContext->FileObject->Flags, FO_SYNCHRONOUS_IO)) {
+                    iosp = IoGetCurrentIrpStackLocation(pContext->MasterIrp);
+                    pContext->FileObject->CurrentByteOffset.QuadPart =
+                        iosp->Parameters.Read.ByteOffset.QuadPart +  pContext->Length;
+                }
             }
 
         } else {
+
             pContext->MasterIrp->IoStatus.Information = 0;
         }
 
@@ -233,8 +241,8 @@ Ext2ReadWriteBlocks(
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
     IN PEXT2_EXTENT         Chain,
-    IN ULONG                Length,
-    IN BOOLEAN              bVerify )
+    IN ULONG                Length
+    )
 {
     PIRP                Irp;
     PIRP                MasterIrp = IrpContext->Irp;
@@ -297,7 +305,7 @@ Ext2ReadWriteBlocks(
             if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WRITE_THROUGH)) {
                 SetFlag(IrpSp->Flags, SL_WRITE_THROUGH);
             }
-            if (bVerify || IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_VERIFY_READ)) {
+            if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_VERIFY_READ)) {
                 SetFlag(IrpSp->Flags, SL_OVERRIDE_VERIFY_VOLUME);
             }
 
@@ -375,7 +383,7 @@ Ext2ReadWriteBlocks(
                 }
 
                 /* set verify flag */
-                if (bVerify ||IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_VERIFY_READ)) {
+                if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_VERIFY_READ)) {
                     SetFlag(IrpSp->Flags, SL_OVERRIDE_VERIFY_VOLUME);
                 }
 
@@ -388,7 +396,6 @@ Ext2ReadWriteBlocks(
                 MasterIrp->AssociatedIrp.IrpCount += 1;
             }
         }
-
         if (!IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
             /* mark MasterIrp pending */
             IoMarkIrpPending(pContext->MasterIrp);

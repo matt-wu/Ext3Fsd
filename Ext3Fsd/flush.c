@@ -17,13 +17,6 @@ extern PEXT2_GLOBAL Ext2Global;
 
 /* DEFINITIONS *************************************************************/
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, Ext2FlushFile)
-#pragma alloc_text(PAGE, Ext2FlushFiles)
-#pragma alloc_text(PAGE, Ext2FlushVolume)
-#pragma alloc_text(PAGE, Ext2Flush)
-#endif
-
 
 NTSTATUS
 Ext2FlushCompletionRoutine (
@@ -54,8 +47,7 @@ Ext2FlushFiles(
     PEXT2_FCB       Fcb;
     PLIST_ENTRY     ListEntry;
 
-    if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY) ||
-            IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED)) {
+    if (IsVcbReadOnly(Vcb)) {
         return STATUS_SUCCESS;
     }
 
@@ -178,8 +170,7 @@ Ext2Flush (IN PEXT2_IRP_CONTEXT IrpContext)
                (Vcb->Identifier.Size == sizeof(EXT2_VCB)));
 
         ASSERT(IsMounted(Vcb));
-        if ( IsFlagOn(Vcb->Flags, VCB_READ_ONLY) ||
-                IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED)) {
+        if (IsVcbReadOnly(Vcb)) {
             Status =  STATUS_SUCCESS;
             __leave;
         }
@@ -244,7 +235,7 @@ Ext2Flush (IN PEXT2_IRP_CONTEXT IrpContext)
 
         if (!IrpContext->ExceptionInProgress) {
 
-            if (Vcb && Irp && IrpSp && (!IsFlagOn(Vcb->Flags, VCB_READ_ONLY))) {
+            if (Vcb && Irp && IrpSp && !IsVcbReadOnly(Vcb)) {
 
                 // Call the disk driver to flush the physial media.
                 NTSTATUS DriverStatus;

@@ -90,6 +90,7 @@ DriverUnload (IN PDRIVER_OBJECT DriverObject)
 
     /* cleanup linux lib */
     ext2_destroy_linux();
+    ext4_destroy_extents_bh();
 
     Ext2FreePool(Ext2Global, 'LG2E');
     Ext2Global = NULL;
@@ -385,6 +386,7 @@ DriverEntry (
 
     int                         rc = 0;
     BOOLEAN                     linux_lib_inited = FALSE;
+    BOOLEAN                     extents_cache_inited = FALSE;
     BOOLEAN                     journal_module_inited = FALSE;
 
     /* Verify ERESOURCE alignment in structures */
@@ -426,6 +428,11 @@ DriverEntry (
         goto errorout;
     }
     linux_lib_inited = TRUE;
+    if (ext4_init_extents_bh()) {
+        Status = STATUS_INSUFFICIENT_RESOURCES;
+        goto errorout;
+    }
+    extents_cache_inited = TRUE;
 
     /* initialize journal module structures */
     LOAD_MODULE(journal_init);
@@ -549,25 +556,23 @@ DriverEntry (
 
     FastIoDispatch = &(Ext2Global->FastIoDispatch);
 
-    FastIoDispatch->SizeOfFastIoDispatch        = sizeof(FAST_IO_DISPATCH);
-    FastIoDispatch->FastIoCheckIfPossible       = Ext2FastIoCheckIfPossible;
-    FastIoDispatch->FastIoRead                  = Ext2FastIoRead;
-    FastIoDispatch->FastIoWrite                 = Ext2FastIoWrite;
-    FastIoDispatch->FastIoQueryBasicInfo        = Ext2FastIoQueryBasicInfo;
-    FastIoDispatch->FastIoQueryStandardInfo     = Ext2FastIoQueryStandardInfo;
-    FastIoDispatch->FastIoLock                  = Ext2FastIoLock;
-    FastIoDispatch->FastIoUnlockSingle          = Ext2FastIoUnlockSingle;
-    FastIoDispatch->FastIoUnlockAll             = Ext2FastIoUnlockAll;
-    FastIoDispatch->FastIoUnlockAllByKey        = Ext2FastIoUnlockAllByKey;
-    FastIoDispatch->FastIoQueryNetworkOpenInfo  = Ext2FastIoQueryNetworkOpenInfo;
-    FastIoDispatch->AcquireForModWrite          = Ext2AcquireFileForModWrite;
-    FastIoDispatch->ReleaseForModWrite          = Ext2ReleaseFileForModWrite;
-    FastIoDispatch->AcquireForCcFlush           = Ext2AcquireFileForCcFlush;
-    FastIoDispatch->ReleaseForCcFlush           = Ext2ReleaseFileForCcFlush;
+    FastIoDispatch->SizeOfFastIoDispatch          = sizeof(FAST_IO_DISPATCH);
+    FastIoDispatch->FastIoCheckIfPossible         = Ext2FastIoCheckIfPossible;
+    FastIoDispatch->FastIoRead                    = Ext2FastIoRead;
+    FastIoDispatch->FastIoWrite                   = Ext2FastIoWrite;
+    FastIoDispatch->FastIoQueryBasicInfo          = Ext2FastIoQueryBasicInfo;
+    FastIoDispatch->FastIoQueryStandardInfo       = Ext2FastIoQueryStandardInfo;
+    FastIoDispatch->FastIoLock                    = Ext2FastIoLock;
+    FastIoDispatch->FastIoUnlockSingle            = Ext2FastIoUnlockSingle;
+    FastIoDispatch->FastIoUnlockAll               = Ext2FastIoUnlockAll;
+    FastIoDispatch->FastIoUnlockAllByKey          = Ext2FastIoUnlockAllByKey;
+    FastIoDispatch->FastIoQueryNetworkOpenInfo    = Ext2FastIoQueryNetworkOpenInfo;
+    FastIoDispatch->AcquireForModWrite            = Ext2AcquireFileForModWrite;
+    FastIoDispatch->ReleaseForModWrite            = Ext2ReleaseFileForModWrite;
+    FastIoDispatch->AcquireForCcFlush             = Ext2AcquireFileForCcFlush;
+    FastIoDispatch->ReleaseForCcFlush             = Ext2ReleaseFileForCcFlush;
     FastIoDispatch->AcquireFileForNtCreateSection = Ext2AcquireForCreateSection;
     FastIoDispatch->ReleaseFileForNtCreateSection = Ext2ReleaseForCreateSection;
-
-
     DriverObject->FastIoDispatch = FastIoDispatch;
 
     //
@@ -597,6 +602,7 @@ DriverEntry (
     Ext2Global->PerfStat.Unit.Slot[PS_EXT2_INODE] = 1;                          /* 10 */
     Ext2Global->PerfStat.Unit.Slot[PS_DENTRY] = sizeof(struct dentry);          /* 11 */
     Ext2Global->PerfStat.Unit.Slot[PS_BUFF_HEAD] = sizeof(struct buffer_head);  /* 12 */
+    Ext2Global->PerfStat.Unit.Slot[PS_EXTENTS_BUFF] = sizeof(struct buffer_head);  /* 13 */
 
     switch ( MmQuerySystemSize() ) {
 
@@ -736,6 +742,10 @@ errorout:
         if (linux_lib_inited) {
             /* cleanup linux lib */
             ext2_destroy_linux();
+        }
+        if (extents_cache_inited) {
+            /* cleanup linux lib */
+            ext4_destroy_extents_bh();
         }
     }
 
