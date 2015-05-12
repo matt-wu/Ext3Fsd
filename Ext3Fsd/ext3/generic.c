@@ -498,6 +498,8 @@ Ext2ZeroBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
     return rc;
 }
 
+#define SIZE_256K 0x40000
+
 BOOLEAN
 Ext2SaveBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
                 IN PEXT2_VCB            Vcb,
@@ -505,40 +507,53 @@ Ext2SaveBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
                 IN ULONG                Size,
                 IN PVOID                Buf )
 {
-    PBCB        Bcb;
-    PVOID       Buffer;
     BOOLEAN     rc;
 
-    if ( !CcPreparePinWrite(
-                Vcb->Volume,
-                (PLARGE_INTEGER) (&Offset),
-                Size,
-                FALSE,
-                PIN_WAIT,
-                &Bcb,
-                &Buffer )) {
+    while (Size) {
 
-        DEBUG(DL_ERR, ( "Ext2SaveBuffer: failed to PinLock offset %I64xh ...\n", Offset));
-        return FALSE;
-    }
+        PBCB        Bcb;
+        PVOID       Buffer;
+        ULONG       Length;
 
-    __try {
+        Length = (ULONG)Offset & (SIZE_256K - 1);
+        Length = SIZE_256K - Length;
+        if (Size < Length)
+            Length = Size;
 
-        RtlCopyMemory(Buffer, Buf, Size);
-        CcSetDirtyPinnedData(Bcb, NULL );
-        SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
+        if ( !CcPreparePinWrite(
+                    Vcb->Volume,
+                    (PLARGE_INTEGER) (&Offset),
+                    Length,
+                    FALSE,
+                    PIN_WAIT,
+                    &Bcb,
+                    &Buffer )) {
 
-        rc = Ext2AddVcbExtent(Vcb, Offset, (LONGLONG)Size);
-        if (!rc) {
-            DbgBreak();
-            Ext2Sleep(100);
-            rc = Ext2AddVcbExtent(Vcb, Offset, (LONGLONG)Size);
+            DEBUG(DL_ERR, ( "Ext2SaveBuffer: failed to PinLock offset %I64xh ...\n", Offset));
+            return FALSE;
         }
 
-    } __finally {
-        CcUnpinData(Bcb);
-    }
+        __try {
 
+            RtlCopyMemory(Buffer, Buf, Length);
+            CcSetDirtyPinnedData(Bcb, NULL );
+            SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
+
+            rc = Ext2AddVcbExtent(Vcb, Offset, (LONGLONG)Length);
+            if (!rc) {
+                DbgBreak();
+                Ext2Sleep(100);
+                rc = Ext2AddVcbExtent(Vcb, Offset, (LONGLONG)Length);
+            }
+
+        } __finally {
+            CcUnpinData(Bcb);
+        }
+
+        Buf = (PUCHAR)Buf + Length;
+        Offset = Offset + Length;
+        Size = Size - Length;
+    }
 
     return rc;
 }
@@ -721,8 +736,8 @@ Again:
         }
 
         if (ext4_block_bitmap(sb, group_desc) == *Block ||
-                ext4_inode_bitmap(sb, group_desc) == *Block ||
-                ext4_inode_table(sb, group_desc)  == *Block ) {
+            ext4_inode_bitmap(sb, group_desc) == *Block ||
+            ext4_inode_table(sb, group_desc)  == *Block ) {
             DbgBreak();
             dwHint = 0;
             goto Again;
@@ -1976,7 +1991,7 @@ __le16 ext4_group_desc_csum(struct ext3_sb_info *sbi, __u32 block_group,
     __u16 crc = 0;
 
     if (sbi->s_es->s_feature_ro_compat &
-            cpu_to_le32(EXT4_FEATURE_RO_COMPAT_GDT_CSUM)) {
+        cpu_to_le32(EXT4_FEATURE_RO_COMPAT_GDT_CSUM)) {
         int offset = offsetof(struct ext4_group_desc, bg_checksum);
         __le32 le_group = cpu_to_le32(block_group);
 
@@ -1999,9 +2014,8 @@ __le16 ext4_group_desc_csum(struct ext3_sb_info *sbi, __u32 block_group,
 int ext4_group_desc_csum_verify(struct ext3_sb_info *sbi, __u32 block_group,
                                 struct ext4_group_desc *gdp)
 {
-    if ((sbi->s_es->s_feature_ro_compat &
-            cpu_to_le32(EXT4_FEATURE_RO_COMPAT_GDT_CSUM)) &&
-            (gdp->bg_checksum != ext4_group_desc_csum(sbi, block_group, gdp)))
+    if ((sbi->s_es->s_feature_ro_compat & cpu_to_le32(EXT4_FEATURE_RO_COMPAT_GDT_CSUM)) &&
+        (gdp->bg_checksum != ext4_group_desc_csum(sbi, block_group, gdp)))
         return 0;
 
     return 1;
