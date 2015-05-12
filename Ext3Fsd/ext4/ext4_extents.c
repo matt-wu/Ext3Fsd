@@ -2373,6 +2373,7 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 		unsigned short ee_len  = le16_to_cpu(ex->ee_len);
 		/* if found exent covers block, simple return it */
 		if (iblock >= ee_block && iblock < ee_block + ee_len) {
+			ASSERT(!ext4_ext_is_unwritten(ex));
 			newblock = iblock - ee_block + ee_start;
 			/* number of remain blocks in the extent */
 			allocated = ee_len - (iblock - ee_block);
