@@ -905,6 +905,9 @@ Ext2NewInode(
 
     ExAcquireResourceExclusiveLite(&Vcb->MetaLock, TRUE);
 
+    if (GroupHint >= Vcb->sbi.s_groups_count)
+        GroupHint = GroupHint % Vcb->sbi.s_groups_count;
+
 repeat:
 
     if (bh) {
@@ -929,9 +932,9 @@ repeat:
                 goto errorout;
             }
 
-            if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_INODE_UNINIT) ||
-                    (ext4_used_dirs_count(sb, group_desc) << 8 <
-                     ext4_free_inodes_count(sb, group_desc)) ) {
+            if ((group_desc->bg_flags & cpu_to_le16(EXT4_BG_INODE_UNINIT)) ||
+                (ext4_used_dirs_count(sb, group_desc) << 8 < 
+                 ext4_free_inodes_count(sb, group_desc)) ) {
                 Group = i + 1;
                 break;
             }
@@ -940,6 +943,8 @@ repeat:
         if (!Group) {
 
             PEXT2_GROUP_DESC  desc = NULL;
+
+            group_desc = NULL;
 
             /* get the group with the biggest vacancy */
             for (j = 0; j < Vcb->sbi.s_groups_count; j++) {
@@ -964,8 +969,8 @@ repeat:
                         group_desc = desc;
                     }
                 } else {
-                    if ( ext4_free_inodes_count(sb, desc) >
-                            ext4_free_inodes_count(sb, group_desc)) {
+                    if (ext4_free_inodes_count(sb, desc) >
+                        ext4_free_inodes_count(sb, group_desc)) {
                         Group = j + 1;
                         group_desc = desc;
                     }
@@ -987,7 +992,7 @@ repeat:
         }
 
         if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_INODE_UNINIT) ||
-                ext4_free_inodes_count(sb, group_desc)) {
+            ext4_free_inodes_count(sb, group_desc)) {
 
             Group = GroupHint + 1;
 
@@ -1033,7 +1038,7 @@ repeat:
                 }
 
                 if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_INODE_UNINIT) ||
-                        ext4_free_inodes_count(sb, group_desc)) {
+                    ext4_free_inodes_count(sb, group_desc)) {
                     Group = i + 1;
                     break;
                 }
