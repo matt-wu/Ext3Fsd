@@ -14,7 +14,6 @@
  */
 
 #include "ext2fs.h"
-#include "kerncompat.h"
 #include "linux\ext4.h"
 
 #pragma warning(push)
@@ -88,8 +87,13 @@ static void ext4_free_blocks(void *icb, handle_t *handle, struct inode *inode, v
 static inline void ext_debug(char *str, ...)
 {
 }
-
-#define EXT4_ERROR_INODE(inode, str, ...) DbgPrint("inode[%p]: "##str "\n", inode, __VA_ARGS__)
+#if TRUE
+#define EXT4_ERROR_INODE(inode, str, ...) do {                      \
+            DbgPrint("inode[%p]: "##str "\n", inode, __VA_ARGS__);  \
+        } while(0)
+#else
+#define EXT4_ERROR_INODE
+#endif
 
 #define ext4_std_error(s, err)
 #define assert ASSERT
