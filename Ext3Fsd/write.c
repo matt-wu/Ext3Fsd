@@ -643,10 +643,9 @@ Ext2WriteInode (
 
         /* For file/non pagingio, we support the allocation on writing. */
 
-        if (!IsFlagOn(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY)) {
-            if (!(IrpContext->Irp->Flags  & IRP_PAGING_IO)) {
-                bAlloc = TRUE;
-            }
+        if (!IsFlagOn(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY) &&
+            !IsFlagOn(IrpContext->Irp->Flags, IRP_PAGING_IO)) {
+            bAlloc = TRUE;
         }
 
         Status = Ext2BuildExtents (

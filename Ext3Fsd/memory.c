@@ -2549,7 +2549,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
          * previously didn't change the revision level when setting the flags,
          * so there is a chance incompat flags are set on a rev 0 filesystem.
          */
-        features = EXT3_HAS_INCOMPAT_FEATURE(&Vcb->sb, ~EXT3_FEATURE_INCOMPAT_SUPP);
+        features = EXT3_HAS_INCOMPAT_FEATURE(&Vcb->sb, ~EXT4_FEATURE_INCOMPAT_SUPP);
         if (features & EXT4_FEATURE_INCOMPAT_DIRDATA) {
             SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
             ClearFlag(features, EXT4_FEATURE_INCOMPAT_DIRDATA);
@@ -2562,7 +2562,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             __leave;
         }
 
-        features = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb, ~EXT3_FEATURE_RO_COMPAT_SUPP);
+        features = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb, ~EXT4_FEATURE_RO_COMPAT_SUPP);
         if (features) {
             printk(KERN_ERR "EXT3-fs: %s: unsupported optional features in this volume: (%x).\n",
                    Vcb->sb.s_id, le32_to_cpu(features));
@@ -2572,8 +2572,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             }
         }
 
-        has_huge_files = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb,
-                         EXT4_FEATURE_RO_COMPAT_HUGE_FILE);
+        has_huge_files = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb, EXT4_FEATURE_RO_COMPAT_HUGE_FILE);
 
         Vcb->sb.s_maxbytes = ext3_max_size(BLOCK_BITS, has_huge_files);
         Vcb->max_bitmap_bytes = ext3_max_bitmap_size(BLOCK_BITS,
