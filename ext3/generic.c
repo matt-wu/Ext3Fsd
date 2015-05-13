@@ -12,53 +12,12 @@
 #include "ext2fs.h"
 #include "linux\ext4.h"
 
-
 /* GLOBALS ***************************************************************/
 
 extern PEXT2_GLOBAL Ext2Global;
 
 /* DEFINITIONS *************************************************************/
 
-BOOLEAN
-Ext2IsBlockEmpty(PULONG BlockArray, ULONG SizeArray);
-
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, Ext2LoadSuper)
-#pragma alloc_text(PAGE, Ext2SaveSuper)
-#pragma alloc_text(PAGE, Ext2RefreshSuper)
-
-#pragma alloc_text(PAGE, Ext2LoadGroup)
-#pragma alloc_text(PAGE, Ext2SaveGroup)
-#pragma alloc_text(PAGE, Ext2RefreshGroup)
-
-#pragma alloc_text(PAGE, Ext2GetInodeLba)
-#pragma alloc_text(PAGE, Ext2LoadInode)
-#pragma alloc_text(PAGE, Ext2SaveInode)
-
-#pragma alloc_text(PAGE, Ext2LoadBlock)
-#pragma alloc_text(PAGE, Ext2SaveBlock)
-
-#pragma alloc_text(PAGE, Ext2SaveBuffer)
-
-#pragma alloc_text(PAGE, Ext2GetBlock)
-
-#pragma alloc_text(PAGE, Ext2UpdateVcbStat)
-#pragma alloc_text(PAGE, Ext2NewBlock)
-#pragma alloc_text(PAGE, Ext2FreeBlock)
-#pragma alloc_text(PAGE, Ext2ExpandLast)
-#pragma alloc_text(PAGE, Ext2ExpandBlock)
-
-#pragma alloc_text(PAGE, Ext2IsBlockEmpty)
-#pragma alloc_text(PAGE, Ext2TruncateBlock)
-
-#pragma alloc_text(PAGE, Ext2NewInode)
-#pragma alloc_text(PAGE, Ext2FreeInode)
-
-#pragma alloc_text(PAGE, Ext2AddEntry)
-#pragma alloc_text(PAGE, Ext2RemoveEntry)
-#pragma alloc_text(PAGE, Ext2SetParentEntry)
-
-#endif
 
 /* FUNCTIONS ***************************************************************/
 
@@ -193,7 +152,7 @@ Ext2LoadGroup(IN PEXT2_VCB Vcb)
         block = descriptor_loc(sb, sb_block, i);
         if (sbi->s_group_desc[i])
             continue;
-        sbi->s_group_desc[i] = sb_bread(sb, block);
+        sbi->s_group_desc[i] = extents_bread(sb, block);
         if (!sbi->s_group_desc[i]) {
             DEBUG(DL_ERR, ("Ext2LoadGroup: can't read group descriptor %d\n", i));
             return FALSE;
@@ -222,7 +181,7 @@ Ext2PutGroup(IN PEXT2_VCB Vcb)
 
     for (i = 0; i < sbi->s_gdb_count; i++) {
         if (sbi->s_group_desc[i]) {
-            brelse(sbi->s_group_desc[i]);
+            extents_brelse(sbi->s_group_desc[i]);
             sbi->s_group_desc[i] = NULL;
         }
     }
@@ -245,16 +204,13 @@ Ext2SaveGroup(
 
     ExAcquireResourceExclusiveLite(&Vcb->MetaLock, TRUE);
     desc = ext4_get_group_desc(&Vcb->sb, Group, &bh);
-    if (bh)
-        get_bh(bh);
     ExReleaseResourceLite(&Vcb->MetaLock);
 
     if (!bh)
         return 0;
 
     desc->bg_checksum = ext4_group_desc_csum(&Vcb->sbi, Group, desc);
-    mark_buffer_dirty(bh);
-    __brelse(bh);
+    extents_mark_buffer_dirty(bh);
 
     return TRUE;
 }
@@ -584,392 +540,6 @@ Ext2SaveBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
     return rc;
 }
 
-NTSTATUS
-Ext2GetBlock(
-    IN PEXT2_IRP_CONTEXT    IrpContext,
-    IN PEXT2_VCB            Vcb,
-    IN PEXT2_MCB            Mcb,
-    IN ULONG                Base,
-    IN ULONG                Layer,
-    IN ULONG                Start,
-    IN ULONG                SizeArray,
-    IN PULONG               BlockArray,
-    IN BOOLEAN              bAlloc,
-    IN OUT PULONG           Hint,
-    OUT PULONG              Block,
-    OUT PULONG              Number
-)
-{
-    NTSTATUS    Status = STATUS_SUCCESS;
-    PBCB        Bcb = NULL;
-    PULONG      pData = NULL;
-    ULONG       Slot = 0, i = 0;
-    ULONG       Unit = 1;
-
-    LARGE_INTEGER Offset;
-
-    if (Layer == 0) {
-
-        *Number = 1;
-        if (BlockArray[0] == 0 && bAlloc) {
-
-            /* now allocate new block */
-            Status = Ext2ExpandLast(
-                         IrpContext,
-                         Vcb,
-                         Mcb,
-                         Base,
-                         Layer,
-                         NULL,
-                         Hint,
-                         &BlockArray[0],
-                         Number
-                     );
-
-            if (!NT_SUCCESS(Status)) {
-                goto errorout;
-            }
-        }
-
-        *Block = BlockArray[0];
-        for (i=1; i < SizeArray; i++) {
-            if (BlockArray[i] == BlockArray[i-1] + 1) {
-                *Number = *Number + 1;
-            } else {
-                break;
-            }
-        }
-        *Hint = BlockArray[*Number - 1];
-
-    } else if (Layer <= 3) {
-
-        /* check the block is valid or not */
-        if (BlockArray[0] >= TOTAL_BLOCKS) {
-            DbgBreak();
-            Status = STATUS_DISK_CORRUPT_ERROR;
-            goto errorout;
-        }
-
-        /* map memory in cache for the index block */
-        Offset.QuadPart = ((LONGLONG)BlockArray[0]) << BLOCK_BITS;
-        if ( !CcPinRead( Vcb->Volume,
-                         (PLARGE_INTEGER) (&Offset),
-                         BLOCK_SIZE,
-                         PIN_WAIT,
-                         &Bcb,
-                         &pData )) {
-
-            DEBUG(DL_ERR, ( "Ext2GetBlock: Failed to PinLock block: %xh ...\n",
-                            BlockArray[0] ));
-            Status = STATUS_CANT_WAIT;
-            goto errorout;
-        }
-
-
-        if (Layer > 1) {
-            Unit = Vcb->max_blocks_per_layer[Layer - 1];
-        } else {
-            Unit = 1;
-        }
-
-        Slot  = Start / Unit;
-        Start = Start % Unit;
-
-        if (pData[Slot] == 0) {
-
-            if (bAlloc) {
-
-                /* we need allocate new block and zero all data in case
-                   it's an in-direct block. Index stores the new block no. */
-                ULONG   Count = 1;
-                Status = Ext2ExpandLast(
-                             IrpContext,
-                             Vcb,
-                             Mcb,
-                             Base,
-                             Layer,
-                             NULL,
-                             Hint,
-                             &pData[Slot],
-                             &Count
-                         );
-
-                if (!NT_SUCCESS(Status)) {
-                    goto errorout;
-                }
-
-                /* refresh hint block */
-                *Hint = pData[Slot];
-
-                /* set dirty bit to notify system to flush */
-                CcSetDirtyPinnedData(Bcb, NULL );
-                SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
-                if (!Ext2AddVcbExtent(Vcb, Offset.QuadPart,
-                                      (LONGLONG)BLOCK_SIZE)) {
-                    DbgBreak();
-                    Ext2Sleep(100);
-                    if (!Ext2AddVcbExtent(Vcb, Offset.QuadPart,
-                                          (LONGLONG)BLOCK_SIZE)) {
-                        Status = STATUS_INSUFFICIENT_RESOURCES;
-                        goto errorout;
-                    }
-                }
-
-                /* save inode information here */
-                Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
-
-            } else {
-
-                *Number = 1;
-
-                if (Layer == 1) {
-                    for (i = Slot + 1; i < BLOCK_SIZE/4; i++) {
-                        if (pData[i] == 0) {
-                            *Number = *Number + 1;
-                        } else {
-                            break;
-                        }
-                    }
-                } else if (Layer == 2) {
-                    *Number = BLOCK_SIZE/4 - Start;
-                } else {
-                    *Number = BLOCK_SIZE/4;
-                }
-
-                goto errorout;
-            }
-        }
-
-        /* transfer to next recursion call */
-        Status = Ext2GetBlock(
-                     IrpContext,
-                     Vcb,
-                     Mcb,
-                     Base,
-                     Layer - 1,
-                     Start,
-                     BLOCK_SIZE/4 - Slot,
-                     &pData[Slot],
-                     bAlloc,
-                     Hint,
-                     Block,
-                     Number
-                 );
-
-        if (!NT_SUCCESS(Status)) {
-            goto errorout;
-        }
-    }
-
-errorout:
-
-    /* free the memory of pData */
-    if (Bcb) {
-        CcUnpinData(Bcb);
-    }
-
-    if (!NT_SUCCESS(Status)) {
-        *Block = 0;
-    }
-
-    return Status;
-}
-
-NTSTATUS
-Ext2BlockMap(
-    IN PEXT2_IRP_CONTEXT    IrpContext,
-    IN PEXT2_VCB            Vcb,
-    IN PEXT2_MCB            Mcb,
-    IN ULONG                Index,
-    IN BOOLEAN              bAlloc,
-    OUT PULONG              pBlock,
-    OUT PULONG              Number
-)
-{
-    ULONG   Layer;
-    ULONG   Slot;
-
-    ULONG   Base = Index;
-
-    NTSTATUS Status = STATUS_SUCCESS;
-
-    *pBlock = 0;
-    *Number = 0;
-
-    for (Layer = 0; Layer < EXT2_BLOCK_TYPES; Layer++) {
-
-        if (Index < Vcb->max_blocks_per_layer[Layer]) {
-
-            ULONG   dwRet = 0;
-            ULONG   dwBlk = 0;
-            ULONG   dwHint = 0;
-
-            Slot = (Layer==0) ? (Index):(Layer + EXT2_NDIR_BLOCKS - 1);
-            dwBlk = Mcb->Inode.i_block[Slot];
-
-            if (dwBlk == 0) {
-
-                if (!bAlloc) {
-
-                    *Number = 1;
-                    goto errorout;
-
-                } else {
-
-                    if (Slot) {
-                        dwHint = Mcb->Inode.i_block[Slot - 1];
-                    }
-
-                    /* allocate and zero block if necessary */
-                    *Number = 1;
-                    Status = Ext2ExpandLast(
-                                 IrpContext,
-                                 Vcb,
-                                 Mcb,
-                                 Base,
-                                 Layer,
-                                 NULL,
-                                 &dwHint,
-                                 &dwBlk,
-                                 Number
-                             );
-
-                    if (!NT_SUCCESS(Status)) {
-                        goto errorout;
-                    }
-
-                    /* save the it into inode*/
-                    Mcb->Inode.i_block[Slot] = dwBlk;
-
-                    /* save the inode */
-                    if (!Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode)) {
-
-                        Status = STATUS_UNSUCCESSFUL;
-                        Ext2FreeBlock(IrpContext, Vcb, dwBlk, 1);
-
-                        goto errorout;
-                    }
-                }
-            }
-
-            /* querying block number of the index-th file block */
-            Status = Ext2GetBlock(
-                         IrpContext,
-                         Vcb,
-                         Mcb,
-                         Base,
-                         Layer,
-                         Index,
-                         (Layer == 0) ? (Vcb->max_blocks_per_layer[Layer] - Index) : 1,
-                         &Mcb->Inode.i_block[Slot],
-                         bAlloc,
-                         &dwHint,
-                         &dwRet,
-                         Number
-                     );
-
-            if (NT_SUCCESS(Status)) {
-                *pBlock = dwRet;
-            }
-
-            break;
-        }
-
-        Index -= Vcb->max_blocks_per_layer[Layer];
-    }
-
-errorout:
-
-    return Status;
-}
-
-NTSTATUS
-Ext2ExtentMap(
-    IN PEXT2_IRP_CONTEXT    IrpContext,
-    IN PEXT2_VCB            Vcb,
-    IN PEXT2_MCB            Mcb,
-    IN ULONG                Index,
-    IN BOOLEAN              Alloc,
-    OUT PULONG              Block,
-    OUT PULONG              Number
-)
-{
-    int continuous;
-    struct buffer_head bh_got;
-    EXT4_EXTENT_HEADER *eh;
-
-    memset(&bh_got, 0, sizeof(struct buffer_head));
-    eh = get_ext4_header(&Mcb->Inode);
-
-    if (eh->eh_magic != EXT4_EXT_MAGIC) {
-        if (Alloc) {
-            ext4_ext_tree_init(IrpContext, NULL, &Mcb->Inode);
-        } else {
-            return STATUS_INVALID_PARAMETER;
-        }
-    }
-    
-    if((continuous = ext4_ext_get_blocks(IrpContext,
-                            NULL,
-                            &Mcb->Inode,
-                            Index,
-                            EXT_INIT_MAX_LEN, &bh_got, Alloc, 0)) < 0) {
-        DbgPrint("Block insufficient resources, err: %d\n", continuous);
-        return Ext2WinntError(continuous);
-    }
-    if (Alloc)
-        Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
-    if (Number)
-        *Number = (continuous)?continuous:1;
-    if (Block)
-        *Block = (ULONG)bh_got.b_blocknr;
-    return STATUS_SUCCESS;
-}
-
-NTSTATUS
-Ext2ExtentExpand(
-    IN PEXT2_IRP_CONTEXT    IrpContext,
-    IN PEXT2_VCB            Vcb,
-    IN PEXT2_MCB            Mcb,
-    IN ULONG                Index,
-    IN OUT PULONG              Block,
-    IN OUT PULONG              Number
-)
-{
-    int continuous;
-    struct buffer_head bh_got;
-    EXT4_EXTENT_HEADER *eh;
-
-    memset(&bh_got, 0, sizeof(struct buffer_head));
-    eh = get_ext4_header(&Mcb->Inode);
-
-    if (eh->eh_magic != EXT4_EXT_MAGIC) {
-        ext4_ext_tree_init(IrpContext, NULL, &Mcb->Inode);
-    }
-
-    if((continuous = ext4_ext_get_blocks(IrpContext,
-                    NULL,
-                    &Mcb->Inode,
-                    Index,
-                    *Number, &bh_got, 1, 0)) < 0) {
-        DbgPrint("Expand Block insufficient resources, Number: %u, err: %d\n", *Number, continuous);
-        return Ext2WinntError(continuous);
-    }
-    if (Number)
-        *Number = (continuous)?continuous:1;
-    if (Block)
-        *Block = (ULONG)bh_got.b_blocknr;
-        
-    if (!Ext2AddBlockExtent(Vcb, Mcb, Index, (*Block), *Number)) {
-        DbgBreak();
-        ClearFlag(Mcb->Flags, MCB_ZONE_INIT);
-        Ext2ClearAllExtents(&Mcb->Extents);
-    }
-
-    Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
-
-    return STATUS_SUCCESS;
-}
 
 VOID
 Ext2UpdateVcbStat(
@@ -1027,7 +597,7 @@ Ext2NewBlock(
 Again:
 
     if (bh) {
-        __brelse(bh);
+        extents_brelse(bh);
         bh = NULL;
     }
 
@@ -1039,19 +609,11 @@ Again:
     }
 
     bitmap_blk = ext4_block_bitmap(sb, group_desc);
-    bh = sb_getblk(sb, bitmap_blk);
+    bh = extents_bread(sb, bitmap_blk);
     if (!bh) {
         DbgBreak();
         Status = STATUS_INSUFFICIENT_RESOURCES;
         goto errorout;
-    }
-    if (!buffer_uptodate(bh)) {
-	    int err = bh_submit_read(bh);
-	    if (err < 0) {
-		    DbgPrint("bh_submit_read error! err: %d\n", err);
-		    Status = Ext2WinntError(err);
-		    goto errorout;
-	    }
     }
 
     if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
@@ -1127,7 +689,7 @@ Again:
         RtlSetBits(&BlockBitmap, Index, *Number);
 
         /* set block bitmap dirty in cache */
-        mark_buffer_dirty(bh);
+        extents_mark_buffer_dirty(bh);
 
         if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT))
             group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
@@ -1165,7 +727,7 @@ errorout:
     ExReleaseResourceLite(&Vcb->MetaLock);
 
     if (bh)
-        __brelse(bh);
+        extents_brelse(bh);
 
     return Status;
 }
@@ -1304,584 +866,6 @@ errorout:
     return Status;
 }
 
-NTSTATUS
-Ext2ExpandLast(
-    IN PEXT2_IRP_CONTEXT    IrpContext,
-    IN PEXT2_VCB            Vcb,
-    IN PEXT2_MCB            Mcb,
-    IN ULONG                Base,
-    IN ULONG                Layer,
-    IN PULONG *             Data,
-    IN PULONG               Hint,
-    IN PULONG               Block,
-    IN OUT PULONG           Number
-)
-{
-    PULONG      pData = NULL;
-    ULONG       i;
-    NTSTATUS    Status = STATUS_SUCCESS;
-
-    if (Layer > 0 || IsMcbDirectory(Mcb)) {
-
-        /* allocate buffer for new block */
-        pData = (ULONG *) Ext2AllocatePool(
-                    PagedPool,
-                    BLOCK_SIZE,
-                    EXT2_DATA_MAGIC
-                );
-        if (!pData) {
-            DEBUG(DL_ERR, ( "Ex2ExpandBlock: failed to allocate memory for Data.\n"));
-            Status = STATUS_INSUFFICIENT_RESOURCES;
-            goto errorout;
-        }
-        RtlZeroMemory(pData, BLOCK_SIZE);
-        INC_MEM_COUNT(PS_BLOCK_DATA, pData, BLOCK_SIZE);
-    }
-
-    /* allocate block from disk */
-    Status = Ext2NewBlock(
-                 IrpContext,
-                 Vcb,
-                 (Mcb->Inode.i_ino - 1) / BLOCKS_PER_GROUP,
-                 *Hint,
-                 Block,
-                 Number
-             );
-
-    if (!NT_SUCCESS(Status)) {
-        goto errorout;
-    }
-
-    /* increase inode i_blocks */
-    Mcb->Inode.i_blocks += (*Number * (BLOCK_SIZE >> 9));
-
-    if (Layer == 0) {
-
-        if (IsMcbDirectory(Mcb)) {
-
-            /* for directory we need initialize it's entry structure */
-            PEXT2_DIR_ENTRY2 pEntry;
-            pEntry = (PEXT2_DIR_ENTRY2) pData;
-            pEntry->rec_len = (USHORT)(BLOCK_SIZE);
-            ASSERT(*Number == 1);
-            Ext2SaveBlock(IrpContext, Vcb, *Block, (PVOID)pData);
-
-        } else {
-
-            /* for file we need remove dirty MCB to prevent Volume's writing */
-            if (!Ext2RemoveBlockExtent(Vcb, NULL, (*Block), *Number)) {
-                DbgBreak();
-                Status = STATUS_INSUFFICIENT_RESOURCES;
-                goto errorout;
-            }
-        }
-
-        /* add new Extent into Mcb */
-        if (!Ext2AddBlockExtent(Vcb, Mcb, Base, (*Block), *Number)) {
-            DbgBreak();
-            ClearFlag(Mcb->Flags, MCB_ZONE_INIT);
-            Ext2ClearAllExtents(&Mcb->Extents);
-        }
-
-    } else {
-
-        /* zero the content of all meta blocks */
-        for (i = 0; i < *Number; i++) {
-            Ext2SaveBlock(IrpContext, Vcb, *Block + i, (PVOID)pData);
-        }
-    }
-
-errorout:
-
-    if (NT_SUCCESS(Status)) {
-        *Hint = *Block + *Number;
-        if (Data) {
-            *Data = pData;
-            ASSERT(*Number == 1);
-        } else {
-            if (pData) {
-                Ext2FreePool(pData, EXT2_DATA_MAGIC);
-                DEC_MEM_COUNT(PS_BLOCK_DATA, pData, BLOCK_SIZE);
-            }
-        }
-    } else {
-        if (pData) {
-            Ext2FreePool(pData, EXT2_DATA_MAGIC);
-            DEC_MEM_COUNT(PS_BLOCK_DATA, pData, BLOCK_SIZE);
-        }
-        if (*Block) {
-            Ext2FreeBlock(IrpContext, Vcb, *Block, *Number);
-            *Block = 0;
-        }
-    }
-
-    return Status;
-}
-
-NTSTATUS
-Ext2ExpandBlock(
-    IN PEXT2_IRP_CONTEXT IrpContext,
-    IN PEXT2_VCB         Vcb,
-    IN PEXT2_MCB         Mcb,
-    IN ULONG             Base,
-    IN ULONG             Layer,
-    IN ULONG             Start,
-    IN ULONG             SizeArray,
-    IN PULONG            BlockArray,
-    IN PULONG            Hint,
-    IN PULONG            Extra
-)
-{
-    ULONG       i = 0;
-    ULONG       j;
-    ULONG       Slot;
-    ULONG       Block = 0;
-    LARGE_INTEGER Offset;
-
-    PBCB        Bcb = NULL;
-    PULONG      pData = NULL;
-    ULONG       Skip = 0;
-
-    ULONG       Number;
-    ULONG       Wanted;
-
-    NTSTATUS    Status = STATUS_SUCCESS;
-
-    if (Layer == 1) {
-
-        /* try to make all leaf block continuous to avoid fragments */
-        Number = min(SizeArray, ((*Extra + (Start & (BLOCK_SIZE/4 - 1))) * 4 / BLOCK_SIZE));
-        Wanted = 0;
-        DEBUG(DL_BLK, ("Ext2ExpandBlock: SizeArray=%xh Extra=%xh Start=%xh %xh\n",
-                       SizeArray, *Extra, Start, Number ));
-
-        for (i=0; i < Number; i++) {
-            if (BlockArray[i] == 0) {
-                Wanted += 1;
-            }
-        }
-
-        i = 0;
-        while (Wanted > 0) {
-
-            Number = Wanted;
-            Status = Ext2ExpandLast(
-                         IrpContext,
-                         Vcb,
-                         Mcb,
-                         Base,
-                         Layer,
-                         NULL,
-                         Hint,
-                         &Block,
-                         &Number
-                     );
-            if (!NT_SUCCESS(Status)) {
-                goto errorout;
-            }
-
-            ASSERT(Number > 0);
-            Wanted -= Number;
-            while (Number) {
-                if (BlockArray[i] == 0) {
-                    BlockArray[i] = Block++;
-                    Number--;
-                }
-                i++;
-            }
-        }
-
-    } else if (Layer == 0) {
-
-        /* bulk allocation for inode data blocks */
-
-        i = 0;
-
-        while (*Extra && i < SizeArray) {
-
-            Wanted = 0;
-            Number = 1;
-
-            for (j = i; j < SizeArray && j < i + *Extra; j++) {
-
-                if (BlockArray[j] >= TOTAL_BLOCKS) {
-                    DbgBreak();
-                    BlockArray[j] = 0;
-                }
-
-                if (BlockArray[j] == 0) {
-                    Wanted += 1;
-                } else {
-                    break;
-                }
-            }
-
-            if (Wanted == 0) {
-
-                /* add block extent into Mcb */
-                ASSERT(BlockArray[i] != 0);
-                if (!Ext2AddBlockExtent(Vcb, Mcb, Base + i, BlockArray[i], 1)) {
-                    DbgBreak();
-                    ClearFlag(Mcb->Flags, MCB_ZONE_INIT);
-                    Ext2ClearAllExtents(&Mcb->Extents);
-                }
-
-            } else {
-
-                Number = Wanted;
-                Status = Ext2ExpandLast(
-                             IrpContext,
-                             Vcb,
-                             Mcb,
-                             Base + i,
-                             0,
-                             NULL,
-                             Hint,
-                             &Block,
-                             &Number
-                         );
-                if (!NT_SUCCESS(Status)) {
-                    goto errorout;
-                }
-
-                ASSERT(Number > 0);
-                for (j = 0; j < Number; j++) {
-                    BlockArray[i + j] = Block++;
-                }
-            }
-
-            *Extra -= Number;
-            i += Number;
-        }
-
-        goto errorout;
-    }
-
-    for (i = 0; *Extra && i < SizeArray; i++) {
-
-        if (Layer <= 3) {
-
-            if (BlockArray[i] >= TOTAL_BLOCKS) {
-                DbgBreak();
-                BlockArray[i] = 0;
-            }
-
-            if (BlockArray[i] == 0) {
-                Number = 1;
-                Status = Ext2ExpandLast(
-                             IrpContext,
-                             Vcb,
-                             Mcb,
-                             Base,
-                             Layer,
-                             &pData,
-                             Hint,
-                             &BlockArray[i],
-                             &Number
-                         );
-                if (!NT_SUCCESS(Status)) {
-                    goto errorout;
-                }
-
-            } else {
-
-                Offset.QuadPart = (((LONGLONG)BlockArray[i]) << BLOCK_BITS);
-                if (!CcPinRead(
-                            Vcb->Volume,
-                            &Offset,
-                            BLOCK_SIZE,
-                            PIN_WAIT,
-                            &Bcb,
-                            &pData )) {
-
-                    DEBUG(DL_ERR, ( "Ext2ExpandInode: failed to PinLock offset :%I64xh...\n",
-                                    Offset.QuadPart));
-                    Status = STATUS_CANT_WAIT;
-                    DbgBreak();
-                    goto errorout;
-                }
-            }
-
-            Skip = Vcb->max_blocks_per_layer[Layer] * i;
-
-            if (i == 0) {
-                if (Layer > 1) {
-                    Slot  = Start / Vcb->max_blocks_per_layer[Layer - 1];
-                    Start = Start % Vcb->max_blocks_per_layer[Layer - 1];
-                    Skip += Slot * Vcb->max_blocks_per_layer[Layer - 1];
-                } else {
-                    Slot  = Start;
-                    Start = 0;
-                    Skip += Slot;
-                }
-            } else {
-                Start = 0;
-                Slot  = 0;
-            }
-
-            Status = Ext2ExpandBlock(
-                         IrpContext,
-                         Vcb,
-                         Mcb,
-                         Base + Skip,
-                         Layer - 1,
-                         Start,
-                         BLOCK_SIZE/4 - Slot,
-                         &pData[Slot],
-                         Hint,
-                         Extra
-                     );
-
-            if (Bcb) {
-                CcSetDirtyPinnedData(Bcb, NULL);
-                if (!Ext2AddBlockExtent(Vcb, NULL,
-                                        BlockArray[i],
-                                        BlockArray[i], 1)) {
-                    DbgBreak();
-                    Ext2Sleep(500);
-                    if (!Ext2AddBlockExtent(Vcb, NULL,
-                                            BlockArray[i],
-                                            BlockArray[i], 1)) {
-                    }
-                }
-            } else {
-                Ext2SaveBlock(IrpContext, Vcb, BlockArray[i], (PVOID)pData);
-            }
-
-            if (pData) {
-                if (Bcb) {
-                    CcUnpinData(Bcb);
-                    Bcb = NULL;
-                } else {
-                    Ext2FreePool(pData, EXT2_DATA_MAGIC);
-                    DEC_MEM_COUNT(PS_BLOCK_DATA, pData, BLOCK_SIZE);
-                }
-                pData = NULL;
-            }
-
-            if (!NT_SUCCESS(Status)) {
-                DbgBreak();
-                break;
-            }
-        }
-    }
-
-errorout:
-
-    return Status;
-}
-
-BOOLEAN
-Ext2IsBlockEmpty(PULONG BlockArray, ULONG SizeArray)
-{
-    ULONG i = 0;
-    for (i=0; i < SizeArray; i++) {
-        if (BlockArray[i]) {
-            break;
-        }
-    }
-    return (i == SizeArray);
-}
-
-
-NTSTATUS
-Ext2TruncateBlock(
-    IN PEXT2_IRP_CONTEXT IrpContext,
-    IN PEXT2_VCB         Vcb,
-    IN PEXT2_MCB         Mcb,
-    IN ULONG             Base,
-    IN ULONG             Start,
-    IN ULONG             Layer,
-    IN ULONG             SizeArray,
-    IN PULONG            BlockArray,
-    IN PULONG            Extra
-)
-{
-    NTSTATUS    Status = STATUS_SUCCESS;
-    ULONG       i = 0;
-    ULONG       Slot = 0;
-    ULONG       Skip = 0;
-
-    LONGLONG    Offset;
-    PBCB        Bcb = NULL;
-    PULONG      pData = NULL;
-
-    ASSERT(Mcb != NULL);
-
-    for (i = 0; i < SizeArray; i++) {
-
-        if (Layer == 0) {
-
-            ULONG   Number = 1;
-
-            while (Extra &&  SizeArray > i + 1 && Number < *Extra) {
-
-                if (BlockArray[SizeArray - i - 1] ==
-                        BlockArray[SizeArray - i - 2] + 1) {
-
-                    BlockArray[SizeArray - i - 1] = 0;
-                    Number++;
-                    SizeArray--;
-
-                } else {
-                    break;
-                }
-            }
-
-            if (BlockArray[SizeArray - i - 1]) {
-
-                Status = Ext2FreeBlock(IrpContext, Vcb, BlockArray[SizeArray - i - 1], Number);
-                if (NT_SUCCESS(Status)) {
-#if EXT2_DEBUG
-                    if (i == 0 || i == SizeArray - 1 || *Extra == Number) {
-                        DEBUG(DL_BLK, ("Ext2TruncateBlock: Vbn: %xh Lbn: %xh Num: %xh\n",
-                                       Base + SizeArray - 1 - i, BlockArray[SizeArray - i - 1], Number));
-                    }
-#endif
-                    ASSERT(Mcb->Inode.i_blocks >= Number * (BLOCK_SIZE >> 9));
-                    if (Mcb->Inode.i_blocks < Number * (BLOCK_SIZE >> 9)) {
-                        Mcb->Inode.i_blocks = 0;
-                        DbgBreak();
-                    } else {
-                        Mcb->Inode.i_blocks -= Number * (BLOCK_SIZE >> 9);
-                    }
-                    BlockArray[SizeArray - i - 1] = 0;
-                }
-            }
-
-            if (Extra) {
-
-                /* dec blocks count */
-                ASSERT(*Extra >= Number);
-                *Extra = *Extra - Number;
-
-                /* remove block mapping frm Mcb Extents */
-                if (!Ext2RemoveBlockExtent(Vcb, Mcb, Base + SizeArray - 1 - i, Number)) {
-                    DbgBreak();
-                    ClearFlag(Mcb->Flags, MCB_ZONE_INIT);
-                    Ext2ClearAllExtents(&Mcb->Extents);
-                }
-            }
-
-        } else {
-
-            ASSERT(Layer <= 3);
-
-            if (BlockArray[SizeArray - i - 1] >= TOTAL_BLOCKS) {
-                DbgBreak();
-                BlockArray[SizeArray - i - 1] = 0;
-            }
-
-            if (i == 0) {
-                if (Layer > 1) {
-                    Slot  = Start / Vcb->max_blocks_per_layer[Layer - 1];
-                    Start = Start % Vcb->max_blocks_per_layer[Layer - 1];
-                } else {
-                    Slot  = Start;
-                    Start = (BLOCK_SIZE / 4) - 1;
-                }
-            } else {
-                Slot = Start = (BLOCK_SIZE / 4) - 1;
-            }
-
-            Skip = (SizeArray - i - 1) * Vcb->max_blocks_per_layer[Layer];
-
-            if (BlockArray[SizeArray - i - 1]) {
-
-                Offset = (LONGLONG) (BlockArray[SizeArray - i - 1]);
-                Offset = Offset << BLOCK_BITS;
-
-                if (!CcPinRead( Vcb->Volume,
-                                (PLARGE_INTEGER) (&Offset),
-                                BLOCK_SIZE,
-                                PIN_WAIT,
-                                &Bcb,
-                                &pData )) {
-
-                    DEBUG(DL_ERR, ( "Ext2TruncateBlock: PinLock failed on block %xh ...\n",
-                                    BlockArray[SizeArray - i - 1]));
-                    Status = STATUS_CANT_WAIT;
-                    DbgBreak();
-                    goto errorout;
-                }
-
-                Status = Ext2TruncateBlock(
-                             IrpContext,
-                             Vcb,
-                             Mcb,
-                             Base + Skip,
-                             Start,
-                             Layer - 1,
-                             Slot + 1,
-                             &pData[0],
-                             Extra
-                         );
-
-                if (!NT_SUCCESS(Status)) {
-                    break;
-                }
-
-                CcSetDirtyPinnedData(Bcb, NULL);
-                Ext2AddVcbExtent(Vcb, Offset, (LONGLONG)BLOCK_SIZE);
-
-                if (*Extra || Ext2IsBlockEmpty(pData, BLOCK_SIZE/4)) {
-
-                    Status = Ext2TruncateBlock(
-                                 IrpContext,
-                                 Vcb,
-                                 Mcb,
-                                 Base + Skip,    /* base */
-                                 0,              /* start */
-                                 0,              /* layer */
-                                 1,
-                                 &BlockArray[SizeArray - i - 1],
-                                 NULL
-                             );
-                }
-
-                if (pData) {
-                    CcUnpinData(Bcb);
-                    Bcb = NULL;
-                    pData = NULL;
-                }
-
-            } else {
-
-                if (Layer > 1) {
-                    if (*Extra > Slot * Vcb->max_blocks_per_layer[Layer - 1] + Start + 1) {
-                        *Extra -= (Slot * Vcb->max_blocks_per_layer[Layer - 1] + Start + 1);
-                    } else {
-                        *Extra  = 0;
-                    }
-                } else {
-                    if (*Extra > Slot + 1) {
-                        *Extra -= (Slot + 1);
-                    } else {
-                        *Extra  = 0;
-                    }
-                }
-
-                if (!Ext2RemoveBlockExtent(Vcb, Mcb, Base + Skip, (Start + 1))) {
-                    DbgBreak();
-                    ClearFlag(Mcb->Flags, MCB_ZONE_INIT);
-                    Ext2ClearAllExtents(&Mcb->Extents);
-                }
-            }
-        }
-
-        if (Extra && *Extra == 0) {
-            break;
-        }
-    }
-
-errorout:
-
-    if (pData) {
-        CcUnpinData(Bcb);
-    }
-
-    return Status;
-}
 
 NTSTATUS
 Ext2NewInode(
@@ -1913,7 +897,7 @@ Ext2NewInode(
 repeat:
 
     if (bh) {
-        __brelse(bh);
+        extents_brelse(bh);
         bh = NULL;
     }
 
@@ -2068,19 +1052,11 @@ repeat:
         goto errorout;
     }
 
-    bh = sb_getblk(sb, bitmap_blk);
+    bh = extents_bread(sb, bitmap_blk);
     if (!bh) {
         DbgBreak();
         Status = STATUS_INSUFFICIENT_RESOURCES;
         goto errorout;
-    }
-    if (!buffer_uptodate(bh)) {
-	    int err = bh_submit_read(bh);
-	    if (err < 0) {
-		    DbgPrint("bh_submit_read error! err: %d\n", err);
-		    Status = Ext2WinntError(err);
-		    goto errorout;
-	    }
     }
 
     if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_INODE_UNINIT)) {
@@ -2125,7 +1101,7 @@ repeat:
         RtlSetBits(&InodeBitmap, dwInode, 1);
 
         /* set block bitmap dirty in cache */
-        mark_buffer_dirty(bh);
+        extents_mark_buffer_dirty(bh);
 
         /* If we didn't allocate from within the initialized part of the inode
          * table then we need to initialize up to this inode. */
@@ -2164,7 +1140,7 @@ repeat:
                 struct buffer_head *block_bitmap_bh;
 
                 /* recheck and clear flag under lock if we still need to */
-                block_bitmap_bh = sb_getblk(sb, ext4_block_bitmap(sb, group_desc));
+                block_bitmap_bh = extents_bwrite(sb, ext4_block_bitmap(sb, group_desc));
                 if (block_bitmap_bh && group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
                     group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
                     free = ext4_init_block_bitmap(sb, block_bitmap_bh, Group, group_desc);
@@ -2172,7 +1148,7 @@ repeat:
                     ext4_free_blks_set(sb, group_desc, free);
                 }
                 if (block_bitmap_bh)
-                    brelse(block_bitmap_bh);
+                    extents_brelse(block_bitmap_bh);
             }
 
         }
@@ -2193,7 +1169,7 @@ errorout:
     ExReleaseResourceLite(&Vcb->MetaLock);
 
     if (bh) {
-        brelse(bh);
+        extents_brelse(bh);
     }
 
     return Status;
@@ -2243,19 +1219,11 @@ Ext2FreeInode(
     }
 
     bitmap_blk = ext4_inode_bitmap(sb, group_desc);
-    bh = sb_getblk(sb, bitmap_blk);
+    bh = extents_bread(sb, bitmap_blk);
     if (!bh) {
         DbgBreak();
         Status = STATUS_INSUFFICIENT_RESOURCES;
         goto errorout;
-    }
-    if (!buffer_uptodate(bh)) {
-        int err = bh_submit_read(bh);
-        if (err < 0) {
-            DbgPrint("bh_submit_read error! err: %d\n", err);
-            Status = Ext2WinntError(err);
-            goto errorout;
-        }
     }
 
     if (Group == Vcb->sbi.s_groups_count - 1) {
@@ -2285,7 +1253,7 @@ Ext2FreeInode(
                              RtlNumberOfClearBits(&InodeBitmap));
 
         /* set inode block dirty and add to vcb dirty range */
-        mark_buffer_dirty(bh);
+        extents_mark_buffer_dirty(bh);
 
         /* update group_desc and super_block */
         if (Type == EXT2_FT_DIR) {
@@ -2302,7 +1270,7 @@ errorout:
     ExReleaseResourceLite(&Vcb->MetaLock);
 
     if (bh) {
-        brelse(bh);
+        extents_brelse(bh);
     }
     return Status;
 }
@@ -2449,7 +1417,7 @@ Ext2RemoveEntry (
             ExReleaseResourceLite(&Dcb->MainResource);
 
         if (bh)
-            brelse(bh);
+            extents_brelse(bh);
     }
 
     return Status;
@@ -3141,7 +2109,7 @@ unsigned ext4_init_inode_bitmap(struct super_block *sb, struct buffer_head *bh,
 {
     struct ext3_sb_info *sbi = EXT3_SB(sb);
 
-    mark_buffer_dirty(bh);
+    extents_mark_buffer_dirty(bh);
 
     /* If checksum is bad mark all blocks and inodes use to prevent
      * allocation, essentially implementing a per-group read-only flag. */
@@ -3231,7 +2199,7 @@ unsigned ext4_init_block_bitmap(struct super_block *sb, struct buffer_head *bh,
     struct ext3_sb_info *sbi = EXT3_SB(sb);
 
     if (bh) {
-        mark_buffer_dirty(bh);
+        extents_mark_buffer_dirty(bh);
         /* If checksum is bad mark all blocks used to prevent allocation
          * essentially implementing a per-group read-only flag. */
         if (!ext4_group_desc_csum_verify(sbi, block_group, gdp)) {
@@ -3490,7 +2458,7 @@ int ext4_check_descriptors(struct super_block *sb)
                    "Checksum for group %u failed (%u!=%u)\n",
                    i, le16_to_cpu(ext4_group_desc_csum(sbi, i,
                                                        gdp)), le16_to_cpu(gdp->bg_checksum));
-            if (!IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+            if (!IsVcbReadOnly(Vcb)) {
                 return 0;
             }
         }

@@ -105,7 +105,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
         if (IsFlagOn(FileObject->Flags, FO_CLEANUP_COMPLETE)) {
             if (IsFlagOn(FileObject->Flags, FO_FILE_MODIFIED) &&
                     IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK) &&
-                    !IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED) ) {
+                    !IsVcbReadOnly(Vcb) ) {
                 Status = Ext2FlushFile(IrpContext, Fcb, Ccb);
             }
             __leave;
@@ -318,9 +318,9 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                     (Fcb->NonCachedOpenCount + 1 == Fcb->ReferenceCount) &&
                     (Fcb->SectionObject.DataSectionObject != NULL)) {
 
-                if (!IsFlagOn(Vcb->Flags, VCB_READ_ONLY) &&
-                        !IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED) ) {
+                if (!IsVcbReadOnly(Vcb)) {
                     CcFlushCache(&Fcb->SectionObject, NULL, 0, NULL);
+                    ClearLongFlag(Fcb->Flags, FCB_FILE_MODIFIED);
                 }
 
                 if (ExAcquireResourceExclusiveLite(&(Fcb->PagingIoResource), TRUE)) {

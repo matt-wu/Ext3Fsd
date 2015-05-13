@@ -26,13 +26,6 @@ ULONG  ProcessNameOffset = 0;
 
 /* DEFINITIONS ***********************************************************/
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text (PAGE, Ext2Printf)
-#pragma alloc_text (PAGE, Ext2GetProcessNameOffset)
-#pragma alloc_text (PAGE, Ext2DbgPrintCall)
-#pragma alloc_text (PAGE, Ext2DbgPrintComplete)
-#pragma alloc_text (PAGE, Ext2NtStatusToString)
-#endif // ALLOC_PRAGMA
 
 /* Static Definitions ****************************************************/
 

@@ -511,8 +511,7 @@ Ext2WriteVolume (IN PEXT2_IRP_CONTEXT IrpContext)
                 Status = Ext2ReadWriteBlocks(IrpContext,
                                              Vcb,
                                              Chain,
-                                             Length,
-                                             FALSE   );
+                                             Length );
                 Irp = IrpContext->Irp;
 
                 if (NT_SUCCESS(Status)) {
@@ -554,8 +553,7 @@ Ext2WriteVolume (IN PEXT2_IRP_CONTEXT IrpContext)
             Status = Ext2ReadWriteBlocks(IrpContext,
                                          Vcb,
                                          &BlockArray,
-                                         Length,
-                                         FALSE   );
+                                         Length );
 
             if (NT_SUCCESS(Status)) {
                 Irp->IoStatus.Information = Length;
@@ -682,8 +680,7 @@ Ext2WriteInode (
                          IrpContext,
                          Vcb,
                          Chain,
-                         Size,
-                         FALSE
+                         Size
                      );
 
         } else {
@@ -1313,7 +1310,7 @@ Ext2Write (IN PEXT2_IRP_CONTEXT IrpContext)
                 __leave;
             }
 
-            if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+            if (IsVcbReadOnly(Vcb)) {
                 Status = STATUS_MEDIA_WRITE_PROTECTED;
                 __leave;
             }

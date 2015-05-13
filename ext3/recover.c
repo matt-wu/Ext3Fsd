@@ -67,7 +67,7 @@ Ext2CheckJournal(
     }
 
     /* must stop here if volume is read-only */
-    if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+    if (IsVcbReadOnly(Vcb)) {
         goto errorout;
     }
 

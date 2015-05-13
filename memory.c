@@ -18,33 +18,10 @@ extern PEXT2_GLOBAL Ext2Global;
 /* DEFINITIONS *************************************************************/
 
 #ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, Ext2AllocateIrpContext)
-#pragma alloc_text(PAGE, Ext2FreeIrpContext)
 #pragma alloc_text(PAGE, Ext2AllocateFcb)
 #pragma alloc_text(PAGE, Ext2FreeFcb)
 #pragma alloc_text(PAGE, Ext2AllocateInode)
 #pragma alloc_text(PAGE, Ext2DestroyInode)
-#pragma alloc_text(PAGE, Ext2AllocateExtent)
-#pragma alloc_text(PAGE, Ext2FreeExtent)
-#pragma alloc_text(PAGE, Ext2CountExtents)
-#pragma alloc_text(PAGE, Ext2JointExtents)
-#pragma alloc_text(PAGE, Ext2DestroyExtentChain)
-#pragma alloc_text(PAGE, Ext2ListExtents)
-#pragma alloc_text(PAGE, Ext2CheckExtent)
-#pragma alloc_text(PAGE, Ext2AddVcbExtent)
-#pragma alloc_text(PAGE, Ext2RemoveVcbExtent)
-#pragma alloc_text(PAGE, Ext2ClearAllExtents)
-#pragma alloc_text(PAGE, Ext2AddMcbExtent)
-#pragma alloc_text(PAGE, Ext2RemoveMcbExtent)
-#pragma alloc_text(PAGE, Ext2AddBlockExtent)
-#pragma alloc_text(PAGE, Ext2RemoveBlockExtent)
-#pragma alloc_text(PAGE, Ext2BuildName)
-#pragma alloc_text(PAGE, Ext2AllocateMcb)
-#pragma alloc_text(PAGE, Ext2SearchMcb)
-#pragma alloc_text(PAGE, Ext2InsertMcb)
-#pragma alloc_text(PAGE, Ext2SearchMcbWithoutLock)
-#pragma alloc_text(PAGE, Ext2RemoveMcb)
-#pragma alloc_text(PAGE, Ext2CleanupAllMcbs)
 #pragma alloc_text(PAGE, Ext2CheckBitmapConsistency)
 #pragma alloc_text(PAGE, Ext2CheckSetBlock)
 #pragma alloc_text(PAGE, Ext2InitializeVcb)
@@ -53,10 +30,6 @@ extern PEXT2_GLOBAL Ext2Global;
 #pragma alloc_text(PAGE, Ext2TearDownStream)
 #pragma alloc_text(PAGE, Ext2DestroyVcb)
 #pragma alloc_text(PAGE, Ext2SyncUninitializeCacheMap)
-#pragma alloc_text(PAGE, Ext2LinkHeadMcb)
-#pragma alloc_text(PAGE, Ext2LinkTailMcb)
-#pragma alloc_text(PAGE, Ext2UnlinkMcb)
-#pragma alloc_text(PAGE, Ext2FirstUnusedMcb)
 #pragma alloc_text(PAGE, Ext2ReaperThread)
 #pragma alloc_text(PAGE, Ext2StartReaperThread)
 #endif
@@ -554,8 +527,9 @@ Ext2DestroyExtentChain(IN PEXT2_EXTENT Chain)
 BOOLEAN
 Ext2ListExtents(PLARGE_MCB  Extents)
 {
-#if EXT2_DEBUG
     if (FsRtlNumberOfRunsInLargeMcb(Extents) != 0) {
+
+#if EXT2_DEBUG
 
         LONGLONG            DirtyVba;
         LONGLONG            DirtyLba;
@@ -565,14 +539,12 @@ Ext2ListExtents(PLARGE_MCB  Extents)
         for (i = 0; FsRtlGetNextLargeMcbEntry(
                     Extents, i, &DirtyVba,
                     &DirtyLba, &DirtyLength); i++)  {
-            DEBUG(DL_EXT, ( "DirtyVba = %I64xh\n", DirtyVba));
-            DEBUG(DL_EXT, ( "DirtyLba = %I64xh\n", DirtyLba));
-            DEBUG(DL_EXT, ( "DirtyLen = %I64xh\n\n", DirtyLength));
+            DEBUG(DL_EXT, ("Vba:%I64xh Lba:%I64xh Len:%I64xh.\n", DirtyVba, DirtyLba, DirtyLength));
         }
+#endif
 
         return TRUE;
     }
-#endif
 
     return FALSE;
 }
@@ -656,8 +628,8 @@ Ext2AddVcbExtent (
     UCHAR       Bits = 0;
     BOOLEAN     rc = FALSE;
 
-    Base = (LONGLONG)SECTOR_SIZE;
-    Bits = (UCHAR)SECTOR_BITS;
+    Base = (LONGLONG)BLOCK_SIZE;
+    Bits = (UCHAR)BLOCK_BITS;
     Offset = Vbn & (~(Base - 1));
     Length = (Length + Vbn - Offset + Base - 1) & (~(Base - 1));
 
@@ -712,8 +684,8 @@ Ext2RemoveVcbExtent (
     UCHAR       Bits = 0;
     BOOLEAN     rc = TRUE;
 
-    Base = (LONGLONG)SECTOR_SIZE;
-    Bits = (UCHAR)SECTOR_BITS;
+    Base = (LONGLONG)BLOCK_SIZE;
+    Bits = (UCHAR)BLOCK_BITS;
     Offset =  Vbn & (~(Base - 1));
     Length = (Length + Vbn - Offset + Base - 1) & (~(Base - 1));
 
@@ -761,9 +733,9 @@ Ext2LookupVcbExtent (
     LONGLONG    offset;
     BOOLEAN     rc;
 
-    offset = Vbn & (~((LONGLONG)SECTOR_SIZE - 1));
-    ASSERT ((offset & (SECTOR_SIZE - 1)) == 0);
-    offset = (offset >> SECTOR_BITS) + 1;
+    offset = Vbn & (~((LONGLONG)BLOCK_SIZE - 1));
+    ASSERT ((offset & (BLOCK_SIZE - 1)) == 0);
+    offset = (offset >> BLOCK_BITS) + 1;
 
     rc = FsRtlLookupLargeMcbEntry(
              &(Vcb->Extents),
@@ -779,13 +751,13 @@ Ext2LookupVcbExtent (
 
         if (Lbn && ((*Lbn) != -1)) {
             ASSERT((*Lbn) > 0);
-            (*Lbn) = (((*Lbn) - 1) << SECTOR_BITS);
-            (*Lbn) += ((Vbn) & ((LONGLONG)SECTOR_SIZE - 1));
+            (*Lbn) = (((*Lbn) - 1) << BLOCK_BITS);
+            (*Lbn) += ((Vbn) & ((LONGLONG)BLOCK_SIZE - 1));
         }
 
         if (Length && *Length) {
-            (*Length) <<= SECTOR_BITS;
-            (*Length)  -= ((Vbn) & ((LONGLONG)SECTOR_SIZE - 1));
+            (*Length) <<= BLOCK_BITS;
+            (*Length)  -= ((Vbn) & ((LONGLONG)BLOCK_SIZE - 1));
         }
     }
 
@@ -943,6 +915,93 @@ Ext2LookupMcbExtent (
     return rc;
 }
 
+
+BOOLEAN
+Ext2AddMcbMetaExts (
+    IN PEXT2_VCB Vcb,
+    IN PEXT2_MCB Mcb,
+    IN ULONG     Block,
+    IN ULONG     Length
+)
+{
+    ULONG       TriedTimes = 0;
+    LONGLONG    Lbn = Block + 1;
+    BOOLEAN     rc = TRUE;
+
+Again:
+
+    __try {
+
+        rc = FsRtlAddLargeMcbEntry(
+                &Mcb->MetaExts,
+                Lbn,
+                Lbn,
+                Length
+             );
+
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+
+        DbgBreak();
+        rc = FALSE;
+    }
+
+    if (!rc && ++TriedTimes < 10) {
+        Ext2Sleep(TriedTimes * 100);
+        goto Again;
+    }
+
+    DEBUG(DL_EXT, ("Ext2AddMcbMetaExts: Block: %xh-%xh rc=%d Runs=%u\n", Block,
+                   Length, rc, FsRtlNumberOfRunsInLargeMcb(&Mcb->MetaExts)));
+
+    if (rc) {
+        Ext2CheckExtent(&Mcb->MetaExts, Lbn, Lbn, Length, TRUE);
+    }
+
+    return rc;
+}
+
+BOOLEAN
+Ext2RemoveMcbMetaExts (
+    IN PEXT2_VCB Vcb,
+    IN PEXT2_MCB Mcb,
+    IN ULONG     Block,
+    IN ULONG     Length
+)
+{
+    ULONG       TriedTimes = 0;
+    LONGLONG    Lbn = Block + 1;
+    BOOLEAN     rc = TRUE;
+
+Again:
+
+    __try {
+
+        FsRtlRemoveLargeMcbEntry(
+            &Mcb->MetaExts,
+            Lbn,
+            Length
+        );
+
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        DbgBreak();
+        rc = FALSE;
+    }
+
+    if (!rc && ++TriedTimes < 10) {
+        Ext2Sleep(TriedTimes * 100);
+        goto Again;
+    }
+
+    DEBUG(DL_EXT, ("Ext2RemoveMcbMetaExts: Block: %xh-%xhh Runs=%u\n", Block,
+                    Length, FsRtlNumberOfRunsInLargeMcb(&Mcb->MetaExts)));
+    if (rc) {
+        Ext2CheckExtent(&Mcb->MetaExts, Lbn, 0, Length, FALSE);
+    }
+
+    return rc;
+}
+
+
 BOOLEAN
 Ext2AddBlockExtent(
     IN PEXT2_VCB    Vcb,
@@ -975,6 +1034,7 @@ Ext2AddBlockExtent(
     ASSERT(Start == Block);
     return Ext2AddVcbExtent(Vcb, Vbn, Length);
 }
+
 
 BOOLEAN
 Ext2LookupBlockExtent(
@@ -1059,7 +1119,7 @@ Ext2InitializeZone(
 
         /* mapping file offset to ext2 block */
         if (INODE_HAS_EXTENT(&Mcb->Inode)) {
-            Status = Ext2ExtentMap(
+            Status = Ext2MapExtent(
                          IrpContext,
                          Vcb,
                          Mcb,
@@ -1069,7 +1129,7 @@ Ext2InitializeZone(
                          &Mapped
                      );
         } else {
-            Status = Ext2BlockMap(
+            Status = Ext2MapIndirect(
                          IrpContext,
                          Vcb,
                          Mcb,
@@ -1093,7 +1153,7 @@ Ext2InitializeZone(
         if (Block) {
             if (!Ext2AddBlockExtent(Vcb, Mcb, Start, Block, Mapped)) {
                 DbgBreak();
-                ClearFlag(Mcb->Flags, MCB_ZONE_INIT);
+                ClearFlag(Mcb->Flags, MCB_ZONE_INITED);
                 Ext2ClearAllExtents(&Mcb->Extents);
                 Status = STATUS_INSUFFICIENT_RESOURCES;
                 goto errorout;
@@ -1106,8 +1166,8 @@ Ext2InitializeZone(
         Start += Mapped;
     }
 
-    /* set the initialized flag */
-    SetLongFlag(Mcb->Flags, MCB_ZONE_INIT);
+    /* set mcb zone as initialized */
+    SetLongFlag(Mcb->Flags, MCB_ZONE_INITED);
 
 errorout:
 
@@ -1136,19 +1196,19 @@ Ext2BuildExtents(
 
     BOOLEAN     IsFirstBlock = TRUE;
 
-     if (!IsZoneInited(Mcb)) {
-		Status = Ext2InitializeZone(IrpContext, Vcb, Mcb);
-		if (!NT_SUCCESS(Status)) {
-			DbgBreak();
-			ClearLongFlag(Mcb->Flags, MCB_ZONE_INIT);
-			goto errorout;
-		}
-    } 
+    if (!IsZoneInited(Mcb)) {
+        Status = Ext2InitializeZone(IrpContext, Vcb, Mcb);
+        if (!NT_SUCCESS(Status)) {
+            DbgBreak();
+            ClearLongFlag(Mcb->Flags, MCB_ZONE_INITED);
+            goto errorout;
+        }
+    }
 
     if ((IrpContext && IrpContext->Irp) &&
             ((IrpContext->Irp->Flags & IRP_NOCACHE) ||
              (IrpContext->Irp->Flags & IRP_PAGING_IO))) {
-        Size = (Size + SECTOR_SIZE - 1) & (~(SECTOR_SIZE - 1));
+        Size = (Size + BLOCK_SIZE - 1) & (~(BLOCK_SIZE - 1));
     }
 
     Start = (ULONG)(Offset >> BLOCK_BITS);
@@ -1185,8 +1245,7 @@ Ext2BuildExtents(
         /* try to BlockMap in case failed to access Extents cache */
         if (!IsZoneInited(Mcb) || (bAlloc && Block == 0)) {
 
-            if (INODE_HAS_EXTENT(&Mcb->Inode)) {
-                Status = Ext2ExtentMap(
+            Status = Ext2BlockMap(
                              IrpContext,
                              Vcb,
                              Mcb,
@@ -1194,19 +1253,7 @@ Ext2BuildExtents(
                              bAlloc,
                              &Block,
                              &Mapped
-                         );
-            } else {
-                Status = Ext2BlockMap(
-                             IrpContext,
-                             Vcb,
-                             Mcb,
-                             Start,
-                             bAlloc,
-                             &Block,
-                             &Mapped
-                         );
-            }
-
+                     );
             if (!NT_SUCCESS(Status)) {
                 goto errorout;
             }
@@ -1413,6 +1460,7 @@ Ext2AllocateMcb (
     /* initialize Mcb Extents, it will raise an expcetion if failed */
     __try {
         FsRtlInitializeLargeMcb(&(Mcb->Extents), NonPagedPool);
+        FsRtlInitializeLargeMcb(&(Mcb->MetaExts), NonPagedPool);
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         Status = STATUS_INSUFFICIENT_RESOURCES;
         DbgBreak();
@@ -1470,10 +1518,17 @@ Ext2FreeMcb (IN PEXT2_VCB Vcb, IN PEXT2_MCB Mcb)
         Ext2DerefMcb(Mcb->Target);
     }
 
-    DEBUG(DL_EXT, ("Ext2FreeMcb ...: %wZ\n", &Mcb->FullName));
-    Ext2ListExtents(&Mcb->Extents);
+    if (FsRtlNumberOfRunsInLargeMcb(&Mcb->Extents)) {
+        DEBUG(DL_EXT, ("List data extents for: %wZ\n", &Mcb->FullName));
+        Ext2ListExtents(&Mcb->Extents);
+    }
     FsRtlUninitializeLargeMcb(&(Mcb->Extents));
-    ClearLongFlag(Mcb->Flags, MCB_ZONE_INIT);
+    if (FsRtlNumberOfRunsInLargeMcb(&Mcb->MetaExts)) {
+        DEBUG(DL_EXT, ("List meta extents for: %wZ\n", &Mcb->FullName));
+        Ext2ListExtents(&Mcb->MetaExts);
+    }
+    FsRtlUninitializeLargeMcb(&(Mcb->MetaExts));
+    ClearLongFlag(Mcb->Flags, MCB_ZONE_INITED);
 
     if (Mcb->ShortName.Buffer) {
         DEC_MEM_COUNT(PS_MCB_NAME, Mcb->ShortName.Buffer,

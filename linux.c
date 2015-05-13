@@ -119,7 +119,7 @@ void init_waitqueue_head(wait_queue_head_t *q)
 }
 
 struct __wait_queue *
-            wait_queue_create()
+wait_queue_create()
 {
     struct __wait_queue * wait = NULL;
     wait = kmalloc(sizeof(struct __wait_queue), GFP_KERNEL);
@@ -324,7 +324,7 @@ ext2_destroy_bh()
 }
 
 struct buffer_head *
-            new_buffer_head()
+new_buffer_head()
 {
     struct buffer_head * bh = NULL;
     bh = kmem_cache_alloc(g_jbh.bh_cache, GFP_NOFS);
@@ -360,11 +360,11 @@ free_buffer_head(struct buffer_head * bh)
 }
 
 struct buffer_head *
-            __getblk(
-                struct block_device *   bdev,
-                sector_t                block,
-                unsigned long           size
-            )
+__getblk(
+    struct block_device *   bdev,
+    sector_t                block,
+    unsigned long           size
+)
 {
     PEXT2_VCB Vcb = bdev->bd_priv;
     LARGE_INTEGER offset;
@@ -387,7 +387,7 @@ struct buffer_head *
     spin_lock_irqsave(&bdev->bd_bh_lock, irql);
     list_for_each(entry, &bdev->bd_bh_list) {
         struct buffer_head * tbh =
-                        list_entry(entry, struct buffer_head, b_list);
+            list_entry(entry, struct buffer_head, b_list);
         if (block == tbh->b_blocknr) {
             bh = tbh;
             get_bh(bh);
@@ -447,7 +447,7 @@ again:
     /* do search again here */
     list_for_each(entry, &bdev->bd_bh_list) {
         struct buffer_head * tbh =
-                        list_entry(entry, struct buffer_head, b_list);
+            list_entry(entry, struct buffer_head, b_list);
         if (block == tbh->b_blocknr) {
             DEBUG(DL_BH, ("getblk:  got conflict: tbh=%p\n", tbh));
             free_buffer_head(bh);
@@ -483,7 +483,7 @@ int submit_bh(int rw, struct buffer_head *bh)
 
     if (rw == WRITE) {
 
-        if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+        if (IsVcbReadOnly(Vcb)) {
             goto errorout;
         }
 
@@ -645,7 +645,7 @@ int sync_blockdev(struct block_device *bdev)
  * NULL
  */
 struct buffer_head *
-            __find_get_block(struct block_device *bdev, sector_t block, unsigned long size)
+__find_get_block(struct block_device *bdev, sector_t block, unsigned long size)
 {
     return __getblk(bdev, block, size);
 }

@@ -1461,6 +1461,15 @@ Ext2MountVolume (IN PEXT2_IRP_CONTEXT IrpContext)
             __leave;
         }
 
+#if 0
+        if (IrpContext->RealDevice->Size >= sizeof(ULONG) + sizeof(DEVICE_OBJECT) &&
+                *((PULONG)IrpContext->RealDevice->DeviceExtension) == 'DSSA') {
+        } else {
+            Status = STATUS_UNRECOGNIZED_VOLUME;
+            __leave;
+        }
+#endif
+
         Irp = IrpContext->Irp;
         IoStackLocation = IoGetCurrentIrpStackLocation(Irp);
         TargetDeviceObject =
@@ -1914,15 +1923,6 @@ Ext2DismountVolume (IN PEXT2_IRP_CONTEXT IrpContext)
             __leave;
         }
 
-        /*
-                if (!FlagOn(Vcb->Flags, VCB_VOLUME_LOCKED)) {
-                    DEBUG(DL_ERR, ( "Ext2Dismount: Volume is not locked.\n"));
-
-                    Status = STATUS_ACCESS_DENIED;
-
-                    __leave;
-                }
-        */
         Ext2FlushFiles(IrpContext, Vcb, FALSE);
         Ext2FlushVolume(IrpContext, Vcb, FALSE);
 
@@ -2069,8 +2069,7 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
         VcbResourceAcquired =
             ExAcquireResourceExclusiveLite(&Vcb->MainResource, TRUE);
 
-        if ( IsFlagOn(Vcb->Flags, VCB_READ_ONLY) ||
-                IsFlagOn(Vcb->Flags, VCB_WRITE_PROTECTED)) {
+        if (IsVcbReadOnly(Vcb)) {
             FlushBeforePurge = FALSE;
         }
 
@@ -2170,8 +2169,7 @@ Ext2PurgeFile ( IN PEXT2_FCB Fcb,
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
 
-    if ( !IsFlagOn(Fcb->Vcb->Flags, VCB_READ_ONLY) && FlushBeforePurge &&
-            !IsFlagOn(Fcb->Vcb->Flags, VCB_WRITE_PROTECTED)) {
+    if (!IsVcbReadOnly(Fcb->Vcb) && FlushBeforePurge) {
 
         DEBUG(DL_INF, ( "Ext2PurgeFile: CcFlushCache on %wZ.\n",
                         &Fcb->Mcb->FullName));

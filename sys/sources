@@ -23,7 +23,8 @@ USER_C_FLAGS = $(USER_C_FLAGS) /D__KERNEL__
 INCLUDES=..\include;
 TARGETLIBS= $(TARGETPATH)\*\nlssup.lib \
             $(TARGETPATH)\*\jbd.lib    \
-            $(TARGETPATH)\*\ext3.lib
+            $(TARGETPATH)\*\ext3.lib   \
+            $(TARGETPATH)\*\ext4.lib
 
 !IF "$(DDK_TARGET_OS)"=="Win2K"
 TARGETLIBS= $(TARGETLIBS)              \

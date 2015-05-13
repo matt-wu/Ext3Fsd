@@ -18,13 +18,7 @@ extern PEXT2_GLOBAL Ext2Global;
 /* DEFINITIONS *************************************************************/
 
 #ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, Ext2Log2)
-#pragma alloc_text(PAGE, Ext2NtTime)
-#pragma alloc_text(PAGE, Ext2LinuxTime)
-#pragma alloc_text(PAGE, Ext2OEMToUnicode)
-#pragma alloc_text(PAGE, Ext2UnicodeToOEM)
 #pragma alloc_text(PAGE, Ext2Sleep)
-#pragma alloc_text(PAGE, Ext2WinntError)
 #endif
 
 ULONG

@@ -1,7 +1,7 @@
 /*
  * COPYRIGHT:        See COPYRIGHT.TXT
  * PROJECT:          Ext2 File System Driver for WinNT/2K/XP
- * FILE:             lock.c
+ * FILE:             htree.c
  * PROGRAMMER:       Matt Wu <mattwu@163.com>
  * HOMEPAGE:         http://www.ext2fsd.com
  * UPDATE HISTORY:
@@ -246,13 +246,13 @@ struct buffer_head *ext3_bread(struct ext2_icb *icb, struct inode *inode,
 
     /* mapping file offset to ext2 block */
     if (INODE_HAS_EXTENT(&Mcb->Inode)) {
-        status = Ext2ExtentMap(icb, inode->i_sb->s_priv,
+        status = Ext2MapExtent(icb, inode->i_sb->s_priv,
                                Mcb, block, FALSE,
                                &lbn, &num);
     } else {
-        status = Ext2BlockMap(icb, inode->i_sb->s_priv,
-                              Mcb, block, FALSE,
-                              &lbn, &num);
+        status = Ext2MapIndirect(icb, inode->i_sb->s_priv,
+                                 Mcb, block, FALSE,
+                                 &lbn, &num);
     }
 
     if (!NT_SUCCESS(status)) {
@@ -260,18 +260,13 @@ struct buffer_head *ext3_bread(struct ext2_icb *icb, struct inode *inode,
         return bh;
     }
 
-    bh = sb_getblk(inode->i_sb, lbn);
+    bh = extents_bread(inode->i_sb, lbn);
     if (!bh) {
         *err = -ENOMEM;
         return bh;
     }
-    if (buffer_uptodate(bh))
-        return bh;
-    *err = bh_submit_read(bh);
-    if (*err) {
-	    brelse(bh);
-	    return NULL;
-    }
+
+    *err = 0;
     return bh;
 }
 
@@ -402,11 +397,11 @@ int add_dirent_to_buf(struct ext2_icb *icb, struct dentry *dentry,
         while ((char *) de <= top) {
             if (!ext3_check_dir_entry("ext3_add_entry", dir, de,
                                       bh, offset)) {
-                brelse(bh);
+                extents_brelse(bh);
                 return -EIO;
             }
             if (ext3_match(namelen, name, de)) {
-                brelse(bh);
+                extents_brelse(bh);
                 return -EEXIST;
             }
             nlen = EXT3_DIR_REC_LEN(de->name_len);
@@ -453,8 +448,8 @@ int add_dirent_to_buf(struct ext2_icb *icb, struct dentry *dentry,
     ext3_update_dx_flag(dir);
     dir->i_version++;
     ext3_mark_inode_dirty(icb, dir);
-    set_buffer_dirty(bh);
-    brelse(bh);
+    extents_mark_buffer_dirty(bh);
+    extents_brelse(bh);
     return 0;
 }
 
@@ -964,7 +959,7 @@ struct stats dx_show_entries(struct ext2_icb *icb, struct dx_hash_info *hinfo,
         names += stats.names;
         space += stats.space;
         bcount += stats.bcount;
-        brelse (bh);
+        extents_brelse (bh);
     }
     if (bcount)
         printk("%snames %u, fullness %u (%u%%)\n", levels?"":"   ",
@@ -1016,7 +1011,7 @@ static struct dx_frame *
         ext3_warning(dir->i_sb, __FUNCTION__,
                      "Unrecognised inode hash code %d",
                      root->info.hash_version);
-        brelse(bh);
+        extents_brelse(bh);
         *err = ERR_BAD_DX_DIR;
         goto fail;
     }
@@ -1030,7 +1025,7 @@ static struct dx_frame *
         ext3_warning(dir->i_sb, __FUNCTION__,
                      "Unimplemented inode hash flags: %#06x",
                      root->info.unused_flags);
-        brelse(bh);
+        extents_brelse(bh);
         *err = ERR_BAD_DX_DIR;
         goto fail;
     }
@@ -1039,7 +1034,7 @@ static struct dx_frame *
         ext3_warning(dir->i_sb, __FUNCTION__,
                      "Unimplemented inode hash depth: %#06x",
                      root->info.indirect_levels);
-        brelse(bh);
+        extents_brelse(bh);
         *err = ERR_BAD_DX_DIR;
         goto fail;
     }
@@ -1051,7 +1046,7 @@ static struct dx_frame *
             root->info.info_length)) {
         ext3_warning(dir->i_sb, __FUNCTION__,
                      "dx entry: limit != root limit");
-        brelse(bh);
+        extents_brelse(bh);
         *err = ERR_BAD_DX_DIR;
         goto fail;
     }
@@ -1063,7 +1058,7 @@ static struct dx_frame *
         if (!count || count > dx_get_limit(entries)) {
             ext3_warning(dir->i_sb, __FUNCTION__,
                          "dx entry: no count or count > limit");
-            brelse(bh);
+            extents_brelse(bh);
             *err = ERR_BAD_DX_DIR;
             goto fail2;
         }
@@ -1105,7 +1100,7 @@ static struct dx_frame *
         if (dx_get_limit(entries) != dx_node_limit (dir)) {
             ext3_warning(dir->i_sb, __FUNCTION__,
                          "dx entry: limit != node limit");
-            brelse(bh);
+            extents_brelse(bh);
             *err = ERR_BAD_DX_DIR;
             goto fail2;
         }
@@ -1114,7 +1109,7 @@ static struct dx_frame *
     }
 fail2:
     while (frame >= frame_in) {
-        brelse(frame->bh);
+        extents_brelse(frame->bh);
         frame--;
     }
 fail:
@@ -1131,8 +1126,8 @@ static void dx_release (struct dx_frame *frames)
         return;
 
     if (((struct dx_root *) frames[0].bh->b_data)->info.indirect_levels)
-        brelse(frames[1].bh);
-    brelse(frames[0].bh);
+        extents_brelse(frames[1].bh);
+    extents_brelse(frames[0].bh);
 }
 
 /*
@@ -1200,7 +1195,7 @@ int ext3_htree_next_block(struct ext2_icb *icb, struct inode *dir,
         if (!(bh = ext3_bread(icb, dir, dx_get_block(p->at), &err)))
             return err; /* Failure */
         p++;
-        brelse (p->bh);
+        extents_brelse (p->bh);
         p->bh = bh;
         p->at = p->entries = ((struct dx_node *) bh->b_data)->entries;
     }
@@ -1236,7 +1231,7 @@ int htree_dirblock_to_tree(struct ext2_icb *icb, struct file *dir_file,
             /* On error, skip the f_pos to the next block. */
             dir_file->f_pos = (dir_file->f_pos |
                                (dir->i_sb->s_blocksize - 1)) + 1;
-            brelse (bh);
+            extents_brelse (bh);
             return count;
         }
         ext3_dirhash(de->name, de->name_len, hinfo);
@@ -1248,12 +1243,12 @@ int htree_dirblock_to_tree(struct ext2_icb *icb, struct file *dir_file,
             continue;
         if ((err = ext3_htree_store_dirent(dir_file,
                                            hinfo->hash, hinfo->minor_hash, de)) != 0) {
-            brelse(bh);
+            extents_brelse(bh);
             return err;
         }
         count++;
     }
-    brelse(bh);
+    extents_brelse(bh);
     return count;
 }
 
@@ -1464,14 +1459,14 @@ struct buffer_head *
                                           dir, de, bh,
                                           (block<<EXT3_BLOCK_SIZE_BITS(sb))
                                           + (unsigned long)((char *)de - bh->b_data))) {
-                    brelse (bh);
+                    extents_brelse (bh);
                     goto errout;
                 }
                 *res_dir = de;
                 dx_release (frames);
                 return bh;
             }
-        brelse (bh);
+        extents_brelse (bh);
         /* Check to see if we should continue to search */
         retval = ext3_htree_next_block(icb, dir, hash, frame,
                                        frames, NULL);
@@ -1667,8 +1662,8 @@ int ext3_dx_add_entry(struct ext2_icb *icb, struct dentry *dentry,
             dxtrace(dx_show_index ("node", frames[1].entries));
             dxtrace(dx_show_index ("node",
                                    ((struct dx_node *) bh2->b_data)->entries));
-            set_buffer_dirty(bh2);
-            brelse (bh2);
+            extents_mark_buffer_dirty(bh2);
+            extents_brelse (bh2);
         } else {
             dxtrace(printk("Creating second level index...\n"));
             memcpy((char *) entries2, (char *) entries,
@@ -1687,7 +1682,7 @@ int ext3_dx_add_entry(struct ext2_icb *icb, struct dentry *dentry,
             frame->bh = bh2;
         }
         // ext3_journal_dirty_metadata(handle, frames[0].bh);
-        set_buffer_dirty(frames[0].bh);
+        extents_mark_buffer_dirty(frames[0].bh);
     }
     de = do_split(icb, dir, &bh, frame, &hinfo, &err);
     if (!de)
@@ -1698,7 +1693,7 @@ int ext3_dx_add_entry(struct ext2_icb *icb, struct dentry *dentry,
 
 cleanup:
     if (bh)
-        brelse(bh);
+        extents_brelse(bh);
     dx_release(frames);
     return err;
 }
@@ -1774,7 +1769,7 @@ struct ext3_dir_entry_2 *
 
     bh2 = ext3_append (icb, dir, &newblock, error);
     if (!(bh2)) {
-        brelse(*bh);
+        extents_brelse(*bh);
         *bh = NULL;
         goto errout;
     }
@@ -1819,10 +1814,10 @@ struct ext3_dir_entry_2 *
         de = de2;
     }
     dx_insert_block (frame, hash2 + continued, newblock);
-    set_buffer_dirty(bh2);
-    set_buffer_dirty(frame->bh);
+    extents_mark_buffer_dirty(bh2);
+    extents_mark_buffer_dirty(frame->bh);
 
-    brelse (bh2);
+    extents_brelse (bh2);
     dxtrace(dx_show_index ("frame", frame->entries));
 errout:
     return de;
@@ -1863,7 +1858,7 @@ int make_indexed_dir(struct ext2_icb *icb, struct dentry *dentry,
     if ((char *) de >= (((char *) root) + blocksize)) {
         DEBUG(DL_ERR, (__FUNCTION__  ": invalid rec_len for '..' in inode %lu",
                        dir->i_ino));
-        brelse(bh);
+        extents_brelse(bh);
         return -EIO;
     }
     len = (unsigned int)((char *) root + blocksize - (char *) de);
@@ -1871,7 +1866,7 @@ int make_indexed_dir(struct ext2_icb *icb, struct dentry *dentry,
     /* Allocate new block for the 0th block's dirents */
     bh2 = ext3_append(icb, dir, &block, &retval);
     if (!(bh2)) {
-        brelse(bh);
+        extents_brelse(bh);
         return retval;
     }
     EXT3_I(dir)->i_flags |= EXT3_INDEX_FL;
@@ -1975,7 +1970,7 @@ int ext3_add_entry(struct ext2_icb *icb, struct dentry *dentry, struct inode *in
             return make_indexed_dir(icb, dentry, inode, bh);
 #endif
 
-        brelse(bh);
+        extents_brelse(bh);
     }
     bh = ext3_append(icb, dir, &block, &retval);
     if (!bh)
@@ -2010,7 +2005,7 @@ int ext3_delete_entry(struct ext2_icb *icb, struct inode *dir,
                 de->inode = 0;
             dir->i_version++;
             /* ext3_journal_dirty_metadata(handle, bh); */
-            set_buffer_dirty(bh);
+            extents_mark_buffer_dirty(bh);
             return 0;
         }
         i += ext3_rec_len_from_disk(de->rec_len);
@@ -2053,7 +2048,7 @@ int ext3_is_dir_empty(struct ext2_icb *icb, struct inode *inode)
         ext3_warning(inode->i_sb, "empty_dir",
                      "bad directory (dir #%lu) - no `.' or `..'",
                      inode->i_ino);
-        brelse(bh);
+        extents_brelse(bh);
         return 1;
     }
     offset = ext3_rec_len_from_disk(de->rec_len) +
@@ -2063,7 +2058,7 @@ int ext3_is_dir_empty(struct ext2_icb *icb, struct inode *inode)
         if (!bh ||
                 (void *) de >= (void *) (bh->b_data+sb->s_blocksize)) {
             err = 0;
-            brelse(bh);
+            extents_brelse(bh);
             bh = ext3_bread(icb, inode, offset >> EXT3_BLOCK_SIZE_BITS(sb), &err);
             if (!bh) {
                 if (err)
@@ -2081,13 +2076,13 @@ int ext3_is_dir_empty(struct ext2_icb *icb, struct inode *inode)
             continue;
         }
         if (le32_to_cpu(de->inode)) {
-            brelse(bh);
+            extents_brelse(bh);
             return 0;
         }
         offset += ext3_rec_len_from_disk(de->rec_len);
         de = ext3_next_entry(de);
     }
-    brelse(bh);
+    extents_brelse(bh);
     return 1;
 }
 
@@ -2149,7 +2144,7 @@ static inline int search_dirblock(struct buffer_head * bh,
  * entry - you'll have to do that yourself if you want to.
  *
  * The returned buffer_head has ->b_count elevated.  The caller is expected
- * to brelse() it when appropriate.
+ * to extents_brelse() it when appropriate.
  */
 struct buffer_head * ext3_find_entry (struct ext2_icb *icb,
                                                   struct dentry *dentry,
@@ -2223,7 +2218,7 @@ restart:
             ext3_error(sb, __FUNCTION__, "reading directory #%lu "
                        "offset %lu", dir->i_ino,
                        (unsigned long)block);
-            brelse(bh);
+            extents_brelse(bh);
             goto next;
         }
         i = search_dirblock(bh, dir, dentry,
@@ -2232,7 +2227,7 @@ restart:
             ret = bh;
             goto cleanup_and_exit;
         } else {
-            brelse(bh);
+            extents_brelse(bh);
             if (i < 0)
                 goto cleanup_and_exit;
         }
@@ -2255,6 +2250,6 @@ next:
 cleanup_and_exit:
     /* Clean up the read-ahead blocks */
     for (; ra_ptr < ra_max; ra_ptr++)
-        brelse(bh_use[ra_ptr]);
+        extents_brelse(bh_use[ra_ptr]);
     return ret;
 }

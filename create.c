@@ -170,9 +170,9 @@ Ext2FollowLink (
         }
 
         if (Target == NULL /* link target doesn't exist */      ||
-            Target == Mcb  /* symlink points to itself */       ||
-            IsMcbSpecialFile(Target) /* target not resolved*/   ||
-            IsFileDeleted(Target)  /* target deleted */         ) {
+                Target == Mcb  /* symlink points to itself */       ||
+                IsMcbSpecialFile(Target) /* target not resolved*/   ||
+                IsFileDeleted(Target)  /* target deleted */         ) {
 
             if (Target) {
                 ASSERT(Target->Refercount > 0);
@@ -613,7 +613,7 @@ Ext2ScanDir (
         Ext2DerefMcb(Parent);
 
         if (bh)
-            brelse(bh);
+            extents_brelse(bh);
 
         if (!NT_SUCCESS(Status)) {
             if (de)
@@ -651,12 +651,12 @@ NTSTATUS Ext2AddDotEntries(struct ext2_icb *icb, struct inode *dir,
     strcpy (de->name, "..");
     ext3_set_de_type(inode->i_sb, de, S_IFDIR);
     inode->i_nlink = 2;
-    set_buffer_dirty(bh);
+    extents_mark_buffer_dirty(bh);
     ext3_mark_inode_dirty(icb, inode);
 
 errorout:
     if (bh)
-        brelse (bh);
+        extents_brelse (bh);
 
     return Ext2WinntError(rc);
 }
@@ -953,7 +953,7 @@ Dissecting:
                     (CreateDisposition == FILE_OPEN_IF) ||
                     (CreateDisposition == FILE_OVERWRITE_IF)) {
 
-                if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+                if (IsVcbReadOnly(Vcb)) {
                     Status = STATUS_MEDIA_WRITE_PROTECTED;
                     __leave;
                 }
@@ -1016,7 +1016,7 @@ Dissecting:
 
             } else if (OpenTargetDirectory) {
 
-                if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+                if (IsVcbReadOnly(Vcb)) {
                     Status = STATUS_MEDIA_WRITE_PROTECTED;
                     __leave;
                 }
@@ -1052,7 +1052,7 @@ Dissecting:
             /* here already get Mcb referred */
             if (OpenTargetDirectory) {
 
-                if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+                if (IsVcbReadOnly(Vcb)) {
                     Status = STATUS_MEDIA_WRITE_PROTECTED;
                     Ext2DerefMcb(Mcb);
                     __leave;
@@ -1149,7 +1149,7 @@ Openit:
             // Check readonly flag
             if (!CanIWrite(Vcb) && Ext2IsOwnerReadOnly(Mcb->Inode.i_mode)) {
                 if (BooleanFlagOn(DesiredAccess,  FILE_WRITE_DATA | FILE_APPEND_DATA |
-                                                  FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)) {
+                                  FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)) {
                     Status = STATUS_ACCESS_DENIED;
                     __leave;
                 } else if (IsFlagOn(Options, FILE_DELETE_ON_CLOSE )) {
@@ -1256,6 +1256,8 @@ Openit:
                         __leave;
                     }
 
+                    /* disable data blocks allocation */
+#if 0
                     Fcb->Header.AllocationSize.QuadPart =
                         Irp->Overlay.AllocationSize.QuadPart;
 
@@ -1273,6 +1275,7 @@ Openit:
                             __leave;
                         }
                     }
+#endif
                 }
 
             } else {
@@ -1283,7 +1286,7 @@ Openit:
 
                 if (DeleteOnClose) {
 
-                    if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+                    if (IsVcbReadOnly(Vcb)) {
                         Status = STATUS_MEDIA_WRITE_PROTECTED;
                         __leave;
                     }
@@ -1313,7 +1316,7 @@ Openit:
 
                             if (Fcb->NonCachedOpenCount == Fcb->OpenHandleCount) {
 
-                                if (!IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+                                if (!IsVcbReadOnly(Vcb)) {
                                     CcFlushCache(&Fcb->SectionObject, NULL, 0, NULL);
                                     ClearLongFlag(Fcb->Flags, FCB_FILE_MODIFIED);
                                 }
@@ -1330,7 +1333,7 @@ Openit:
 
             if (!IsDirectory(Fcb)) {
 
-                if (!IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+                if (!IsVcbReadOnly(Vcb)) {
                     if ((CreateDisposition == FILE_SUPERSEDE) && !IsPagingFile) {
                         DesiredAccess |= DELETE;
                     } else if (((CreateDisposition == FILE_OVERWRITE) ||
@@ -1470,7 +1473,7 @@ Openit:
                         __leave;
                     }
 
-                    if (IsFlagOn(Vcb->Flags, VCB_READ_ONLY)) {
+                    if (IsVcbReadOnly(Vcb)) {
                         Status = STATUS_MEDIA_WRITE_PROTECTED;
                         __leave;
                     }
@@ -1850,9 +1853,11 @@ Ext2CreateInode(
     } else {
         DbgBreak();
     }
+
     /* Force using extent */
-    if (IsFlagOn(SUPER_BLOCK->s_feature_incompat, EXT4_FEATURE_INCOMPAT_EXTENTS))
+    if (IsFlagOn(SUPER_BLOCK->s_feature_incompat, EXT4_FEATURE_INCOMPAT_EXTENTS)) {
         Inode.i_flags |= EXT2_EXTENTS_FL;
+    }
 
     /* add new entry to its parent */
     Status = Ext2AddEntry(

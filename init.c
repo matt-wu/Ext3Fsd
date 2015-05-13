@@ -556,25 +556,23 @@ DriverEntry (
 
     FastIoDispatch = &(Ext2Global->FastIoDispatch);
 
-    FastIoDispatch->SizeOfFastIoDispatch        = sizeof(FAST_IO_DISPATCH);
-    FastIoDispatch->FastIoCheckIfPossible       = Ext2FastIoCheckIfPossible;
-    FastIoDispatch->FastIoRead                  = Ext2FastIoRead;
-    FastIoDispatch->FastIoWrite                 = Ext2FastIoWrite;
-    FastIoDispatch->FastIoQueryBasicInfo        = Ext2FastIoQueryBasicInfo;
-    FastIoDispatch->FastIoQueryStandardInfo     = Ext2FastIoQueryStandardInfo;
-    FastIoDispatch->FastIoLock                  = Ext2FastIoLock;
-    FastIoDispatch->FastIoUnlockSingle          = Ext2FastIoUnlockSingle;
-    FastIoDispatch->FastIoUnlockAll             = Ext2FastIoUnlockAll;
-    FastIoDispatch->FastIoUnlockAllByKey        = Ext2FastIoUnlockAllByKey;
-    FastIoDispatch->FastIoQueryNetworkOpenInfo  = Ext2FastIoQueryNetworkOpenInfo;
-    FastIoDispatch->AcquireForModWrite          = Ext2AcquireFileForModWrite;
-    FastIoDispatch->ReleaseForModWrite          = Ext2ReleaseFileForModWrite;
-    FastIoDispatch->AcquireForCcFlush           = Ext2AcquireFileForCcFlush;
-    FastIoDispatch->ReleaseForCcFlush           = Ext2ReleaseFileForCcFlush;
+    FastIoDispatch->SizeOfFastIoDispatch          = sizeof(FAST_IO_DISPATCH);
+    FastIoDispatch->FastIoCheckIfPossible         = Ext2FastIoCheckIfPossible;
+    FastIoDispatch->FastIoRead                    = Ext2FastIoRead;
+    FastIoDispatch->FastIoWrite                   = Ext2FastIoWrite;
+    FastIoDispatch->FastIoQueryBasicInfo          = Ext2FastIoQueryBasicInfo;
+    FastIoDispatch->FastIoQueryStandardInfo       = Ext2FastIoQueryStandardInfo;
+    FastIoDispatch->FastIoLock                    = Ext2FastIoLock;
+    FastIoDispatch->FastIoUnlockSingle            = Ext2FastIoUnlockSingle;
+    FastIoDispatch->FastIoUnlockAll               = Ext2FastIoUnlockAll;
+    FastIoDispatch->FastIoUnlockAllByKey          = Ext2FastIoUnlockAllByKey;
+    FastIoDispatch->FastIoQueryNetworkOpenInfo    = Ext2FastIoQueryNetworkOpenInfo;
+    FastIoDispatch->AcquireForModWrite            = Ext2AcquireFileForModWrite;
+    FastIoDispatch->ReleaseForModWrite            = Ext2ReleaseFileForModWrite;
+    FastIoDispatch->AcquireForCcFlush             = Ext2AcquireFileForCcFlush;
+    FastIoDispatch->ReleaseForCcFlush             = Ext2ReleaseFileForCcFlush;
     FastIoDispatch->AcquireFileForNtCreateSection = Ext2AcquireForCreateSection;
     FastIoDispatch->ReleaseFileForNtCreateSection = Ext2ReleaseForCreateSection;
-
-
     DriverObject->FastIoDispatch = FastIoDispatch;
 
     //

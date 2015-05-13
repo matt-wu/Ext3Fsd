@@ -29,7 +29,7 @@ Ext2ExceptionFilter (
 
     ExceptRecord = ExceptionPointer->ExceptionRecord;
     ExceptionCode = ExceptRecord->ExceptionCode;
-	
+
     DbgPrint("-------------------------------------------------------------\n");
     DbgPrint("Exception happends in Ext2Fsd (code %xh):\n", ExceptionCode);
     DbgPrint(".exr %p;.cxr %p;\n", ExceptionPointer->ExceptionRecord,
