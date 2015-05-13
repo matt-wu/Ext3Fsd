@@ -251,23 +251,23 @@ void extents_mark_buffer_dirty(struct buffer_head *bh)
 
     set_buffer_dirty(bh);
 
-	SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
-	Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
-	if (CcPreparePinWrite(
-				Vcb->Volume,
-				&Offset,
-				BLOCK_SIZE,
-				FALSE,
-				PIN_WAIT,
-				&Bcb,
-				&Buffer )) {
-		CcSetDirtyPinnedData(Bcb, NULL);
-		Ext2AddBlockExtent( Vcb, NULL,
-							(ULONG)bh->b_blocknr,
-							(ULONG)bh->b_blocknr,
-							(bh->b_size >> BLOCK_BITS));
-		CcUnpinData(Bcb);
-	}
+    SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
+    Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
+    if (CcPreparePinWrite(
+                Vcb->Volume,
+                &Offset,
+                BLOCK_SIZE,
+                FALSE,
+                PIN_WAIT,
+                &Bcb,
+                &Buffer )) {
+        CcSetDirtyPinnedData(Bcb, NULL);
+        Ext2AddBlockExtent( Vcb, NULL,
+                            (ULONG)bh->b_blocknr,
+                            (ULONG)bh->b_blocknr,
+                            (bh->b_size >> BLOCK_BITS));
+        CcUnpinData(Bcb);
+    }
 }
 
 /*
