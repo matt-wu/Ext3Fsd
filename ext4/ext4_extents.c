@@ -15,6 +15,7 @@
 
 #include "ext2fs.h"
 #include "linux\ext4.h"
+#include "kerncompat.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4018)
