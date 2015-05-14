@@ -1067,6 +1067,7 @@ Ext2TruncateIndirectFast(
     /* clear inode blocks & sizes */
     Mcb->Inode.i_blocks = 0;
     Mcb->Inode.i_size = 0;
+    memset(&Mcb->Inode.i_block[0], 0, sizeof(__u32) * 15);
 
     /* the caller will do inode save */
 
