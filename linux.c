@@ -500,18 +500,23 @@ int submit_bh(int rw, struct buffer_head *bh)
 #if 0
             if (memcmp(Buffer, bh->b_data, BLOCK_SIZE) != 0) {
                 DbgBreak();
-                memmove(Buffer, bh->b_data, BLOCK_SIZE);
             }
+            memmove(Buffer, bh->b_data, BLOCK_SIZE);
 #endif
-
             CcSetDirtyPinnedData(Bcb, NULL);
+            Ext2AddBlockExtent( Vcb, NULL,
+                                (ULONG)bh->b_blocknr,
+                                (ULONG)bh->b_blocknr,
+                                (bh->b_size >> BLOCK_BITS));
             CcUnpinData(Bcb);
+        } else {
+
+            Ext2AddBlockExtent( Vcb, NULL,
+                                (ULONG)bh->b_blocknr,
+                                (ULONG)bh->b_blocknr,
+                                (bh->b_size >> BLOCK_BITS));
         }
 
-        Ext2AddBlockExtent( Vcb, NULL,
-                            (ULONG)bh->b_blocknr,
-                            (ULONG)bh->b_blocknr,
-                            (bh->b_size >> BLOCK_BITS));
     } else {
 
         DbgBreak();
