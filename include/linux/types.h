@@ -53,6 +53,10 @@ typedef __u64       u64;
 #define inline __inline
 #endif
 
+#ifndef noinline
+#define noinline
+#endif
+
 typedef __u32 __bitwise __be32;
 typedef __u16 __bitwise __be16;
 
@@ -74,6 +78,18 @@ typedef unsigned __int64 loff_t;
 
 #define BITS_PER_LONG  (32)
 #define ORDER_PER_LONG (05)
+
+#if defined(_WIN64)
+typedef __int64 long_ptr_t;
+typedef unsigned __int64 ulong_ptr_t;
+# define CFS_BITS_PER_LONG  (64)
+# define CFS_ORDER_PER_LONG (06)
+#else
+typedef long long_ptr_t;
+typedef unsigned long ulong_ptr_t;
+# define CFS_BITS_PER_LONG  (32)
+# define CFS_ORDER_PER_LONG (05)
+#endif
 
 //
 // bit spin lock
