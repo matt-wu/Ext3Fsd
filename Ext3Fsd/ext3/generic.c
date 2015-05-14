@@ -368,6 +368,7 @@ Ext2SaveInode ( IN PEXT2_IRP_CONTEXT IrpContext,
 
     IO_STATUS_BLOCK     IoStatus;
     LONGLONG            Offset = 0;
+    ULONG               InodeSize = sizeof(ext3i);
     BOOLEAN             rc = 0;
 
     DEBUG(DL_INF, ( "Ext2SaveInode: Saving Inode %xh: Mode=%xh Size=%xh\n",
@@ -395,7 +396,9 @@ Ext2SaveInode ( IN PEXT2_IRP_CONTEXT IrpContext,
     }
 
     Ext2EncodeInode(&ext3i, Inode);
-    rc = Ext2SaveBuffer(IrpContext, Vcb, Offset, sizeof(struct ext3_inode), &ext3i);
+    if (InodeSize > Vcb->InodeSize)
+        InodeSize = Vcb->InodeSize;
+    rc = Ext2SaveBuffer(IrpContext, Vcb, Offset, InodeSize, &ext3i);
 
     if (rc && IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK)) {
         Ext2StartFloppyFlushDpc(Vcb, NULL, NULL);

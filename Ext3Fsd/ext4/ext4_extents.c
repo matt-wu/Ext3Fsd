@@ -65,22 +65,15 @@ static ext4_fsblk_t ext4_new_meta_blocks(void *icb, handle_t *handle, struct ino
 		*errp = Ext2LinuxError(status);
 		return 0;
 	}
-	if (inode->i_flags & EXT4_HUGE_FILE_FL)
-		inode->i_blocks += blockcnt;
-	else
-		inode->i_blocks += (blockcnt * (inode->i_sb->s_blocksize >> 9));
+	inode->i_blocks += (blockcnt * (inode->i_sb->s_blocksize >> 9));
 	return block;
 }
 
 static void ext4_free_blocks(void *icb, handle_t *handle, struct inode *inode, void *fake,
 		ext4_fsblk_t block, int count, int flags)
 {
-	Ext2FreeBlock((PEXT2_IRP_CONTEXT)icb,
-			inode->i_sb->s_priv, block, count);
-	if (inode->i_flags & EXT4_HUGE_FILE_FL)
-		inode->i_blocks -= count;
-	else
-		inode->i_blocks -= count * (inode->i_sb->s_blocksize >> 9);
+	Ext2FreeBlock((PEXT2_IRP_CONTEXT)icb, inode->i_sb->s_priv, block, count);
+	inode->i_blocks -= count * (inode->i_sb->s_blocksize >> 9);
 	return;
 }
 
