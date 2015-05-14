@@ -606,13 +606,13 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
                 }
                 MainResourceAcquired = TRUE;
 
-                if ((ByteOffset.QuadPart + (LONGLONG)Length) > Fcb->Header.ValidDataLength.QuadPart) {
-                    if (ByteOffset.QuadPart >= Fcb->Header.ValidDataLength.QuadPart) {
+                if ((ByteOffset.QuadPart + (LONGLONG)Length) > Fcb->Header.FileSize.QuadPart) {
+                    if (ByteOffset.QuadPart >= Fcb->Header.FileSize.QuadPart) {
                         Irp->IoStatus.Information = 0;
                         Status = STATUS_END_OF_FILE;
                         __leave;
                     }
-                    ReturnedLength = (ULONG)(Fcb->Header.ValidDataLength.QuadPart - ByteOffset.QuadPart);
+                    ReturnedLength = (ULONG)(Fcb->Header.FileSize.QuadPart - ByteOffset.QuadPart);
                 }
             }
 
@@ -679,7 +679,6 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
             } else {
 
                 Buffer = Ext2GetUserBuffer(Irp);
-
                 if (Buffer == NULL) {
                     Status = STATUS_INVALID_USER_BUFFER;
                     DbgBreak();
@@ -703,39 +702,22 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
         } else {
 
-            ULONG   VDLOffset, BytesRead = ReturnedLength;
-            PVOID   SystemVA = Ext2GetUserBuffer(IrpContext->Irp);
-            BOOLEAN ZeroByte = FALSE;
+            ULONG   BytesRead = ReturnedLength;
+            PUCHAR  SystemVA  = Ext2GetUserBuffer(IrpContext->Irp);
 
-            if (!PagingIo && ByteOffset.QuadPart + BytesRead > Fcb->Header.ValidDataLength.QuadPart) {
+            if (ByteOffset.QuadPart + BytesRead > Fcb->Header.ValidDataLength.QuadPart) {
 
-                ReturnedLength = (ULONG)(Fcb->Header.ValidDataLength.QuadPart - ByteOffset.QuadPart);
-                if (ByteOffset.QuadPart < Fcb->Header.ValidDataLength.QuadPart) {
-
-                    if (!IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
-                        Status = STATUS_PENDING;
-                        __leave;
-                    }
-
-                    VDLOffset = ReturnedLength;
-                    ZeroByte = TRUE;
-
-                } else {
-
-                    if (SystemVA)
+                if (ByteOffset.QuadPart >= Fcb->Header.ValidDataLength.QuadPart) {
+                    if (SystemVA) {
                         SafeZeroMemory(SystemVA, Length);
-
-                    Irp->IoStatus.Information = Length;
+                    }
+                    Irp->IoStatus.Information = ReturnedLength;
                     Status = STATUS_SUCCESS;
                     __leave;
-                }
-
-                BytesRead = (ReturnedLength + SECTOR_SIZE - 1) & (~(SECTOR_SIZE - 1));
-
-                if (BytesRead > ReturnedLength ) {
-                    if (!IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
-                        Status = STATUS_PENDING;
-                        __leave;
+                } else {
+                    BytesRead = (ULONG)(Fcb->Header.ValidDataLength.QuadPart - ByteOffset.QuadPart);
+                    if (SystemVA) {
+                        SafeZeroMemory(SystemVA + BytesRead, Length - BytesRead);
                     }
                 }
             }
@@ -763,17 +745,6 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
                and fail it in other failure cases  */
             if (!NT_SUCCESS(Status)) {
                 __leave;
-            }
-
-            /* return zero content to user (beyond file valid data) */
-            ASSERT(ReturnedLength <= Length);
-            if (SystemVA && ReturnedLength < Length) {
-                SafeZeroMemory((PUCHAR)SystemVA + ReturnedLength,
-                               Length - ReturnedLength);
-                if (ZeroByte && VDLOffset < ReturnedLength) {
-                    SafeZeroMemory((PUCHAR)SystemVA + VDLOffset,
-                                   ReturnedLength - VDLOffset);
-                }
             }
 
             /* pended by low level device */
