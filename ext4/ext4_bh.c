@@ -251,23 +251,23 @@ void extents_mark_buffer_dirty(struct buffer_head *bh)
 
     set_buffer_dirty(bh);
 
-    SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
-    Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
-    if (CcPreparePinWrite(
-                Vcb->Volume,
-                &Offset,
-                BLOCK_SIZE,
-                FALSE,
-                PIN_WAIT,
-                &Bcb,
-                &Buffer )) {
-        CcSetDirtyPinnedData(Bcb, NULL);
-        Ext2AddBlockExtent( Vcb, NULL,
-                            (ULONG)bh->b_blocknr,
-                            (ULONG)bh->b_blocknr,
-                            (bh->b_size >> BLOCK_BITS));
-        CcUnpinData(Bcb);
-    }
+	SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
+	Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
+	if (CcPreparePinWrite(
+				Vcb->Volume,
+				&Offset,
+				bh->b_size,
+				FALSE,
+				PIN_WAIT,
+				&Bcb,
+				&Buffer )) {
+		CcSetDirtyPinnedData(Bcb, NULL);
+		Ext2AddBlockExtent( Vcb, NULL,
+							(ULONG)bh->b_blocknr,
+							(ULONG)bh->b_blocknr,
+							(bh->b_size >> BLOCK_BITS));
+		CcUnpinData(Bcb);
+	}
 }
 
 /*
@@ -294,5 +294,39 @@ void extents_brelse(struct buffer_head *bh)
 
         Ext2DestroyMdl(bh->b_mdl);
     }
+    extents_free_buffer_head(bh);
+}
+
+/*
+ * extents_bforget: Release the corresponding buffer header
+ *					and purge the buffer.
+ *
+ * @bh: The corresponding buffer header that is going to be freed.
+ *
+ * The pages underlying the buffer header will be unlocked.
+ */
+void extents_bforget(struct buffer_head *bh)
+{
+	struct block_device *bdev = bh->b_bdev;
+	PEXT2_VCB            Vcb  = bdev->bd_priv;
+	LARGE_INTEGER        Offset;
+    if (bh == NULL)
+        return;
+    
+    if (bh->b_mdl) {
+        DEBUG(DL_BH, ("bh=%p mdl=%p (Flags:%xh VA:%p) released.\n", bh, bh->b_mdl,
+                      bh->b_mdl->MdlFlags, bh->b_mdl->MappedSystemVa));
+        if (IsFlagOn(bh->b_mdl->MdlFlags, MDL_PAGES_LOCKED)) {
+            /* MmUnlockPages will release it's VA */
+            MmUnlockPages(bh->b_mdl);
+        } else if (IsFlagOn(bh->b_mdl->MdlFlags, MDL_MAPPED_TO_SYSTEM_VA)) {
+            MmUnmapLockedPages(bh->b_mdl->MappedSystemVa, bh->b_mdl);
+        }
+
+        Ext2DestroyMdl(bh->b_mdl);
+    }
+	
+	Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
+	CcPurgeCacheSection(&Vcb->SectionObject, &Offset, bh->b_size, FALSE);
     extents_free_buffer_head(bh);
 }
