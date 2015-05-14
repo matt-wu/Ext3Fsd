@@ -15,7 +15,6 @@
 
 #include "ext2fs.h"
 #include "linux\ext4.h"
-#include "kerncompat.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4018)
@@ -66,30 +65,28 @@ static ext4_fsblk_t ext4_new_meta_blocks(void *icb, handle_t *handle, struct ino
 		*errp = Ext2LinuxError(status);
 		return 0;
 	}
-	if (inode->i_flags & EXT4_HUGE_FILE_FL)
-		inode->i_blocks += blockcnt;
-	else
-		inode->i_blocks += (blockcnt * (inode->i_sb->s_blocksize >> 9));
+	inode->i_blocks += (blockcnt * (inode->i_sb->s_blocksize >> 9));
 	return block;
 }
 
 static void ext4_free_blocks(void *icb, handle_t *handle, struct inode *inode, void *fake,
 		ext4_fsblk_t block, int count, int flags)
 {
-	Ext2FreeBlock((PEXT2_IRP_CONTEXT)icb,
-			inode->i_sb->s_priv, block, count);
-	if (inode->i_flags & EXT4_HUGE_FILE_FL)
-		inode->i_blocks -= count;
-	else
-		inode->i_blocks -= count * (inode->i_sb->s_blocksize >> 9);
+	Ext2FreeBlock((PEXT2_IRP_CONTEXT)icb, inode->i_sb->s_priv, block, count);
+	inode->i_blocks -= count * (inode->i_sb->s_blocksize >> 9);
 	return;
 }
 
 static inline void ext_debug(char *str, ...)
 {
 }
-
-#define EXT4_ERROR_INODE(inode, str, ...) DbgPrint("inode[%p]: "##str "\n", inode, __VA_ARGS__)
+#if TRUE
+#define EXT4_ERROR_INODE(inode, str, ...) do {                      \
+            DbgPrint("inode[%p]: "##str "\n", inode, __VA_ARGS__);  \
+        } while(0)
+#else
+#define EXT4_ERROR_INODE
+#endif
 
 #define ext4_std_error(s, err)
 #define assert ASSERT
@@ -1901,14 +1898,14 @@ static int ext4_remove_blocks(void *icb, handle_t *handle, struct inode *inode,
 	int i;
 
 	if (from >= le32_to_cpu(ex->ee_block)
-			&& to == le32_to_cpu(ex->ee_block) + ext4_ext_get_actual_len(ex) - 1) {
+			&& to == le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len) - 1) {
 		/* tail removal */
 		unsigned long num, start;
-		num = le32_to_cpu(ex->ee_block) + ext4_ext_get_actual_len(ex) - from;
-		start = ext4_ext_pblock(ex) + ext4_ext_get_actual_len(ex) - num;
+		num = le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len) - from;
+		start = ext4_ext_pblock(ex) + le16_to_cpu(ex->ee_len) - num;
 		ext4_free_blocks(icb, handle, inode, NULL, start, num, 0);
 	} else if (from == le32_to_cpu(ex->ee_block)
-			&& to <= le32_to_cpu(ex->ee_block) + ext4_ext_get_actual_len(ex) - 1) {
+			&& to <= le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len) - 1) {
 	} else {
 	}
 	return 0;
@@ -1960,7 +1957,7 @@ ext4_ext_rm_leaf(void *icb, handle_t *handle, struct inode *inode,
 	ex = EXT_LAST_EXTENT(eh);
 
 	ex_ee_block = le32_to_cpu(ex->ee_block);
-	ex_ee_len = ext4_ext_get_actual_len(ex);
+	ex_ee_len = le16_to_cpu(ex->ee_len);
 
 	while (ex >= EXT_FIRST_EXTENT(eh) &&
 			ex_ee_block + ex_ee_len > start) {
@@ -2030,7 +2027,7 @@ ext4_ext_rm_leaf(void *icb, handle_t *handle, struct inode *inode,
 
 		ex--;
 		ex_ee_block = le32_to_cpu(ex->ee_block);
-		ex_ee_len = ext4_ext_get_actual_len(ex);
+		ex_ee_len = le16_to_cpu(ex->ee_len);
 	}
 
 	if (correct_index && eh->eh_entries)
@@ -2370,21 +2367,10 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	if ((ex = path[depth].p_ext)) {
 		ext4_lblk_t ee_block = le32_to_cpu(ex->ee_block);
 		ext4_fsblk_t ee_start = ext4_ext_pblock(ex);
-		unsigned short ee_len  = ext4_ext_get_actual_len(ex);
+		unsigned short ee_len  = le16_to_cpu(ex->ee_len);
 		/* if found exent covers block, simple return it */
 		if (iblock >= ee_block && iblock < ee_block + ee_len) {
-			if (ext4_ext_is_unwritten(ex)) {
-				printk(KERN_DEBUG "unwritten extent: "
-						"ee_block: %u, ee_len: %d\n",
-						ee_block, ee_len);
-				err = ext4_split_extent_at(icb, handle,
-					     inode,
-					     &path,
-					     le32_to_cpu(ex->ee_block),
-					     0, 0);
-				if (err)
-					goto out2;
-			}
+			ASSERT(!ext4_ext_is_unwritten(ex));
 			newblock = iblock - ee_block + ee_start;
 			/* number of remain blocks in the extent */
 			allocated = ee_len - (iblock - ee_block);
@@ -2402,7 +2388,7 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 
 	/* find next allocated block so that we know how many
 	 * blocks we can allocate without ovelapping next extent */
-	/*BUG_ON(iblock < le32_to_cpu(ex->ee_block) + ext4_ext_get_actual_len(ex));*/
+	/*BUG_ON(iblock < le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len));*/
 	next = ext4_ext_next_allocated_block(path);
 	BUG_ON(next <= iblock);
 	allocated = next - iblock;
