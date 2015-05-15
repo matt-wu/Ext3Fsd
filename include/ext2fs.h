@@ -644,6 +644,12 @@ typedef struct _EXT2_VCB {
     // Sector size in bits
     ULONG                       SectorBits;
 
+    // Aligned size (Page or Block)
+    ULONG                       IoUnitSize;
+
+    // Bits of aligned size
+    ULONG                       IoUnitBits;
+
     // Inode size
     ULONG                       InodeSize;
 

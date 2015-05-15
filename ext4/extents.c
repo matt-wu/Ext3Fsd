@@ -175,7 +175,6 @@ Ext2TruncateExtent(
     /* calculate blocks to be freed */
     Extra = End - Wanted;
 
-	DbgPrint("Entering ext4_ext_remove_space()\n");
 	err = ext4_ext_remove_space(IrpContext, &Mcb->Inode, Wanted);
     if (err == 0) {
         if (!Ext2RemoveBlockExtent(Vcb, Mcb, Wanted, Extra)) {
