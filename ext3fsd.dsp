@@ -8,12 +8,12 @@ CFG=Ext3Fsd - Win32 Debug
 !MESSAGE This is not a valid makefile. To build this project using NMAKE,
 !MESSAGE use the Export Makefile command and run
 !MESSAGE 
-!MESSAGE NMAKE /f "ext3fsd.mak".
+!MESSAGE NMAKE /f "Ext3Fsd.mak".
 !MESSAGE 
 !MESSAGE You can specify a configuration when running NMAKE
 !MESSAGE by defining the macro CFG on the command line. For example:
 !MESSAGE 
-!MESSAGE NMAKE /f "ext3fsd.mak" CFG="Ext3Fsd - Win32 Debug"
+!MESSAGE NMAKE /f "Ext3Fsd.mak" CFG="Ext3Fsd - Win32 Debug"
 !MESSAGE 
 !MESSAGE Possible choices for configuration are:
 !MESSAGE 
@@ -41,7 +41,7 @@ CFG=Ext3Fsd - Win32 Debug
 # PROP Use_Debug_Libraries 0
 # PROP Output_Dir "fre"
 # PROP Intermediate_Dir "fre"
-# PROP Cmd_Line ".\DDKBuild.bat -WNET chk . -cZ"
+# PROP Cmd_Line ".\DDKBuild.bat -W7XP fre ."
 # PROP Rebuild_Opt "-cZ"
 # PROP Target_File "Ext3Fsd.sys"
 # PROP Bsc_Name ".\winnet\chk\i386\Ext3Fsd.bsc"
@@ -62,7 +62,7 @@ CFG=Ext3Fsd - Win32 Debug
 # PROP Use_Debug_Libraries 1
 # PROP Output_Dir "chk"
 # PROP Intermediate_Dir "chk"
-# PROP Cmd_Line ".\DDKBuild.bat -WNET chk ."
+# PROP Cmd_Line ".\DDKBuild.bat -W7XP chk ."
 # PROP Rebuild_Opt "-ceZ"
 # PROP Target_File "Ext2Fsd.sys"
 # PROP Bsc_Name ".\winnet\chk\i386\Ext3Fsd.bsc"
@@ -273,6 +273,10 @@ SOURCE=.\ext3\htree.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\ext3\indirect.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\ext3\MAKEFILE
 # End Source File
 # Begin Source File
@@ -282,6 +286,34 @@ SOURCE=.\ext3\recover.c
 # Begin Source File
 
 SOURCE=.\ext3\sources
+# End Source File
+# End Group
+# Begin Group "ext4"
+
+# PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=.\ext4\ext4_bh.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\ext4\ext4_extents.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\ext4\ext4_jbd2.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\ext4\extents.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\ext4\MAKEFILE
+# End Source File
+# Begin Source File
+
+SOURCE=.\ext4\Sources
 # End Source File
 # End Group
 # Begin Group "jbd"
