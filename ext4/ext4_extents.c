@@ -397,7 +397,7 @@ static int __ext4_ext_check(const char *function, unsigned int line,
 		error_msg = "invalid magic";
 		goto corrupted;
 	}
-	if (eh->eh_depth != depth) {
+	if (le16_to_cpu(eh->eh_depth) != depth) {
 		error_msg = "unexpected eh_depth";
 		goto corrupted;
 	}
@@ -1100,7 +1100,7 @@ static int ext4_ext_grow_indepth(void *icb, handle_t *handle, struct inode *inod
 			(EXT_FIRST_INDEX(neh)->ei_block),
 			ext4_idx_pblock(EXT_FIRST_INDEX(neh)));
 
-	neh->eh_depth += 1;
+	le16_add_cpu(&neh->eh_depth, 1);
 	ext4_mark_inode_dirty(icb, handle, inode);
 out:
 	extents_brelse(bh);
