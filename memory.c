@@ -624,33 +624,28 @@ Ext2AddVcbExtent (
     ULONG       TriedTimes = 0;
 
     LONGLONG    Offset = 0;
-    LONGLONG    Base = 0;
-    UCHAR       Bits = 0;
     BOOLEAN     rc = FALSE;
 
-    Base = (LONGLONG)BLOCK_SIZE;
-    Bits = (UCHAR)BLOCK_BITS;
-    Offset = Vbn & (~(Base - 1));
-    Length = (Length + Vbn - Offset + Base - 1) & (~(Base - 1));
+    Offset = Vbn & (~(Vcb->IoUnitSize - 1));
+    Length = (Vbn - Offset + Length + Vcb->IoUnitSize - 1) &
+             ~(Vcb->IoUnitSize - 1);
 
-    ASSERT ((Offset & (Base - 1)) == 0);
-    ASSERT ((Length & (Base - 1)) == 0);
+    ASSERT ((Offset & (Vcb->IoUnitSize - 1)) == 0);
+    ASSERT ((Length & (Vcb->IoUnitSize - 1)) == 0);
 
-    Offset =  (Offset >> Bits) + 1;
-    Length = (Length >> Bits);
+    Offset = (Offset >> Vcb->IoUnitBits) + 1;
+    Length = (Length >> Vcb->IoUnitBits);
 
 Again:
 
     __try {
         rc = FsRtlAddLargeMcbEntry(
-            &Vcb->Extents,
-            Offset,
-            Offset,
-            Length
-        );
-
+                &Vcb->Extents,
+                Offset,
+                Offset,
+                Length
+                );
     } __except (EXCEPTION_EXECUTE_HANDLER) {
-
         DbgBreak();
         rc = FALSE;
     }
@@ -680,20 +675,16 @@ Ext2RemoveVcbExtent (
 {
     ULONG       TriedTimes = 0;
     LONGLONG    Offset = 0;
-    LONGLONG    Base = 0;
-    UCHAR       Bits = 0;
     BOOLEAN     rc = TRUE;
 
-    Base = (LONGLONG)BLOCK_SIZE;
-    Bits = (UCHAR)BLOCK_BITS;
-    Offset =  Vbn & (~(Base - 1));
-    Length = (Length + Vbn - Offset + Base - 1) & (~(Base - 1));
+    Offset =  Vbn & (~(Vcb->IoUnitSize - 1));
+    Length = (Length + Vbn - Offset + Vcb->IoUnitSize - 1) & (~(Vcb->IoUnitSize - 1));
 
-    ASSERT ((Offset & (Base - 1)) == 0);
-    ASSERT ((Length & (Base - 1)) == 0);
+    ASSERT ((Offset & (Vcb->IoUnitSize - 1)) == 0);
+    ASSERT ((Length & (Vcb->IoUnitSize - 1)) == 0);
 
-    Offset = (Offset >> Bits) + 1;
-    Length = (Length >> Bits);
+    Offset = (Offset >> Vcb->IoUnitBits) + 1;
+    Length = (Length >> Vcb->IoUnitBits);
 
 Again:
 
@@ -733,9 +724,9 @@ Ext2LookupVcbExtent (
     LONGLONG    offset;
     BOOLEAN     rc;
 
-    offset = Vbn & (~((LONGLONG)BLOCK_SIZE - 1));
-    ASSERT ((offset & (BLOCK_SIZE - 1)) == 0);
-    offset = (offset >> BLOCK_BITS) + 1;
+    offset = Vbn & (~((LONGLONG)Vcb->IoUnitSize - 1));
+    ASSERT ((offset & (Vcb->IoUnitSize - 1)) == 0);
+    offset = (offset >> Vcb->IoUnitBits) + 1;
 
     rc = FsRtlLookupLargeMcbEntry(
              &(Vcb->Extents),
@@ -751,13 +742,13 @@ Ext2LookupVcbExtent (
 
         if (Lbn && ((*Lbn) != -1)) {
             ASSERT((*Lbn) > 0);
-            (*Lbn) = (((*Lbn) - 1) << BLOCK_BITS);
-            (*Lbn) += ((Vbn) & ((LONGLONG)BLOCK_SIZE - 1));
+            (*Lbn) = (((*Lbn) - 1) << Vcb->IoUnitBits);
+            (*Lbn) += ((Vbn) & ((LONGLONG)Vcb->IoUnitSize - 1));
         }
 
         if (Length && *Length) {
-            (*Length) <<= BLOCK_BITS;
-            (*Length)  -= ((Vbn) & ((LONGLONG)BLOCK_SIZE - 1));
+            (*Length) <<= Vcb->IoUnitBits;
+            (*Length)  -= ((Vbn) & ((LONGLONG)Vcb->IoUnitSize - 1));
         }
     }
 
@@ -1208,7 +1199,7 @@ Ext2BuildExtents(
     if ((IrpContext && IrpContext->Irp) &&
             ((IrpContext->Irp->Flags & IRP_NOCACHE) ||
              (IrpContext->Irp->Flags & IRP_PAGING_IO))) {
-        Size = (Size + BLOCK_SIZE - 1) & (~(BLOCK_SIZE - 1));
+        Size = (Size + SECTOR_SIZE - 1) & (~(SECTOR_SIZE - 1));
     }
 
     Start = (ULONG)(Offset >> BLOCK_BITS);
@@ -1862,7 +1853,6 @@ Ext2CheckSetBlock(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb, LONGLONG Block)
     }
 
     if (bModified) {
-
         CcSetDirtyPinnedData(BitmapBcb, NULL );
         Ext2AddVcbExtent(Vcb, Offset.QuadPart, (LONGLONG)BLOCK_SIZE);
     }
@@ -2290,6 +2280,14 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             __leave;
         }
 
+        if (Vcb->BlockSize >= PAGE_SIZE) {
+            Vcb->IoUnitBits = PAGE_SHIFT;
+            Vcb->IoUnitSize = PAGE_SIZE;
+        } else {
+            Vcb->IoUnitSize = Vcb->BlockSize;
+            Vcb->IoUnitBits = Ext2Log2(Vcb->BlockSize);
+        }
+
         /* initialize vcb header members ... */
         Vcb->Header.IsFastIoPossible = FastIoIsNotPossible;
         Vcb->Header.Resource = &(Vcb->MainResource);
@@ -2549,7 +2547,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
          * previously didn't change the revision level when setting the flags,
          * so there is a chance incompat flags are set on a rev 0 filesystem.
          */
-        features = EXT3_HAS_INCOMPAT_FEATURE(&Vcb->sb, ~EXT3_FEATURE_INCOMPAT_SUPP);
+        features = EXT3_HAS_INCOMPAT_FEATURE(&Vcb->sb, ~EXT4_FEATURE_INCOMPAT_SUPP);
         if (features & EXT4_FEATURE_INCOMPAT_DIRDATA) {
             SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
             ClearFlag(features, EXT4_FEATURE_INCOMPAT_DIRDATA);
@@ -2562,7 +2560,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             __leave;
         }
 
-        features = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb, ~EXT3_FEATURE_RO_COMPAT_SUPP);
+        features = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb, ~EXT4_FEATURE_RO_COMPAT_SUPP);
         if (features) {
             printk(KERN_ERR "EXT3-fs: %s: unsupported optional features in this volume: (%x).\n",
                    Vcb->sb.s_id, le32_to_cpu(features));
@@ -2572,8 +2570,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             }
         }
 
-        has_huge_files = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb,
-                         EXT4_FEATURE_RO_COMPAT_HUGE_FILE);
+        has_huge_files = EXT3_HAS_RO_COMPAT_FEATURE(&Vcb->sb, EXT4_FEATURE_RO_COMPAT_HUGE_FILE);
 
         Vcb->sb.s_maxbytes = ext3_max_size(BLOCK_BITS, has_huge_files);
         Vcb->max_bitmap_bytes = ext3_max_bitmap_size(BLOCK_BITS,
