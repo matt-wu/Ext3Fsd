@@ -70,7 +70,7 @@ Ext2ExpandLast(
     }
 
     /* increase inode i_blocks */
-    Mcb->Inode.i_blocks += (*Number * (BLOCK_SIZE >> 9));
+    Mcb->Inode.i_blocks += (*Number << (BLOCK_BITS - 9));
 
     if (Layer == 0) {
 
@@ -135,6 +135,7 @@ errorout:
         }
         if (*Block) {
             Ext2FreeBlock(IrpContext, Vcb, *Block, *Number);
+            Mcb->Inode.i_blocks -= (*Number << (BLOCK_BITS - 9));
             *Block = 0;
         }
     }
@@ -646,7 +647,7 @@ Ext2TruncateBlock(
             while (Extra &&  SizeArray > i + 1 && Number < *Extra) {
 
                 if (BlockArray[SizeArray - i - 1] ==
-                        BlockArray[SizeArray - i - 2] + 1) {
+                    BlockArray[SizeArray - i - 2] + 1) {
 
                     BlockArray[SizeArray - i - 1] = 0;
                     Number++;
@@ -661,18 +662,12 @@ Ext2TruncateBlock(
 
                 Status = Ext2FreeBlock(IrpContext, Vcb, BlockArray[SizeArray - i - 1], Number);
                 if (NT_SUCCESS(Status)) {
-#if EXT2_DEBUG
-                    if (i == 0 || i == SizeArray - 1 || *Extra == Number) {
-                        DEBUG(DL_BLK, ("Ext2TruncateBlock: Vbn: %xh Lbn: %xh Num: %xh\n",
-                                       Base + SizeArray - 1 - i, BlockArray[SizeArray - i - 1], Number));
-                    }
-#endif
-                    ASSERT(Mcb->Inode.i_blocks >= Number * (BLOCK_SIZE >> 9));
-                    if (Mcb->Inode.i_blocks < Number * (BLOCK_SIZE >> 9)) {
+                    ASSERT(Mcb->Inode.i_blocks >= (Number << (BLOCK_BITS - 9)));
+                    if (Mcb->Inode.i_blocks < (Number << (BLOCK_BITS - 9))) {
                         Mcb->Inode.i_blocks = 0;
                         DbgBreak();
                     } else {
-                        Mcb->Inode.i_blocks -= Number * (BLOCK_SIZE >> 9);
+                        Mcb->Inode.i_blocks -= (Number << (BLOCK_BITS - 9));
                     }
                     BlockArray[SizeArray - i - 1] = 0;
                 }
