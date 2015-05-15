@@ -40,7 +40,7 @@
 
 /* STRUCTS & CONSTS******************************************************/
 
-#define EXT2FSD_VERSION  "0.53"
+#define EXT2FSD_VERSION  "0.54"
 
 
 //
@@ -1315,7 +1315,7 @@ Ext2SupersedeOrOverWriteFile(
 #define DL_RES 0x00000080   /* entry reference managment */
 #define DL_BLK 0x00000100   /* data block allocation / free */
 #define DL_CP  0x00000200   /* code pages (create, querydir) */
-#define DL_EXT 0x00000400   /* extents */
+#define DL_EXT 0x00000400   /* mcb extents */
 #define DL_MAP 0x00000800   /* retrieval points */
 #define DL_JNL 0x00001000   /* dump journal operations */
 #define DL_HTI 0x00002000   /* htree index */

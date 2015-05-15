@@ -206,8 +206,8 @@ static inline ext4_fsblk_t ext4_idx_pblock(struct ext4_extent_idx *ix)
 static inline void ext4_ext_store_pblock(struct ext4_extent *ex,
 					 ext4_fsblk_t pb)
 {
-	ex->ee_start_lo = (unsigned long)(pb & 0xffffffff);
-	ex->ee_start_hi = (unsigned long)((pb >> 31) >> 1) & 0xffff;
+	ex->ee_start_lo = (uint32_t)(pb & 0xffffffff);
+	ex->ee_start_hi = (uint16_t)((pb >> 31) >> 1) & 0xffff;
 }
 
 /*
@@ -218,8 +218,8 @@ static inline void ext4_ext_store_pblock(struct ext4_extent *ex,
 static inline void ext4_idx_store_pblock(struct ext4_extent_idx *ix,
 					 ext4_fsblk_t pb)
 {
-	ix->ei_leaf_lo = (unsigned long)(pb & 0xffffffff);
-	ix->ei_leaf_hi = (unsigned long)((pb >> 31) >> 1) & 0xffff;
+	ix->ei_leaf_lo = (uint32_t)(pb & 0xffffffff);
+	ix->ei_leaf_hi = (uint16_t)((pb >> 31) >> 1) & 0xffff;
 }
 
 #define ext4_ext_dirty(icb, handle, inode, path)                                           \
