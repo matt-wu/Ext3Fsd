@@ -195,6 +195,7 @@ static int __ext4_ext_dirty(void *icb, struct inode *inode,
 		/*ext4_extent_block_csum_set(inode, ext_block_hdr(path->p_bh));*/
 		/* path points to block */
 		err = 0;
+		set_buffer_uptodate(path->p_bh);
 		extents_mark_buffer_dirty(path->p_bh);
 	} else {
 		/* path points to leaf/index in inode body */
@@ -638,6 +639,7 @@ out:
 	} else if (bh) {
 		/* If we got a sibling leaf. */
 		*sibling_index = ext4_ext_block_index(bh);
+		set_buffer_uptodate(bh);
 		extents_mark_buffer_dirty(bh);
 		extents_brelse(bh);
 	} else {
@@ -863,6 +865,7 @@ out:
 	} else if (bh) {
 		/* If we got a sibling leaf. */
 		*sibling_index = ext4_ext_block_index(bh);
+		set_buffer_uptodate(bh);
 		extents_mark_buffer_dirty(bh);
 		extents_brelse(bh);
 	} else {
@@ -921,6 +924,7 @@ static int ext4_ext_grow_indepth(void *icb, struct inode *inode,
 	neh->eh_magic = EXT4_EXT_MAGIC;
 	ext4_extent_block_csum_set(inode, neh);
 
+	set_buffer_uptodate(bh);
 	extents_mark_buffer_dirty(bh);
 
 	/* Update top-level index: num,max,pointer */
