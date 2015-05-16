@@ -641,7 +641,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 
 int bh_submit_read(struct buffer_head *bh)
 {
-	ll_rw_block(READ, 1, &bh);
+    ll_rw_block(READ, 1, &bh);
     lock_buffer(bh);
     if (!buffer_uptodate(bh)) {
         unlock_buffer(bh);
