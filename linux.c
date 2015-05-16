@@ -415,7 +415,7 @@ again:
     if (CcPinRead( Vcb->Volume,
                     &offset,
                     bh->b_size,
-                    PIN_IF_BCB,
+                    0,
                     &bcb,
                     &ptr)) {
         if (ptr) {
