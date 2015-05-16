@@ -180,8 +180,7 @@ static int __ext4_ext_check(const char *function, unsigned int line,
 		ext4_fsblk_t pblk);
 
 /*
- * ext4_read_block_buffer: @inode, @block, @err
- *
+ * read_extent_tree_block:
  * Get a buffer_head by extents_bread, and read fresh data from the storage.
  */
 static struct buffer_head *
