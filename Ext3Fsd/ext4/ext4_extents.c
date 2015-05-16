@@ -180,8 +180,7 @@ static int __ext4_ext_check(const char *function, unsigned int line,
 		ext4_fsblk_t pblk);
 
 /*
- * ext4_read_block_buffer: @inode, @block, @err
- *
+ * read_extent_tree_block:
  * Get a buffer_head by extents_bread, and read fresh data from the storage.
  */
 static struct buffer_head *
@@ -397,7 +396,7 @@ static int __ext4_ext_check(const char *function, unsigned int line,
 		error_msg = "invalid magic";
 		goto corrupted;
 	}
-	if (eh->eh_depth != depth) {
+	if (le16_to_cpu(eh->eh_depth) != depth) {
 		error_msg = "unexpected eh_depth";
 		goto corrupted;
 	}
@@ -869,7 +868,6 @@ static int ext4_ext_split(void *icb, handle_t *handle, struct inode *inode,
 		err = -ENOMEM;
 		goto cleanup;
 	}
-	lock_buffer(bh);
 
 	err = ext4_journal_get_create_access(icb, handle, bh);
 	if (err)
@@ -902,7 +900,6 @@ static int ext4_ext_split(void *icb, handle_t *handle, struct inode *inode,
 
 	ext4_extent_block_csum_set(inode, neh);
 	set_buffer_uptodate(bh);
-	unlock_buffer(bh);
 
 	err = ext4_handle_dirty_metadata(icb, handle, inode, bh);
 	if (err)
@@ -942,7 +939,6 @@ static int ext4_ext_split(void *icb, handle_t *handle, struct inode *inode,
 			err = -ENOMEM;
 			goto cleanup;
 		}
-		lock_buffer(bh);
 
 		err = ext4_journal_get_create_access(icb, handle, bh);
 		if (err)
@@ -981,7 +977,6 @@ static int ext4_ext_split(void *icb, handle_t *handle, struct inode *inode,
 		}
 		ext4_extent_block_csum_set(inode, neh);
 		set_buffer_uptodate(bh);
-		unlock_buffer(bh);
 
 		err = ext4_handle_dirty_metadata(icb, handle, inode, bh);
 		if (err)
@@ -1008,11 +1003,8 @@ static int ext4_ext_split(void *icb, handle_t *handle, struct inode *inode,
 			le32_to_cpu(border), newblock);
 
 cleanup:
-	if (bh) {
-		if (buffer_locked(bh))
-			unlock_buffer(bh);
+	if (bh)
 		extents_brelse(bh);
-	}
 
 	if (err) {
 		/* free all allocated blocks in error case */
@@ -1056,13 +1048,10 @@ static int ext4_ext_grow_indepth(void *icb, handle_t *handle, struct inode *inod
 	bh = extents_bwrite(inode->i_sb, newblock);
 	if (!bh)
 		return -ENOMEM;
-	lock_buffer(bh);
 
 	err = ext4_journal_get_create_access(icb, handle, bh);
-	if (err) {
-		unlock_buffer(bh);
+	if (err)
 		goto out;
-	}
 
 	/* move top-level index/leaf into new block */
 	memmove(bh->b_data, EXT4_I(inode)->i_block,
@@ -1079,7 +1068,6 @@ static int ext4_ext_grow_indepth(void *icb, handle_t *handle, struct inode *inod
 	neh->eh_magic = EXT4_EXT_MAGIC;
 	ext4_extent_block_csum_set(inode, neh);
 	set_buffer_uptodate(bh);
-	unlock_buffer(bh);
 
 	err = ext4_handle_dirty_metadata(icb, handle, inode, bh);
 	if (err)
@@ -1100,7 +1088,7 @@ static int ext4_ext_grow_indepth(void *icb, handle_t *handle, struct inode *inod
 			(EXT_FIRST_INDEX(neh)->ei_block),
 			ext4_idx_pblock(EXT_FIRST_INDEX(neh)));
 
-	neh->eh_depth += 1;
+	le16_add_cpu(&neh->eh_depth, 1);
 	ext4_mark_inode_dirty(icb, handle, inode);
 out:
 	extents_brelse(bh);
