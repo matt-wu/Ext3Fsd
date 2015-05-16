@@ -595,7 +595,7 @@ void __brelse(struct buffer_head *bh)
     if (!uptodate) {
         CcPurgeCacheSection( &Vcb->SectionObject,
                              &Offset,
-                             bh->b_size,
+                             BLOCK_SIZE,
                              FALSE);
     }
 }
