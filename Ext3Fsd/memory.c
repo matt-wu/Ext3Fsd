@@ -724,7 +724,7 @@ Ext2LookupVcbExtent (
     LONGLONG    offset;
     BOOLEAN     rc;
 
-    offset = Vbn & (~((LONGLONG)Vcb->IoUnitSize - 1));
+    offset = Vbn & (~(Vcb->IoUnitSize - 1));
     ASSERT ((offset & (Vcb->IoUnitSize - 1)) == 0);
     offset = (offset >> Vcb->IoUnitBits) + 1;
 
@@ -743,12 +743,12 @@ Ext2LookupVcbExtent (
         if (Lbn && ((*Lbn) != -1)) {
             ASSERT((*Lbn) > 0);
             (*Lbn) = (((*Lbn) - 1) << Vcb->IoUnitBits);
-            (*Lbn) += ((Vbn) & ((LONGLONG)Vcb->IoUnitSize - 1));
+            (*Lbn) += ((Vbn) & (Vcb->IoUnitSize - 1));
         }
 
         if (Length && *Length) {
             (*Length) <<= Vcb->IoUnitBits;
-            (*Length)  -= ((Vbn) & ((LONGLONG)Vcb->IoUnitSize - 1));
+            (*Length)  -= ((Vbn) & (Vcb->IoUnitSize - 1));
         }
     }
 
