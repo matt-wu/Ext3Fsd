@@ -573,6 +573,15 @@ void __brelse(struct buffer_head *bh)
     while (buffer_dirty(bh)) {
         ll_rw_block(WRITE, 1, &bh);
     }
+	
+	if (!buffer_uptodate(bh)) {
+        LARGE_INTEGER Offset;
+        Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
+        CcPurgeCacheSection( &Vcb->SectionObject,
+                             &Offset,
+                             bh->b_size,
+                             FALSE);
+	}
 
     spin_lock_irqsave(&bdev->bd_bh_lock, irql);
     if (!atomic_dec_and_test(&bh->b_count)) {
