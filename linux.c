@@ -566,22 +566,17 @@ void __brelse(struct buffer_head *bh)
     struct block_device *bdev = bh->b_bdev;
     PEXT2_VCB Vcb = (PEXT2_VCB)bdev->bd_priv;
     KIRQL   irql = 0;
+    BOOLEAN uptodate;
+    LARGE_INTEGER Offset;
 
     ASSERT(Vcb->Identifier.Type == EXT2VCB);
 
+    Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
     /* write data in case it's dirty */
     while (buffer_dirty(bh)) {
         ll_rw_block(WRITE, 1, &bh);
     }
-	
-	if (!buffer_uptodate(bh)) {
-        LARGE_INTEGER Offset;
-        Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
-        CcPurgeCacheSection( &Vcb->SectionObject,
-                             &Offset,
-                             bh->b_size,
-                             FALSE);
-	}
+    uptodate = buffer_uptodate(bh);
 
     spin_lock_irqsave(&bdev->bd_bh_lock, irql);
     if (!atomic_dec_and_test(&bh->b_count)) {
@@ -597,6 +592,12 @@ void __brelse(struct buffer_head *bh)
 
     free_buffer_head(bh);
     atomic_dec(&g_jbh.bh_count);
+    if (!uptodate) {
+        CcPurgeCacheSection( &Vcb->SectionObject,
+                             &Offset,
+                             bh->b_size,
+                             FALSE);
+    }
 }
 
 void __bforget(struct buffer_head *bh)
