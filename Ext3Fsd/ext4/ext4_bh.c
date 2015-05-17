@@ -220,11 +220,11 @@ void extents_brelse(struct buffer_head *bh)
     ASSERT(Vcb->Identifier.Type == EXT2VCB);
 
     if (buffer_dirty(bh)) {
+        CcSetDirtyPinnedData(bh->b_bcb, NULL);
         Ext2AddBlockExtent(Vcb, NULL,
                             (ULONG)bh->b_blocknr,
                             (ULONG)bh->b_blocknr,
                             (bh->b_size >> BLOCK_BITS));
-        CcSetDirtyPinnedData(bh->b_bcb, NULL);
     }
     if (bh->b_bcb)
         CcUnpinData(bh->b_bcb);

@@ -862,10 +862,10 @@ Again:
 
         /* indict the cache range is dirty */
         CcSetDirtyPinnedData(BitmapBcb, NULL );
+        Ext2AddVcbExtent(Vcb, Offset.QuadPart, (LONGLONG)Vcb->BlockSize);
         CcUnpinData(BitmapBcb);
         BitmapBcb = NULL;
         BitmapCache = NULL;
-        Ext2AddVcbExtent(Vcb, Offset.QuadPart, (LONGLONG)Vcb->BlockSize);
         Ext2SaveGroup(IrpContext, Vcb, Group);
 
         /* save super block (used/unused blocks statics) */

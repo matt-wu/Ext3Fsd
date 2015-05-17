@@ -105,13 +105,12 @@ Ext2ExpandLast(
         /* zero the content of all meta blocks */
         for (i = 0; i < *Number; i++) {
             Ext2SaveBlock(IrpContext, Vcb, *Block + i, (PVOID)pData);
-        }
-
-        /* add block to meta extents */
-        if (!Ext2AddMcbMetaExts(Vcb, Mcb, *Block, *Number)) {
-            DbgBreak();
-            Ext2Sleep(500);
-            Ext2AddMcbMetaExts(Vcb, Mcb, *Block, *Number);
+            /* add block to meta extents */
+            if (!Ext2AddMcbMetaExts(Vcb, Mcb, *Block + i, 1)) {
+                DbgBreak();
+                Ext2Sleep(500);
+                Ext2AddMcbMetaExts(Vcb, Mcb, *Block + i, 1);
+            }
         }
     }
 
@@ -188,6 +187,13 @@ Ext2GetBlock(
             if (!NT_SUCCESS(Status)) {
                 goto errorout;
             }
+        } else {
+            /* check the block is valid or not */
+            if (BlockArray[0] >= TOTAL_BLOCKS) {
+                DbgBreak();
+                Status = STATUS_DISK_CORRUPT_ERROR;
+                goto errorout;
+            }
         }
 
         *Block = BlockArray[0];
@@ -203,7 +209,7 @@ Ext2GetBlock(
     } else if (Layer <= 3) {
 
         /* check the block is valid or not */
-        if (BlockArray[0] >= TOTAL_BLOCKS) {
+        if (BlockArray[0] == 0 || BlockArray[0] >= TOTAL_BLOCKS) {
             DbgBreak();
             Status = STATUS_DISK_CORRUPT_ERROR;
             goto errorout;
@@ -372,7 +378,10 @@ Ext2ExpandBlock(
 
     if (Layer == 1) {
 
-        /* try to make all leaf block continuous to avoid fragments */
+        /*
+         * try to make all leaf block continuous to avoid fragments
+         */
+
         Number = min(SizeArray, ((*Extra + (Start & (BLOCK_SIZE/4 - 1))) * 4 / BLOCK_SIZE));
         Wanted = 0;
         DEBUG(DL_BLK, ("Ext2ExpandBlock: SizeArray=%xh Extra=%xh Start=%xh %xh\n",
@@ -416,7 +425,9 @@ Ext2ExpandBlock(
 
     } else if (Layer == 0) {
 
-        /* bulk allocation for inode data blocks */
+        /*
+         * bulk allocation for inode data blocks
+         */
 
         i = 0;
 
@@ -480,6 +491,11 @@ Ext2ExpandBlock(
         goto errorout;
     }
 
+
+    /*
+     * only for meta blocks allocation
+     */
+
     for (i = 0; *Extra && i < SizeArray; i++) {
 
         if (Layer <= 3) {
@@ -522,6 +538,13 @@ Ext2ExpandBlock(
                     Status = STATUS_CANT_WAIT;
                     DbgBreak();
                     goto errorout;
+                }
+
+                /* add block to meta extents */
+                if (!Ext2AddMcbMetaExts(Vcb, Mcb,  BlockArray[i], 1)) {
+                    DbgBreak();
+                    Ext2Sleep(500);
+                    Ext2AddMcbMetaExts(Vcb, Mcb,  BlockArray[i], 1);
                 }
             }
 
@@ -569,13 +592,6 @@ Ext2ExpandBlock(
                 }
             } else {
                 Ext2SaveBlock(IrpContext, Vcb, BlockArray[i], (PVOID)pData);
-            }
-
-            /* add block to meta extents */
-            if (!Ext2AddMcbMetaExts(Vcb, Mcb,  BlockArray[i], 1)) {
-                DbgBreak();
-                Ext2Sleep(500);
-                Ext2AddMcbMetaExts(Vcb, Mcb,  BlockArray[i], 1);
             }
 
             if (pData) {
@@ -879,10 +895,8 @@ Ext2MapIndirect(
 
                     /* save the inode */
                     if (!Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode)) {
-
+                        DbgBreak();
                         Status = STATUS_UNSUCCESSFUL;
-                        Ext2FreeBlock(IrpContext, Vcb, dwBlk, 1);
-
                         goto errorout;
                     }
                 }
@@ -945,7 +959,7 @@ Ext2ExpandIndirect(
     Extra = End - Start;
 
 	/* exceeds the biggest file size (indirect) */
-    if (End > Vcb->max_bitmap_bytes) {
+    if (End > Vcb->max_data_blocks) {
         return STATUS_INVALID_PARAMETER;
     }
 
@@ -1147,10 +1161,16 @@ errorout:
     }
 
     if (Size->QuadPart == 0) {
+        /* check and remove all data extents */
         if (Ext2ListExtents(&Mcb->Extents)) {
             DbgBreak();
         }
         Ext2ClearAllExtents(&Mcb->Extents);
+        /* check and remove all meta extents */
+        if (Ext2ListExtents(&Mcb->MetaExts)) {
+            DbgBreak();
+        }
+        Ext2ClearAllExtents(&Mcb->MetaExts);
     }
 
     /* save inode */
