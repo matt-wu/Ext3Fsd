@@ -415,7 +415,7 @@ again:
     if (CcPinRead( Vcb->Volume,
                     &offset,
                     bh->b_size,
-                    PIN_WAIT,
+                    0,
                     &bcb,
                     &ptr)) {
         if (ptr) {
@@ -566,7 +566,7 @@ void __brelse(struct buffer_head *bh)
     struct block_device *bdev = bh->b_bdev;
     PEXT2_VCB Vcb = (PEXT2_VCB)bdev->bd_priv;
     KIRQL   irql = 0;
-    BOOLEAN uptodate;
+    int uptodate;
     LARGE_INTEGER Offset;
 
     ASSERT(Vcb->Identifier.Type == EXT2VCB);
