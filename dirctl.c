@@ -132,7 +132,6 @@ Ext2ProcessEntry(
 
         if (S_ISDIR(Inode.i_mode) || S_ISREG(Inode.i_mode)) {
         } else if (S_ISLNK(Inode.i_mode)) {
-            Inode.i_size = 0;
             DEBUG(DL_RES, ("Ext2ProcessDirEntry: SymLink: %wZ\\%wZ\n",
                            &Dcb->Mcb->FullName, pName));
             Ext2LookupFile(IrpContext, Vcb, pName, Dcb->Mcb, &Mcb, 0);

@@ -110,25 +110,10 @@ extents_bread(struct super_block *sb, sector_t block)
                     size,
                     PIN_WAIT,
                     &bh->b_bcb,
-                    &ptr);
+                    &bh->b_data);
 
     if (!ret) {
         DbgPrint("Insufficient memory resources!\n");
-        extents_free_buffer_head(bh);
-        bh = NULL;
-        goto errorout;
-    }
-    
-    bh->b_mdl = Ext2CreateMdl(ptr, TRUE, bh->b_size, IoModifyAccess);
-    if (bh->b_mdl) {
-        /* muse map the PTE to NonCached zone. journal recovery will
-           access the PTE under spinlock: DISPATCH_LEVEL IRQL */
-        bh->b_data = MmMapLockedPagesSpecifyCache(
-                         bh->b_mdl, KernelMode, MmNonCached,
-                         NULL,FALSE, HighPagePriority);
-    } else {
-        DbgPrint("Unable to make pages resident in memory!\n");
-        CcUnpinData(bh->b_bcb);
         extents_free_buffer_head(bh);
         bh = NULL;
         goto errorout;
@@ -139,8 +124,6 @@ extents_bread(struct super_block *sb, sector_t block)
     get_bh(bh);
 
     /* we get it */
-    CcUnpinData(bh->b_bcb);
-    bh->b_bcb = NULL;
 errorout:
     return bh;
 }
@@ -188,7 +171,7 @@ extents_bwrite(struct super_block *sb, sector_t block)
                             FALSE,
                             PIN_WAIT,
                             &bh->b_bcb,
-                            &ptr);
+                            &bh->b_data);
 
     if (!ret) {
         DbgPrint("Insufficient memory resources!\n");
@@ -197,27 +180,10 @@ extents_bwrite(struct super_block *sb, sector_t block)
         goto errorout;
     }
 
-    bh->b_mdl = Ext2CreateMdl(ptr, TRUE, bh->b_size, IoModifyAccess);
-    if (bh->b_mdl) {
-        /* muse map the PTE to NonCached zone. journal recovery will
-           access the PTE under spinlock: DISPATCH_LEVEL IRQL */
-        bh->b_data = MmMapLockedPagesSpecifyCache(
-                         bh->b_mdl, KernelMode, MmNonCached,
-                         NULL,FALSE, HighPagePriority);
-    } else {
-        DbgPrint("Unable to make pages resident in memory!\n");
-        CcUnpinData(bh->b_bcb);
-        extents_free_buffer_head(bh);
-        bh = NULL;
-        goto errorout;
-    }
-    
     set_buffer_new(bh);
     get_bh(bh);
 
     /* we get it */
-    CcUnpinData(bh->b_bcb);
-    bh->b_bcb = NULL;
 errorout:
     return bh;
 }
@@ -230,44 +196,7 @@ errorout:
  */
 void extents_mark_buffer_dirty(struct buffer_head *bh)
 {
-    struct block_device *bdev = bh->b_bdev;
-    PEXT2_VCB            Vcb  = bdev->bd_priv;
-    PBCB                 Bcb;
-    PVOID                Buffer;
-    LARGE_INTEGER        Offset;
-
-    if (bh == NULL)
-        return;
-
-    bdev = bh->b_bdev;
-    Vcb = (PEXT2_VCB)bdev->bd_priv;
-
-    ASSERT(Vcb->Identifier.Type == EXT2VCB);
-    ASSERT(bh->b_data);
-    
-    if (IsVcbReadOnly(Vcb)) {
-        return;
-    }
-
     set_buffer_dirty(bh);
-
-    SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
-    Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
-    if (CcPreparePinWrite(
-                Vcb->Volume,
-                &Offset,
-                bh->b_size,
-                FALSE,
-                PIN_WAIT,
-                &Bcb,
-                &Buffer )) {
-        CcSetDirtyPinnedData(Bcb, NULL);
-        Ext2AddBlockExtent( Vcb, NULL,
-                            (ULONG)bh->b_blocknr,
-                            (ULONG)bh->b_blocknr,
-                            (bh->b_size >> BLOCK_BITS));
-        CcUnpinData(Bcb);
-    }
 }
 
 /*
@@ -279,54 +208,26 @@ void extents_mark_buffer_dirty(struct buffer_head *bh)
  */
 void extents_brelse(struct buffer_head *bh)
 {
+    struct block_device *bdev;
+    PEXT2_VCB Vcb;
+
     if (bh == NULL)
         return;
-    
-    if (bh->b_mdl) {
-        DEBUG(DL_BH, ("bh=%p mdl=%p (Flags:%xh VA:%p) released.\n", bh, bh->b_mdl,
-                      bh->b_mdl->MdlFlags, bh->b_mdl->MappedSystemVa));
-        if (IsFlagOn(bh->b_mdl->MdlFlags, MDL_PAGES_LOCKED)) {
-            /* MmUnlockPages will release it's VA */
-            MmUnlockPages(bh->b_mdl);
-        } else if (IsFlagOn(bh->b_mdl->MdlFlags, MDL_MAPPED_TO_SYSTEM_VA)) {
-            MmUnmapLockedPages(bh->b_mdl->MappedSystemVa, bh->b_mdl);
-        }
 
-        Ext2DestroyMdl(bh->b_mdl);
+    bdev = bh->b_bdev;
+    Vcb = (PEXT2_VCB)bdev->bd_priv;
+
+    ASSERT(Vcb->Identifier.Type == EXT2VCB);
+
+    if (buffer_dirty(bh)) {
+        CcSetDirtyPinnedData(bh->b_bcb, NULL);
+        Ext2AddBlockExtent(Vcb, NULL,
+                            (ULONG)bh->b_blocknr,
+                            (ULONG)bh->b_blocknr,
+                            (bh->b_size >> BLOCK_BITS));
     }
-    extents_free_buffer_head(bh);
-}
+    if (bh->b_bcb)
+        CcUnpinData(bh->b_bcb);
 
-/*
- * extents_bforget: Release the corresponding buffer header
- *                    and purge the buffer.
- *
- * @bh: The corresponding buffer header that is going to be freed.
- *
- * The pages underlying the buffer header will be unlocked.
- */
-void extents_bforget(struct buffer_head *bh)
-{
-    struct block_device *bdev = bh->b_bdev;
-    PEXT2_VCB            Vcb  = bdev->bd_priv;
-    LARGE_INTEGER        Offset;
-    if (bh == NULL)
-        return;
-    
-    if (bh->b_mdl) {
-        DEBUG(DL_BH, ("bh=%p mdl=%p (Flags:%xh VA:%p) released.\n", bh, bh->b_mdl,
-                      bh->b_mdl->MdlFlags, bh->b_mdl->MappedSystemVa));
-        if (IsFlagOn(bh->b_mdl->MdlFlags, MDL_PAGES_LOCKED)) {
-            /* MmUnlockPages will release it's VA */
-            MmUnlockPages(bh->b_mdl);
-        } else if (IsFlagOn(bh->b_mdl->MdlFlags, MDL_MAPPED_TO_SYSTEM_VA)) {
-            MmUnmapLockedPages(bh->b_mdl->MappedSystemVa, bh->b_mdl);
-        }
-
-        Ext2DestroyMdl(bh->b_mdl);
-    }
-    
-    Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
-    CcPurgeCacheSection(&Vcb->SectionObject, &Offset, bh->b_size, FALSE);
     extents_free_buffer_head(bh);
 }

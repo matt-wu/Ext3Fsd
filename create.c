@@ -613,7 +613,7 @@ Ext2ScanDir (
         Ext2DerefMcb(Parent);
 
         if (bh)
-            extents_brelse(bh);
+            brelse(bh);
 
         if (!NT_SUCCESS(Status)) {
             if (de)
@@ -651,12 +651,12 @@ NTSTATUS Ext2AddDotEntries(struct ext2_icb *icb, struct inode *dir,
     strcpy (de->name, "..");
     ext3_set_de_type(inode->i_sb, de, S_IFDIR);
     inode->i_nlink = 2;
-    extents_mark_buffer_dirty(bh);
+    set_buffer_dirty(bh);
     ext3_mark_inode_dirty(icb, inode);
 
 errorout:
     if (bh)
-        extents_brelse (bh);
+        brelse (bh);
 
     return Ext2WinntError(rc);
 }
