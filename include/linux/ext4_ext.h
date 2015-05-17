@@ -74,7 +74,8 @@ struct ext4_ext_path
 	struct ext4_extent *p_ext;
 	struct ext4_extent_idx *p_idx;
 	struct ext4_extent_header *p_hdr;
-	struct buffer_head *p_bh;
+	PPUBLIC_BCB p_bcb;
+    PVOID *p_data;
 };
 
 /*
@@ -126,9 +127,9 @@ static inline struct ext4_extent_header *ext_inode_hdr(struct inode *inode)
 	return get_ext4_header(inode);
 }
 
-static inline struct ext4_extent_header *ext_block_hdr(struct buffer_head *bh)
+static inline struct ext4_extent_header *ext_block_hdr(PVOID data)
 {
-	return (struct ext4_extent_header *)bh->b_data;
+	return (struct ext4_extent_header *)data;
 }
 
 static inline unsigned short ext_depth(struct inode *inode)

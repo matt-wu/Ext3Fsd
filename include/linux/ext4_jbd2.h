@@ -5,29 +5,29 @@
  * Wrapper functions with which ext4 calls into JBD.
  */
 int __ext4_journal_get_write_access(const char *where, unsigned int line,
-				    void *icb, handle_t *handle, struct buffer_head *bh);
+				    void *icb, handle_t *handle, PPUBLIC_BCB Bcb);
 
 int __ext4_forget(const char *where, unsigned int line, void *icb, handle_t *handle,
 		  int is_metadata, struct inode *inode,
-		  struct buffer_head *bh, ext4_fsblk_t blocknr);
+		  PPUBLIC_BCB Bcb, ext4_fsblk_t blocknr);
 
 int __ext4_journal_get_create_access(const char *where, unsigned int line,
-				void *icb, handle_t *handle, struct buffer_head *bh);
+				void *icb, handle_t *handle, PPUBLIC_BCB Bcb);
 
 int __ext4_handle_dirty_metadata(const char *where, unsigned int line,
 				 void *icb, handle_t *handle, struct inode *inode,
-				 struct buffer_head *bh);
+				 PPUBLIC_BCB Bcb);
 
-#define ext4_journal_get_write_access(handle, icb, bh) \
-	__ext4_journal_get_write_access("", __LINE__, (icb), (handle), (bh))
-#define ext4_forget(handle, icb, is_metadata, inode, bh, block_nr) \
+#define ext4_journal_get_write_access(handle, icb, Bcb) \
+	__ext4_journal_get_write_access("", __LINE__, (icb), (handle), (Bcb))
+#define ext4_forget(handle, icb, is_metadata, inode, Bcb, block_nr) \
 	__ext4_forget("", __LINE__, (icb), (handle), (is_metadata), (inode), \
-		      (bh), (block_nr))
-#define ext4_journal_get_create_access(handle, icb, bh) \
-	__ext4_journal_get_create_access("", __LINE__, (icb), (handle), (bh))
-#define ext4_handle_dirty_metadata(handle, icb, inode, bh) \
+		      (Bcb), (block_nr))
+#define ext4_journal_get_create_access(handle, icb, Bcb) \
+	__ext4_journal_get_create_access("", __LINE__, (icb), (handle), (Bcb))
+#define ext4_handle_dirty_metadata(handle, icb, inode, Bcb) \
 	__ext4_handle_dirty_metadata("", __LINE__, (icb), (handle), (inode), \
-				     (bh))
+				     (Bcb))
 
 handle_t *__ext4_journal_start_sb(void *icb, struct super_block *sb, unsigned int line,
 				  int type, int blocks, int rsv_blocks);

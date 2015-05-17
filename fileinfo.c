@@ -1143,6 +1143,7 @@ Ext2ExpandFile(
     PLARGE_INTEGER    Size
 )
 {
+    NTSTATUS status;
     ULONG    Start = 0;
     ULONG    End = 0;
 
@@ -1162,10 +1163,12 @@ Ext2ExpandFile(
 
 	/* expandind file extents */ 
     if (INODE_HAS_EXTENT(&Mcb->Inode)) {
-        return Ext2ExpandExtent(IrpContext, Vcb, Mcb, Start, End, Size);
+        status = Ext2ExpandExtent(IrpContext, Vcb, Mcb, Start, End, Size);
+    } else {
+        status = Ext2ExpandIndirect(IrpContext, Vcb, Mcb, Start, End, Size);
     }
 
-	return Ext2ExpandIndirect(IrpContext, Vcb, Mcb, Start, End, Size);
+    return status;
 }
 
 NTSTATUS
@@ -1743,8 +1746,6 @@ Ext2DeleteFile(
                 if (Mcb->Inode.i_size > EXT2_LINKLEN_IN_INODE) {
                     Size.QuadPart = (LONGLONG)0;
                     Status = Ext2TruncateFile(IrpContext, Vcb, Mcb, &Size);
-                    if (NT_SUCCESS(Status)) {
-                    }
                 }
 
             } else {
