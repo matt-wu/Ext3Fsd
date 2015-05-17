@@ -82,9 +82,9 @@ static inline void ext_debug(char *str, ...)
 {
 }
 #if TRUE
-#define EXT4_ERROR_INODE(inode, str, ...) do {                      \
-            DbgPrint("inode[%p]: "##str "\n", inode, __VA_ARGS__);  \
-        } while(0)
+#define EXT4_ERROR_INODE(inode, str, ...) do {					  \
+			DbgPrint("inode[%p]: "##str "\n", inode, __VA_ARGS__);  \
+		} while(0)
 #else
 #define EXT4_ERROR_INODE
 #endif
@@ -237,12 +237,12 @@ static void ext4_extent_block_csum_set(struct inode *inode,
 }
 
 static int ext4_split_extent_at(void *icb,
-			     handle_t *handle,
-			     struct inode *inode,
-			     struct ext4_ext_path **ppath,
-			     ext4_lblk_t split,
-			     int split_flag,
-			     int flags);
+				 handle_t *handle,
+				 struct inode *inode,
+				 struct ext4_ext_path **ppath,
+				 ext4_lblk_t split,
+				 int split_flag,
+				 int flags);
 
 static inline int
 ext4_force_split_extent_at(void *icb, handle_t *handle, struct inode *inode,
@@ -317,11 +317,11 @@ static ext4_fsblk_t ext4_ext_find_goal(struct inode *inode,
 
 		/* it looks like index is empty;
 		 * try to find starting block from index itself */
-        if (path[depth].p_bcb) {
-                struct super_block *sb = inode->i_sb;
-                return path[depth].p_bcb->MappedFileOffset.QuadPart
-                        >> sb->s_blocksize_bits;
-        }
+		if (path[depth].p_bcb) {
+				struct super_block *sb = inode->i_sb;
+				return path[depth].p_bcb->MappedFileOffset.QuadPart
+						>> sb->s_blocksize_bits;
+		}
 	}
 
 	/* OK. use inode's group */
@@ -373,7 +373,7 @@ void ext4_ext_drop_refs(struct ext4_ext_path *path)
 		if (path->p_bcb) {
 			extents_brelse(path->p_bcb);
 			path->p_bcb = NULL;
-            path->p_data = NULL;
+			path->p_data = NULL;
 		}
 }
 
@@ -633,7 +633,7 @@ ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 	PPUBLIC_BCB bcb;
 	struct ext4_ext_path *path = orig_path ? *orig_path : NULL;
 	short int depth, i, ppos = 0;
-    PVOID data;
+	PVOID data;
 	int ret;
 
 	eh = ext_inode_hdr(inode);
@@ -656,7 +656,7 @@ ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 	}
 	path[0].p_hdr = eh;
 	path[0].p_bcb = NULL;
-    path[0].p_data = NULL;
+	path[0].p_data = NULL;
 
 	i = depth;
 	/* walk through the tree */
@@ -686,7 +686,7 @@ ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 			goto err;
 		}
 		path[ppos].p_bcb = bcb;
-        path[ppos].p_data = data;
+		path[ppos].p_data = data;
 		path[ppos].p_hdr = eh;
 	}
 
@@ -809,7 +809,7 @@ static int ext4_ext_split(void *icb, handle_t *handle, struct inode *inode,
 	__le32 border;
 	ext4_fsblk_t *ablocks = NULL; /* array of allocated blocks */
 	int err = 0;
-    PVOID data;
+	PVOID data;
 
 	/* make decision: where to split? */
 	/* FIXME: now decision is simplest: at current extent */
@@ -1034,7 +1034,7 @@ static int ext4_ext_grow_indepth(void *icb, handle_t *handle, struct inode *inod
 	struct ext4_extent_header *neh;
 	PPUBLIC_BCB bcb;
 	ext4_fsblk_t newblock, goal = 0;
-    PVOID data;
+	PVOID data;
 	int err = 0;
 
 	/* Try to prepend new index to old one */
@@ -1248,7 +1248,7 @@ static int ext4_ext_search_right(struct inode *inode,
 	struct ext4_extent_idx *ix;
 	struct ext4_extent *ex;
 	ext4_fsblk_t block;
-    PVOID data;
+	PVOID data;
 	int depth;	/* Note, NOT eh_depth; depth from top of tree */
 	int ee_len;
 
@@ -1871,7 +1871,7 @@ static int ext4_ext_zeroout(struct inode *inode, struct ext4_extent *ex)
 	unsigned int ee_len;
 	int ret;
 
-	ee_len    = ext4_ext_get_actual_len(ex);
+	ee_len	= ext4_ext_get_actual_len(ex);
 	ee_pblock = ext4_ext_pblock(ex);
 
 	ret = 0;
@@ -2227,7 +2227,7 @@ int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start)
 			/* root level have p_bcb == NULL, extents_brelse() eats this */
 			extents_brelse(path[i].p_bcb);
 			path[i].p_bcb = NULL;
-            path[i].p_data = NULL;
+			path[i].p_data = NULL;
 			i--;
 			continue;
 		}
@@ -2248,18 +2248,18 @@ int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start)
 
 		if (ext4_ext_more_to_rm(path + i)) {
 			PPUBLIC_BCB bcb;
-            PVOID data;
+			PVOID data;
 			/* go to the next level */
 			memset(path + i + 1, 0, sizeof(*path));
 			bcb = read_extent_tree_block(inode, ext4_idx_pblock(path[i].p_idx), path[0].p_depth - (i + 1),
-                                        &data, 0);
+					&data, 0);
 			if (IS_ERR(bcb)) {
 				/* should we reset i_size? */
 				err = -EIO;
 				break;
 			}
 			path[i+1].p_bcb = bcb;
-            path[i+1].p_data = data;
+			path[i+1].p_data = data;
 
 			/* put actual number of indexes to know is this
 			 * number got changed at the next iteration */
@@ -2276,7 +2276,7 @@ int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start)
 			/* root level have p_bcb == NULL, extents_brelse() eats this */
 			extents_brelse(path[i].p_bcb);
 			path[i].p_bcb = NULL;
-            path[i].p_data = NULL;
+			path[i].p_data = NULL;
 			i--;
 		}
 	}
