@@ -82,9 +82,9 @@ static inline void ext_debug(char *str, ...)
 {
 }
 #if TRUE
-#define EXT4_ERROR_INODE(inode, str, ...) do {					  \
-			DbgPrint("inode[%p]: "##str "\n", inode, __VA_ARGS__);  \
-		} while(0)
+#define EXT4_ERROR_INODE(inode, str, ...) do {                      \
+            DbgPrint("inode[%p]: "##str "\n", inode, __VA_ARGS__);  \
+        } while(0)
 #else
 #define EXT4_ERROR_INODE
 #endif
@@ -237,12 +237,12 @@ static void ext4_extent_block_csum_set(struct inode *inode,
 }
 
 static int ext4_split_extent_at(void *icb,
-				 handle_t *handle,
-				 struct inode *inode,
-				 struct ext4_ext_path **ppath,
-				 ext4_lblk_t split,
-				 int split_flag,
-				 int flags);
+			     handle_t *handle,
+			     struct inode *inode,
+			     struct ext4_ext_path **ppath,
+			     ext4_lblk_t split,
+			     int split_flag,
+			     int flags);
 
 static inline int
 ext4_force_split_extent_at(void *icb, handle_t *handle, struct inode *inode,
@@ -1871,7 +1871,7 @@ static int ext4_ext_zeroout(struct inode *inode, struct ext4_extent *ex)
 	unsigned int ee_len;
 	int ret;
 
-	ee_len	= ext4_ext_get_actual_len(ex);
+	ee_len    = ext4_ext_get_actual_len(ex);
 	ee_pblock = ext4_ext_pblock(ex);
 
 	ret = 0;
@@ -2339,7 +2339,6 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	ext4_fsblk_t next, newblock;
 
 	clear_buffer_new(bh_result);
-	/*mutex_lock(&ext4_I(inode)->truncate_mutex);*/
 
 	/* find extent for this block */
 	path = ext4_find_extent(inode, iblock, NULL, 0);
@@ -2382,7 +2381,6 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 
 	/* find next allocated block so that we know how many
 	 * blocks we can allocate without ovelapping next extent */
-	/*BUG_ON(iblock < le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len));*/
 	next = ext4_ext_next_allocated_block(path);
 	BUG_ON(next <= iblock);
 	allocated = next - iblock;
@@ -2426,7 +2424,6 @@ out2:
 		ext4_ext_drop_refs(path);
 		kfree(path);
 	}
-	/*mutex_unlock(&ext4_I(inode)->truncate_mutex);*/
 
 	return err ? err : allocated;
 }
