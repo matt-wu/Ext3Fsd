@@ -2339,7 +2339,6 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	ext4_fsblk_t next, newblock;
 
 	clear_buffer_new(bh_result);
-	/*mutex_lock(&ext4_I(inode)->truncate_mutex);*/
 
 	/* find extent for this block */
 	path = ext4_find_extent(inode, iblock, NULL, 0);
@@ -2382,7 +2381,6 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 
 	/* find next allocated block so that we know how many
 	 * blocks we can allocate without ovelapping next extent */
-	/*BUG_ON(iblock < le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len));*/
 	next = ext4_ext_next_allocated_block(path);
 	BUG_ON(next <= iblock);
 	allocated = next - iblock;
@@ -2426,7 +2424,6 @@ out2:
 		ext4_ext_drop_refs(path);
 		kfree(path);
 	}
-	/*mutex_unlock(&ext4_I(inode)->truncate_mutex);*/
 
 	return err ? err : allocated;
 }
