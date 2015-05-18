@@ -162,8 +162,11 @@ static ext4_fsblk_t ext4_ext_find_goal(struct inode *inode,
 
 		/* it looks like index is empty;
 		 * try to find starting block from index itself */
-		if (path[depth].p_bh)
-			return path[depth].p_bh->b_blocknr;
+		if (path[depth].p_bcb) {
+				struct super_block *sb = inode->i_sb;
+				return path[depth].p_bcb->MappedFileOffset.QuadPart
+						>> sb->s_blocksize_bits;
+		}
 	}
 
 	/* OK. use inode's group */
@@ -191,12 +194,11 @@ static int __ext4_ext_dirty(void *icb, struct inode *inode,
 {
 	int err;
 
-	if (path->p_bh) {
-		/*ext4_extent_block_csum_set(inode, ext_block_hdr(path->p_bh));*/
+	if (path->p_bcb) {
+		/*ext4_extent_block_csum_set(inode, ext_block_hdr(path->p_data));*/
 		/* path points to block */
 		err = 0;
-		set_buffer_uptodate(path->p_bh);
-		extents_mark_buffer_dirty(path->p_bh);
+		extents_mark_buffer_dirty(inode->i_sb, path->p_bcb);
 	} else {
 		/* path points to leaf/index in inode body */
 		err = ext4_mark_inode_dirty(icb, inode);
@@ -212,9 +214,10 @@ void ext4_ext_drop_refs(struct ext4_ext_path *path)
 		return;
 	depth = path->p_depth;
 	for (i = 0; i <= depth; i++, path++)
-		if (path->p_bh) {
-			extents_brelse(path->p_bh);
-			path->p_bh = NULL;
+		if (path->p_bcb) {
+			extents_brelse(path->p_bcb);
+			path->p_bcb = NULL;
+			path->p_data = NULL;
 		}
 }
 
@@ -275,35 +278,32 @@ corrupted:
 	return -EIO;
 }
 
-static struct buffer_head *
+static PPUBLIC_BCB
 read_extent_tree_block(struct inode *inode, ext4_fsblk_t pblk, int depth,
-			 int *perr, int flags)
+			 PVOID *pdata, int *perr, int flags)
 {
-	struct buffer_head		*bh;
+	PPUBLIC_BCB bcb;
 	int				err;
 
 	if (perr)
 		*perr = 0;
 
 	err = 0;
-	bh = extents_bread(inode->i_sb, pblk);
-	if (!bh) {
+	bcb = extents_bread(inode->i_sb, pblk, pdata);
+	if (!bcb) {
 		err = -ENOMEM;
 		goto errout;
 	}
 
-	if (buffer_verified(bh))
-		goto out;
 	err = ext4_ext_check(inode,
-			       ext_block_hdr(bh), depth, pblk);
+			       ext_block_hdr(*pdata), depth, pblk);
 	if (err)
 		goto errout;
-	set_buffer_verified(bh);
 out:
-	return bh;
+	return bcb;
 errout:
-	if (bh)
-		extents_brelse(bh);
+	if (bcb)
+		extents_brelse(bcb);
 	if (perr)
 		*perr = err;
 	return NULL;
@@ -374,7 +374,8 @@ int ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 		 struct ext4_ext_path **orig_path, int flags)
 {
 	struct ext4_extent_header *eh;
-	struct buffer_head *bh;
+	PPUBLIC_BCB bcb;
+	PVOID data;
 	struct ext4_ext_path *path = *orig_path;
 	int depth, i, ppos = 0;
 	int ret;
@@ -398,7 +399,8 @@ int ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 		path[0].p_maxdepth = depth + 1;
 	}
 	path[0].p_hdr = eh;
-	path[0].p_bh = NULL;
+	path[0].p_bcb = NULL;
+	path[0].p_data = NULL;
 
 	i = depth;
 	/* walk through the tree */
@@ -408,20 +410,21 @@ int ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 		path[ppos].p_depth = i;
 		path[ppos].p_ext = NULL;
 
-		bh = read_extent_tree_block(inode, path[ppos].p_block, --i,
-					    &ret, flags);
+		bcb = read_extent_tree_block(inode, path[ppos].p_block, --i,
+					    &data, &ret, flags);
 		if (ret) {
 			goto err;
 		}
 
-		eh = ext_block_hdr(bh);
+		eh = ext_block_hdr(data);
 		ppos++;
 		if (ppos > depth) {
-			extents_brelse(bh);
+			extents_brelse(bcb);
 			ret = -EIO;
 			goto err;
 		}
-		path[ppos].p_bh = bh;
+		path[ppos].p_bcb = bcb;
+		path[ppos].p_data = data;
 		path[ppos].p_hdr = eh;
 	}
 
@@ -455,15 +458,17 @@ static int ext4_ext_split_node(void *icb, struct inode *inode,
 			       int at,
 			       struct ext4_extent *newext,
 			       ext4_fsblk_t *sibling,
-			       struct buffer_head **new_bh)
+			       PPUBLIC_BCB *new_bcb,
+			       PVOID *pdata)
 {
 	int ret;
 	ext4_fsblk_t newblock;
-	struct buffer_head *bh = NULL;
+	PVOID data;
+	PPUBLIC_BCB bcb = NULL;
 	int depth = ext_depth(inode);
 
 	ASSERT(sibling);
-	ASSERT(new_bh);
+	ASSERT(new_bcb);
 	/* FIXME: currently we split at the point after the current extent. */
 	newblock = ext4_ext_new_meta_block(icb, inode, path,
 					   newext, &ret, 0);
@@ -471,8 +476,8 @@ static int ext4_ext_split_node(void *icb, struct inode *inode,
 		goto cleanup;
 
 	/*  For write access.*/
-	bh = extents_bwrite(inode->i_sb, newblock);
-	if (!bh) {
+	bcb = extents_bwrite(inode->i_sb, newblock, &data);
+	if (!bcb) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
@@ -481,7 +486,7 @@ static int ext4_ext_split_node(void *icb, struct inode *inode,
 		/* start copy from next extent */
 		int m = EXT_MAX_EXTENT(path[at].p_hdr) - path[at].p_ext;
 		struct ext4_extent_header *neh;
-		neh = ext_block_hdr(bh);
+		neh = ext_block_hdr(data);
 		neh->eh_entries = 0;
 		neh->eh_max = cpu_to_le16(ext4_ext_space_block(inode, 0));
 		neh->eh_magic = EXT4_EXT_MAGIC;
@@ -500,7 +505,7 @@ static int ext4_ext_split_node(void *icb, struct inode *inode,
 	} else {
 		int m = EXT_MAX_INDEX(path[at].p_hdr) - path[at].p_idx;
 		struct ext4_extent_header *neh;
-		neh = ext_block_hdr(bh);
+		neh = ext_block_hdr(data);
 		neh->eh_entries = 0;
 		neh->eh_max = cpu_to_le16(ext4_ext_space_block(inode, depth - at));
 		neh->eh_magic = EXT4_EXT_MAGIC;
@@ -519,9 +524,10 @@ static int ext4_ext_split_node(void *icb, struct inode *inode,
 	}
 cleanup:
 	if (ret) {
-		if (bh) {
-			extents_brelse(bh);
-			bh = NULL;
+		if (bcb) {
+			extents_brelse(bcb);
+			bcb = NULL;
+			data = NULL;
 		}
 		if (newblock)
 			ext4_free_blocks(icb, inode, newblock, 1, 0);
@@ -529,14 +535,15 @@ cleanup:
 		newblock = 0;
 	}
 	*sibling = newblock;
-	*new_bh = bh;
+	*new_bcb = bcb;
+	*pdata = data;
 	return ret;
 }
 
-static ext4_lblk_t ext4_ext_block_index(struct buffer_head *bh)
+static ext4_lblk_t ext4_ext_block_index(PVOID data)
 {
 	struct ext4_extent_header *neh;
-	neh = ext_block_hdr(bh);
+	neh = ext_block_hdr(data);
 
 	if (neh->eh_depth)
 		return le32_to_cpu(EXT_FIRST_INDEX(neh)->ei_block);
@@ -556,7 +563,8 @@ static int ext4_ext_insert_index(void *icb, struct inode *inode,
 {
 	struct ext4_extent_idx *ix;
 	struct ext4_ext_path *curp = path + at;
-	struct buffer_head *bh = NULL;
+	PPUBLIC_BCB bcb;
+	PVOID data = NULL;
 	int len, err;
 	struct ext4_extent_header *eh;
 
@@ -568,11 +576,11 @@ static int ext4_ext_insert_index(void *icb, struct inode *inode,
 		if (at) {
 			struct ext4_extent_header *neh;
 			err = ext4_ext_split_node(icb, inode, path, at,
-						  newext, sibling, &bh);
+						  newext, sibling, &bcb, &data);
 			if (err)
 				goto out;
 
-			neh = ext_block_hdr(bh);
+			neh = ext_block_hdr(data);
 			if (insert_index >
 				le32_to_cpu(curp->p_idx->ei_block)) {
 				/* Make decision which node should be used to insert the index.*/
@@ -633,15 +641,14 @@ static int ext4_ext_insert_index(void *icb, struct inode *inode,
 
 out:
 	if (err) {
-		if (bh)
-			extents_bforget(bh);
+		if (bcb)
+			extents_bforget(bcb);
 
-	} else if (bh) {
+	} else if (bcb) {
 		/* If we got a sibling leaf. */
-		*sibling_index = ext4_ext_block_index(bh);
-		set_buffer_uptodate(bh);
-		extents_mark_buffer_dirty(bh);
-		extents_brelse(bh);
+		*sibling_index = ext4_ext_block_index(data);
+		extents_mark_buffer_dirty(inode->i_sb, bcb);
+		extents_brelse(bcb);
 	} else {
 		*sibling_index = 0;
 		*sibling = 0;
@@ -762,7 +769,8 @@ static int ext4_ext_insert_leaf(void *icb, struct inode *inode,
 {
 	struct ext4_extent *ex;
 	struct ext4_ext_path *curp = path + at;
-	struct buffer_head *bh = NULL;
+	PPUBLIC_BCB bcb;
+	PVOID data = NULL;
 	int len, err;
 	struct ext4_extent_header *eh;
 
@@ -791,11 +799,11 @@ static int ext4_ext_insert_leaf(void *icb, struct inode *inode,
 		if (at) {
 			struct ext4_extent_header *neh;
 			err = ext4_ext_split_node(icb, inode, path, at,
-						  newext, sibling, &bh);
+						  newext, sibling, &bcb, &data);
 			if (err)
 				goto out;
 
-			neh = ext_block_hdr(bh);
+			neh = ext_block_hdr(data);
 			if (le32_to_cpu(newext->ee_block) >
 				le32_to_cpu(curp->p_ext->ee_block)) {
 				if (le16_to_cpu(neh->eh_entries) > le16_to_cpu(curp->p_hdr->eh_entries)) {
@@ -859,15 +867,14 @@ static int ext4_ext_insert_leaf(void *icb, struct inode *inode,
 
 out:
 	if (err) {
-		if (bh)
-			extents_bforget(bh);
+		if (bcb)
+			extents_bforget(bcb);
 
-	} else if (bh) {
+	} else if (bcb) {
 		/* If we got a sibling leaf. */
-		*sibling_index = ext4_ext_block_index(bh);
-		set_buffer_uptodate(bh);
-		extents_mark_buffer_dirty(bh);
-		extents_brelse(bh);
+		*sibling_index = ext4_ext_block_index(data);
+		extents_mark_buffer_dirty(bcb);
+		extents_brelse(bcb);
 	} else {
 		*sibling_index = 0;
 		*sibling = 0;
@@ -889,7 +896,8 @@ static int ext4_ext_grow_indepth(void *icb, struct inode *inode,
 				 unsigned int flags)
 {
 	struct ext4_extent_header *neh;
-	struct buffer_head *bh;
+	PPUBLIC_BCB bcb;
+	PVOID data;
 	ext4_fsblk_t newblock, goal = 0;
 	int err = 0;
 
@@ -902,19 +910,19 @@ static int ext4_ext_grow_indepth(void *icb, struct inode *inode,
 	if (newblock == 0)
 		return err;
 
-	bh = extents_bwrite(inode->i_sb, newblock);
-	if (!bh) {
+	bcb = extents_bwrite(inode->i_sb, newblock, &data);
+	if (!bcb) {
 		ext4_free_blocks(icb, inode, newblock, 1, 0);
 		err = -ENOMEM;
 		return err;
 	}
 
 	/* move top-level index/leaf into new block */
-	memmove(bh->b_data, EXT4_I(inode)->i_block,
+	memmove(data, EXT4_I(inode)->i_block,
 		sizeof(EXT4_I(inode)->i_block));
 
 	/* set size of new block */
-	neh = ext_block_hdr(bh);
+	neh = ext_block_hdr(data);
 	/* old root could have indexes or leaves
 	 * so calculate e_max right way */
 	if (ext_depth(inode))
@@ -924,8 +932,7 @@ static int ext4_ext_grow_indepth(void *icb, struct inode *inode,
 	neh->eh_magic = EXT4_EXT_MAGIC;
 	ext4_extent_block_csum_set(inode, neh);
 
-	set_buffer_uptodate(bh);
-	extents_mark_buffer_dirty(bh);
+	extents_mark_buffer_dirty(inode->i_sb, bcb);
 
 	/* Update top-level index: num,max,pointer */
 	neh = ext_inode_hdr(inode);
@@ -940,7 +947,7 @@ static int ext4_ext_grow_indepth(void *icb, struct inode *inode,
 
 	le16_add_cpu(&neh->eh_depth, 1);
 	ext4_mark_inode_dirty(icb, inode);
-	extents_brelse(bh);
+	extents_brelse(bcb);
 
 	return err;
 }
@@ -1000,7 +1007,6 @@ static int ext4_remove_blocks(void *icb, handle_t *handle, struct inode *inode,
 		struct ext4_extent *ex,
 		unsigned long from, unsigned long to)
 {
-	struct buffer_head *bh;
 	int i;
 
 	if (from >= le32_to_cpu(ex->ee_block)
@@ -1053,7 +1059,7 @@ ext4_ext_rm_leaf(void *icb, handle_t *handle, struct inode *inode,
 
 	/* the header must be checked already in ext4_ext_remove_space() */
 	if (!path[depth].p_hdr)
-		path[depth].p_hdr = ext_block_hdr(path[depth].p_bh);
+		path[depth].p_hdr = ext_block_hdr(path[depth].p_data);
 	eh = path[depth].p_hdr;
 	ASSERT(eh != NULL);
 
@@ -1133,7 +1139,7 @@ ext4_ext_rm_leaf(void *icb, handle_t *handle, struct inode *inode,
 
 	/* if this leaf is free, then we should
 	 * remove it from index block above */
-	if (err == 0 && eh->eh_entries == 0 && path[depth].p_bh != NULL)
+	if (err == 0 && eh->eh_entries == 0 && path[depth].p_bcb != NULL)
 		err = ext4_ext_rm_idx(icb, handle, inode, path + depth);
 
 out:
@@ -1190,16 +1196,17 @@ int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start)
 		if (i == depth) {
 			/* this is leaf block */
 			err = ext4_ext_rm_leaf(icb, handle, inode, path, start);
-			/* root level have p_bh == NULL, extents_brelse() eats this */
-			extents_brelse(path[i].p_bh);
-			path[i].p_bh = NULL;
+			/* root level have p_bcb == NULL, extents_brelse() eats this */
+			extents_brelse(path[i].p_bcb);
+			path[i].p_bcb = NULL;
+			path[i].p_data = NULL;
 			i--;
 			continue;
 		}
 
 		/* this is index block */
 		if (!path[i].p_hdr) {
-			path[i].p_hdr = ext_block_hdr(path[i].p_bh);
+			path[i].p_hdr = ext_block_hdr(path[i].p_data);
 		}
 
 		if (!path[i].p_idx) {
@@ -1212,19 +1219,21 @@ int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start)
 		}
 
 		if (ext4_ext_more_to_rm(path + i)) {
-			struct buffer_head *bh;
+			PPUBLIC_BCB bcb;
+			PVOID data;
 			/* go to the next level */
 			memset(path + i + 1, 0, sizeof(*path));
-			bh = read_extent_tree_block(inode,
+			bcb = read_extent_tree_block(inode,
 										ext4_idx_pblock(path[i].p_idx),
 										path[0].p_depth - (i + 1),
-										&err,
+										&data, &err,
 										0);
 			if (err) {
 				/* should we reset i_size? */
 				break;
 			}
-			path[i+1].p_bh = bh;
+			path[i+1].p_bcb = bcb;
+			path[i+1].p_data = data;
 
 			/* put actual number of indexes to know is this
 			 * number got changed at the next iteration */
@@ -1238,9 +1247,10 @@ int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start)
 				 * truncatei_leaf() */
 				err = ext4_ext_rm_idx(icb, handle, inode, path + i);
 			}
-			/* root level have p_bh == NULL, extents_brelse() eats this */
-			extents_brelse(path[i].p_bh);
-			path[i].p_bh = NULL;
+			/* root level have p_bcb == NULL, extents_brelse() eats this */
+			extents_brelse(path[i].p_bcb);
+			path[i].p_bcb = NULL;
+			path[i].p_data = NULL;
 			i--;
 		}
 	}

@@ -845,10 +845,10 @@ int bh_uptodate_or_lock(struct buffer_head *bh);
 int bh_submit_read(struct buffer_head *bh);
 /* They are separately managed  */
 PPUBLIC_BCB 
-extents_bread(struct super_block *sb, sector_t block, PVOID *data);
+extents_bread(struct super_block *sb, sector_t block, PVOID *pdata);
 
 PPUBLIC_BCB 
-extents_bwrite(struct super_block *sb, sector_t block, PVOID *data);
+extents_bwrite(struct super_block *sb, sector_t block, PVOID *pdata);
 
 void extents_mark_buffer_dirty(struct super_block *sb, PPUBLIC_BCB Bcb);
 

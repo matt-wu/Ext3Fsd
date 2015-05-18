@@ -13,7 +13,7 @@
  * will be locked into memory, so that the buffer header returned for use is safe.
  */
 PPUBLIC_BCB 
-extents_bread(struct super_block *sb, sector_t block, PVOID *data)
+extents_bread(struct super_block *sb, sector_t block, PVOID *pdata)
 {
     PEXT2_VCB Vcb = sb->s_bdev->bd_priv;
     LARGE_INTEGER offset;
@@ -37,7 +37,7 @@ extents_bread(struct super_block *sb, sector_t block, PVOID *data)
                     size,
                     PIN_WAIT,
                     &Bcb,
-                    data);
+                    pdata);
 
     if (!ret) {
         DbgPrint("Insufficient memory resources!\n");
@@ -58,7 +58,7 @@ errorout:
  * @block: the block we want to write to.
  */
 PPUBLIC_BCB 
-extents_bwrite(struct super_block *sb, sector_t block, PVOID *data)
+extents_bwrite(struct super_block *sb, sector_t block, PVOID *pdata)
 {
     PEXT2_VCB Vcb = sb->s_bdev->bd_priv;
     LARGE_INTEGER offset;
@@ -84,7 +84,7 @@ extents_bwrite(struct super_block *sb, sector_t block, PVOID *data)
                             FALSE,
                             PIN_WAIT,
                             &Bcb,
-                            data);
+                            pdata);
 
     if (!ret) {
         DbgPrint("Insufficient memory resources!\n");

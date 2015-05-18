@@ -186,18 +186,18 @@ static int __ext4_ext_check(const char *function, unsigned int line,
  */
 static PPUBLIC_BCB
 __read_extent_tree_block(const char *function, unsigned int line,
-		struct inode *inode, ext4_fsblk_t pblk, int depth, PVOID *data,
+		struct inode *inode, ext4_fsblk_t pblk, int depth, PVOID *pdata,
 		int flags)
 {
 	PPUBLIC_BCB bcb;
 	int				err;
 
-	bcb = extents_bread(inode->i_sb, pblk, data);
+	bcb = extents_bread(inode->i_sb, pblk, pdata);
 	if (!bcb)
 		return ERR_PTR(-EIO);
 
 	err = __ext4_ext_check(function, line, inode,
-			ext_block_hdr(*data), depth, pblk);
+			ext_block_hdr(*pdata), depth, pblk);
 	if (err)
 		goto errout;
 	return bcb;
@@ -207,9 +207,9 @@ errout:
 
 }
 
-#define read_extent_tree_block(inode, pblk, depth, data, flags)		\
+#define read_extent_tree_block(inode, pblk, depth, pdata, flags)		\
 	__read_extent_tree_block("", __LINE__, (inode), (pblk),   \
-			(depth), (data), (flags))
+			(depth), (pdata), (flags))
 
 #define ext4_ext_check(inode, eh, depth, pblk)			\
 	__ext4_ext_check("", __LINE__, (inode), (eh), (depth), (pblk))
