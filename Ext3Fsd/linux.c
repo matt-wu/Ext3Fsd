@@ -369,7 +369,7 @@ __getblk(
     PEXT2_VCB Vcb = bdev->bd_priv;
     LARGE_INTEGER offset;
     PVOID         bcb = NULL;
-    PVOID         ptr;
+    PVOID         ptr = NULL;
 
     KIRQL irql = 0;
     struct list_head *entry;
@@ -412,14 +412,30 @@ again:
 
     offset.QuadPart = (s64) bh->b_blocknr;
     offset.QuadPart <<= BLOCK_BITS;
-    if (!CcPinRead( Vcb->Volume,
+    if (CcPinRead( Vcb->Volume,
                     &offset,
                     bh->b_size,
+                    0,
+                    &bcb,
+                    &ptr)) {
+        if (ptr) {
+            set_buffer_uptodate(bh);
+            goto got_bcb;
+        } else
+            CcUnpinData(bcb);
+
+    }
+    if (!CcPreparePinWrite( Vcb->Volume,
+                            &offset,
+                            bh->b_size,
+                            TRUE,
                     PIN_WAIT,
                     &bcb,
                     &ptr)) {
         goto again;
     }
+
+got_bcb:
 
     bh->b_mdl = Ext2CreateMdl(ptr, TRUE, bh->b_size, IoModifyAccess);
     if (bh->b_mdl) {
@@ -436,7 +452,6 @@ again:
         goto errorout;
     }
 
-    set_buffer_uptodate(bh);
     get_bh(bh);
 
     DEBUG(DL_BH, ("getblk: Vcb=%p bhcount=%u block=%u bh=%p mdl=%p (Flags:%xh VA:%p)\n",
@@ -494,7 +509,7 @@ int submit_bh(int rw, struct buffer_head *bh)
                     &Offset,
                     BLOCK_SIZE,
                     FALSE,
-                    TRUE,
+                    PIN_WAIT,
                     &Bcb,
                     &Buffer )) {
 #if 0
@@ -509,17 +524,34 @@ int submit_bh(int rw, struct buffer_head *bh)
                                 (ULONG)bh->b_blocknr,
                                 (bh->b_size >> BLOCK_BITS));
             CcUnpinData(Bcb);
+            set_buffer_uptodate(bh);
         } else {
 
             Ext2AddBlockExtent( Vcb, NULL,
                                 (ULONG)bh->b_blocknr,
                                 (ULONG)bh->b_blocknr,
                                 (bh->b_size >> BLOCK_BITS));
+
+            clear_buffer_uptodate(bh);
         }
 
     } else {
+        NTSTATUS Status;
 
-        DbgBreak();
+        Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
+        Status = Ext2ReadSync( Vcb, 
+                                     Offset.QuadPart,
+                                     bh->b_size,
+                                     bh->b_data,
+                                     FALSE);
+        if (NT_SUCCESS(Status)) {
+
+            set_buffer_uptodate(bh);
+        } else {
+
+            DEBUG(DL_ERR, ("Failed to fetch data from disk. %u\n", Status));
+            clear_buffer_uptodate(bh);            
+        }
     }
 
 errorout:
@@ -534,13 +566,17 @@ void __brelse(struct buffer_head *bh)
     struct block_device *bdev = bh->b_bdev;
     PEXT2_VCB Vcb = (PEXT2_VCB)bdev->bd_priv;
     KIRQL   irql = 0;
+    int uptodate;
+    LARGE_INTEGER Offset;
 
     ASSERT(Vcb->Identifier.Type == EXT2VCB);
 
+    Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
     /* write data in case it's dirty */
     while (buffer_dirty(bh)) {
         ll_rw_block(WRITE, 1, &bh);
     }
+    uptodate = buffer_uptodate(bh);
 
     spin_lock_irqsave(&bdev->bd_bh_lock, irql);
     if (!atomic_dec_and_test(&bh->b_count)) {
@@ -556,6 +592,12 @@ void __brelse(struct buffer_head *bh)
 
     free_buffer_head(bh);
     atomic_dec(&g_jbh.bh_count);
+    if (!uptodate) {
+        CcPurgeCacheSection( &Vcb->SectionObject,
+                             &Offset,
+                             BLOCK_SIZE,
+                             FALSE);
+    }
 }
 
 void __bforget(struct buffer_head *bh)
@@ -610,6 +652,12 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 int bh_submit_read(struct buffer_head *bh)
 {
 	ll_rw_block(READ, 1, &bh);
+    lock_buffer(bh);
+    if (!buffer_uptodate(bh)) {
+        unlock_buffer(bh);
+        return -EIO;
+    }
+    unlock_buffer(bh);
     return 0;
 }
 

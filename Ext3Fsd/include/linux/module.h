@@ -844,10 +844,15 @@ void write_boundary_block(struct block_device *bdev,
 int bh_uptodate_or_lock(struct buffer_head *bh);
 int bh_submit_read(struct buffer_head *bh);
 /* They are separately managed  */
-struct buffer_head *extents_bread(struct super_block *sb, sector_t block);
-struct buffer_head *extents_bwrite(struct super_block *sb, sector_t block);
-void extents_mark_buffer_dirty(struct buffer_head *bh);
-void extents_brelse(struct buffer_head *bh);
+PPUBLIC_BCB 
+extents_bread(struct super_block *sb, sector_t block, PVOID *pdata);
+
+PPUBLIC_BCB 
+extents_bwrite(struct super_block *sb, sector_t block, PVOID *pdata);
+
+void extents_mark_buffer_dirty(struct super_block *sb, PPUBLIC_BCB Bcb);
+
+void extents_brelse(PPUBLIC_BCB Bcb);
 
 extern int buffer_heads_over_limit;
 
