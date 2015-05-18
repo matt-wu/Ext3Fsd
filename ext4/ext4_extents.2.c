@@ -299,7 +299,7 @@ read_extent_tree_block(struct inode *inode, ext4_fsblk_t pblk, int depth,
 			       ext_block_hdr(*pdata), depth, pblk);
 	if (err)
 		goto errout;
-out:
+
 	return bcb;
 errout:
 	if (bcb)
@@ -642,7 +642,7 @@ static int ext4_ext_insert_index(void *icb, struct inode *inode,
 out:
 	if (err) {
 		if (bcb)
-			extents_bforget(bcb);
+			extents_brelse(bcb);
 
 	} else if (bcb) {
 		/* If we got a sibling leaf. */
@@ -868,12 +868,12 @@ static int ext4_ext_insert_leaf(void *icb, struct inode *inode,
 out:
 	if (err) {
 		if (bcb)
-			extents_bforget(bcb);
+			extents_brelse(bcb);
 
 	} else if (bcb) {
 		/* If we got a sibling leaf. */
 		*sibling_index = ext4_ext_block_index(data);
-		extents_mark_buffer_dirty(bcb);
+		extents_mark_buffer_dirty(inode->i_sb, bcb);
 		extents_brelse(bcb);
 	} else {
 		*sibling_index = 0;
