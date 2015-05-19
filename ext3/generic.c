@@ -1807,8 +1807,11 @@ int ext3_inode_blocks_set(struct ext3_inode *raw_inode,
         inode->i_flags &= ~EXT4_HUGE_FILE_FL;
         return 0;
     }
-    if (!EXT3_HAS_RO_COMPAT_FEATURE(sb, EXT4_FEATURE_RO_COMPAT_HUGE_FILE))
-        return -EFBIG;
+
+    if (!EXT3_HAS_RO_COMPAT_FEATURE(sb, EXT4_FEATURE_RO_COMPAT_HUGE_FILE)) {
+        EXT3_SET_RO_COMPAT_FEATURE(sb, EXT4_FEATURE_RO_COMPAT_HUGE_FILE);
+        Ext2SaveSuper(NULL, Vcb);
+    }
 
     if (i_blocks <= 0xffffffffffff) {
         /*
