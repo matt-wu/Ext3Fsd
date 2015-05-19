@@ -529,21 +529,21 @@ Ext2ListExtents(PLARGE_MCB  Extents)
 {
     if (FsRtlNumberOfRunsInLargeMcb(Extents) != 0) {
 
-#if EXT2_DEBUG
-
         LONGLONG            DirtyVba;
         LONGLONG            DirtyLba;
         LONGLONG            DirtyLength;
-        int                 i;
+        int                 i, n = 0;
 
         for (i = 0; FsRtlGetNextLargeMcbEntry(
                     Extents, i, &DirtyVba,
                     &DirtyLba, &DirtyLength); i++)  {
-            DEBUG(DL_EXT, ("Vba:%I64xh Lba:%I64xh Len:%I64xh.\n", DirtyVba, DirtyLba, DirtyLength));
+            if (DirtyVba > 0 && DirtyLba != -1) {
+                DEBUG(DL_EXT, ("Vba:%I64xh Lba:%I64xh Len:%I64xh.\n", DirtyVba, DirtyLba, DirtyLength));
+                n++;
+            }
         }
-#endif
 
-        return TRUE;
+        return n ? TRUE : FALSE;
     }
 
     return FALSE;
