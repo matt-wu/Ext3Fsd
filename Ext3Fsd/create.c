@@ -227,12 +227,15 @@ Ext2IsSpecialSystemFile(
 {
     PWSTR SpecialFileList[] = {
         L"pagefile.sys",
+        L"swapfile.sys",
+        L"hiberfil.sys",
         NULL
     };
 
     PWSTR SpecialDirList[] = {
         L"Recycled",
         L"RECYCLER",
+        L"$RECYCLE.BIN",
         NULL
     };
 
