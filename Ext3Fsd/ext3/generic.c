@@ -472,7 +472,7 @@ Ext2ZeroBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
                 (PLARGE_INTEGER) (&Offset),
                 Size,
                 FALSE,
-                PIN_WAIT,
+                PIN_WAIT | PIN_EXCLUSIVE,
                 &Bcb,
                 &Buffer )) {
 
@@ -528,7 +528,7 @@ Ext2SaveBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
                     (PLARGE_INTEGER) (&Offset),
                     Length,
                     FALSE,
-                    PIN_WAIT,
+                    PIN_WAIT | PIN_EXCLUSIVE,
                     &Bcb,
                     &Buffer )) {
 

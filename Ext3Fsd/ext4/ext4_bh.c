@@ -35,7 +35,7 @@ extents_bread(struct super_block *sb, sector_t block, PVOID *pdata)
     ret = CcPinRead(Vcb->Volume,
                     &offset,
                     size,
-                    PIN_WAIT,
+                    PIN_WAIT | PIN_EXCLUSIVE,
                     &Bcb,
                     pdata);
 
@@ -82,7 +82,7 @@ extents_bwrite(struct super_block *sb, sector_t block, PVOID *pdata)
                             &offset,
                             size,
                             FALSE,
-                            PIN_WAIT,
+                            PIN_WAIT | PIN_EXCLUSIVE,
                             &Bcb,
                             pdata);
 

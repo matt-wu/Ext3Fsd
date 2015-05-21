@@ -494,7 +494,7 @@ int submit_bh(int rw, struct buffer_head *bh)
                     &Offset,
                     BLOCK_SIZE,
                     FALSE,
-                    TRUE,
+                    PIN_WAIT | PIN_EXCLUSIVE,
                     &Bcb,
                     &Buffer )) {
 #if 0
