@@ -746,6 +746,14 @@ Again:
             goto Again;
         }
 
+        /* Always remove dirty MCB to prevent Volume's lazy writing.
+           Metadata blocks will be re-added during modifications.*/
+        if (Ext2RemoveBlockExtent(Vcb, NULL, *Block, *Number)) {
+        } else {
+            DbgBreak();
+            Ext2RemoveBlockExtent(Vcb, NULL, *Block, *Number);
+        }
+
         DEBUG(DL_INF, ("Ext2NewBlock:  Block %xh - %x allocated.\n",
                        *Block, *Block + *Number));
         Status = STATUS_SUCCESS;

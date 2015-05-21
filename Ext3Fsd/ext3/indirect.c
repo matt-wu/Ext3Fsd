@@ -75,22 +75,12 @@ Ext2ExpandLast(
     if (Layer == 0) {
 
         if (IsMcbDirectory(Mcb)) {
-
             /* for directory we need initialize it's entry structure */
             PEXT2_DIR_ENTRY2 pEntry;
             pEntry = (PEXT2_DIR_ENTRY2) pData;
             pEntry->rec_len = (USHORT)(BLOCK_SIZE);
             ASSERT(*Number == 1);
             Ext2SaveBlock(IrpContext, Vcb, *Block, (PVOID)pData);
-
-        } else {
-
-            /* for file we need remove dirty MCB to prevent Volume's writing */
-            if (!Ext2RemoveBlockExtent(Vcb, NULL, (*Block), *Number)) {
-                DbgBreak();
-                Status = STATUS_INSUFFICIENT_RESOURCES;
-                goto errorout;
-            }
         }
 
         /* add new Extent into Mcb */
