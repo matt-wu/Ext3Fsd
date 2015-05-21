@@ -1160,19 +1160,6 @@ errorout:
         Size->QuadPart += ((ULONGLONG)Extra << BLOCK_BITS);
     }
 
-    if (Size->QuadPart == 0) {
-        /* check and remove all data extents */
-        if (Ext2ListExtents(&Mcb->Extents)) {
-            DbgBreak();
-        }
-        Ext2ClearAllExtents(&Mcb->Extents);
-        /* check and remove all meta extents */
-        if (Ext2ListExtents(&Mcb->MetaExts)) {
-            DbgBreak();
-        }
-        Ext2ClearAllExtents(&Mcb->MetaExts);
-    }
-
     /* save inode */
     if (Mcb->Inode.i_size > (loff_t)(Size->QuadPart))
         Mcb->Inode.i_size = (loff_t)(Size->QuadPart);

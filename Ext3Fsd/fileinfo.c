@@ -1187,6 +1187,22 @@ Ext2TruncateFile(
 		status = Ext2TruncateIndirect(IrpContext, Vcb, Mcb, Size);
 	}
 
+    /* check and clear data/meta mcb extents */
+    if (Size->QuadPart == 0) {
+
+        /* check and remove all data extents */
+        if (Ext2ListExtents(&Mcb->Extents)) {
+            DbgBreak();
+        }
+        Ext2ClearAllExtents(&Mcb->Extents);
+        /* check and remove all meta extents */
+        if (Ext2ListExtents(&Mcb->MetaExts)) {
+            DbgBreak();
+        }
+        Ext2ClearAllExtents(&Mcb->MetaExts);
+        ClearLongFlag(Mcb->Flags, MCB_ZONE_INITED);
+    }
+
     return status;
 }
 
@@ -1756,11 +1772,6 @@ Ext2DeleteFile(
 
                 /* check file offset mappings */
                 DEBUG(DL_EXT, ("Ext2DeleteFile ...: %wZ\n", &Mcb->FullName));
-                if (Ext2ListExtents(&Mcb->Extents)) {
-                    DbgBreak();
-                }
-                Ext2ClearAllExtents(&Mcb->Extents);
-                ClearLongFlag(Mcb->Flags, MCB_ZONE_INITED);
 
                 if (Fcb) {
                     Fcb->Header.AllocationSize.QuadPart = Size.QuadPart;

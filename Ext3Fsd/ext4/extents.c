@@ -92,7 +92,9 @@ Ext2ExtentExpandOnce(
                     &Mcb->Inode,
                     Index,
                     *Number, &bh_got, 1, 0)) < 0) {
-        DbgPrint("Expand Block insufficient resources, Number: %u, err: %d\n", *Number, continuous);
+        DbgPrint("Expand Block insufficient resources, Number: %u, err: %d\n",
+                  *Number, continuous);
+        DbgBreak();
         return Ext2WinntError(continuous);
     }
     if (Number)
@@ -188,13 +190,6 @@ Ext2TruncateExtent(
 
     if (!NT_SUCCESS(Status)) {
         Size->QuadPart += ((ULONGLONG)Extra << BLOCK_BITS);
-    }
-
-    if (Size->QuadPart == 0) {
-        if (Ext2ListExtents(&Mcb->Extents)) {
-            DbgBreak();
-        }
-        Ext2ClearAllExtents(&Mcb->Extents);
     }
 
     /* save inode */

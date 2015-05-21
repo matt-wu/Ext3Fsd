@@ -298,7 +298,6 @@ struct buffer_head *ext3_append(struct ext2_icb *icb, struct inode *inode,
 
         /* save parent directory's inode */
         Ext2SaveInode(icb, dcb->Vcb, inode);
-
     }
 
     return ext3_bread(icb, inode, *block, err);
