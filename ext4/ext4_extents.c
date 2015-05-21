@@ -1861,7 +1861,7 @@ cleanup:
 
 static inline int get_default_free_blocks_flags(struct inode *inode)
 {
-	return 0;
+	return EXT4_FREE_BLOCKS_FORGET;
 }
 
 /* FIXME!! we need to try to merge to left or right after zero-out  */
@@ -1892,7 +1892,7 @@ static int ext4_remove_blocks(void *icb, handle_t *handle, struct inode *inode,
 		unsigned long num, start;
 		num = le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len) - from;
 		start = ext4_ext_pblock(ex) + le16_to_cpu(ex->ee_len) - num;
-		ext4_free_blocks(icb, handle, inode, NULL, start, num, 0);
+		ext4_free_blocks(icb, handle, inode, NULL, start, num, get_default_free_blocks_flags(inode));
 	} else if (from == le32_to_cpu(ex->ee_block)
 			&& to <= le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len) - 1) {
 	} else {
@@ -1920,7 +1920,7 @@ int ext4_ext_rm_idx(void *icb, handle_t *handle, struct inode *inode,
 	path->p_hdr->eh_entries = cpu_to_le16(le16_to_cpu(path->p_hdr->eh_entries)-1);
 	if ((err = ext4_ext_dirty(icb, handle, inode, path)))
 		return err;
-	ext4_free_blocks(icb, handle, inode, NULL, leaf, 1, 0);
+	ext4_free_blocks(icb, handle, inode, NULL, leaf, 1, EXT4_FREE_BLOCKS_FORGET);
 	return err;
 }
 
