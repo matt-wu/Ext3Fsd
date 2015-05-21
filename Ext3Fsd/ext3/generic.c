@@ -805,8 +805,8 @@ Ext2FreeBlock(
 Again:
 
     if ( Block < EXT2_FIRST_DATA_BLOCK ||
-            Block >= TOTAL_BLOCKS ||
-            Group >= Vcb->sbi.s_groups_count) {
+         Block >= TOTAL_BLOCKS ||
+         Group >= Vcb->sbi.s_groups_count) {
 
         DbgBreak();
         Status = STATUS_SUCCESS;
@@ -875,6 +875,13 @@ Again:
         BitmapBcb = NULL;
         BitmapCache = NULL;
         Ext2SaveGroup(IrpContext, Vcb, Group);
+
+        /* remove dirty MCB to prevent Volume's lazy writing. */
+        if (Ext2RemoveBlockExtent(Vcb, NULL, Block, Count)) {
+        } else {
+            DbgBreak();
+            Ext2RemoveBlockExtent(Vcb, NULL, Block, Count);
+        }
 
         /* save super block (used/unused blocks statics) */
         Ext2UpdateVcbStat(IrpContext, Vcb);
