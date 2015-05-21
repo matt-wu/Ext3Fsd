@@ -73,6 +73,7 @@ static ext4_fsblk_t ext4_new_meta_blocks(void *icb, handle_t *handle, struct ino
 static void ext4_free_blocks(void *icb, handle_t *handle, struct inode *inode, void *fake,
 		ext4_fsblk_t block, int count, int flags)
 {
+	/* We do not handle any flags right now. */
 	Ext2FreeBlock((PEXT2_IRP_CONTEXT)icb, inode->i_sb->s_priv, block, count);
 	inode->i_blocks -= count * (inode->i_sb->s_blocksize >> 9);
 	return;
