@@ -2323,16 +2323,6 @@ ext2_init_linux();
 void
 ext2_destroy_linux();
 
-//
-// extents-buffer.c: Extents buffer cache wrapper.
-//
-
-int
-ext4_init_extents_bh();
-
-void
-ext4_destroy_extents_bh();
-
 
 //
 // Lock.c

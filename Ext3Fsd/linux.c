@@ -360,16 +360,17 @@ free_buffer_head(struct buffer_head * bh)
 }
 
 struct buffer_head *
-__getblk(
+get_block_bh(
     struct block_device *   bdev,
     sector_t                block,
-    unsigned long           size
-)
+    unsigned long           size,
+    int                     zero
+) 
 {
     PEXT2_VCB Vcb = bdev->bd_priv;
     LARGE_INTEGER offset;
     PVOID         bcb = NULL;
-    PVOID         ptr;
+    PVOID         ptr = NULL;
 
     KIRQL irql = 0;
     struct list_head *entry;
@@ -412,13 +413,29 @@ again:
 
     offset.QuadPart = (s64) bh->b_blocknr;
     offset.QuadPart <<= BLOCK_BITS;
-    if (!CcPinRead( Vcb->Volume,
-                    &offset,
-                    bh->b_size,
-                    PIN_WAIT,
-                    &bcb,
-                    &ptr)) {
-        goto again;
+
+    if (zero) {
+        if (!CcPreparePinWrite(Vcb->Volume,
+                            &offset,
+                            bh->b_size,
+                            TRUE,
+                            PIN_WAIT | PIN_EXCLUSIVE,
+                            &bcb,
+                            &ptr)) {
+            Ext2Sleep(100);
+            goto again;
+        }
+    } else {
+        if (!CcPinRead( Vcb->Volume,
+                        &offset,
+                        bh->b_size,
+                        PIN_WAIT,
+                        &bcb,
+                        &ptr)) {
+            Ext2Sleep(100);
+            goto again;
+        }
+        set_buffer_uptodate(bh);
     }
 
     bh->b_mdl = Ext2CreateMdl(ptr, TRUE, bh->b_size, IoModifyAccess);
@@ -429,14 +446,12 @@ again:
                          bh->b_mdl, KernelMode, MmNonCached,
                          NULL,FALSE, HighPagePriority);
     }
-
     if (!bh->b_mdl || !bh->b_data) {
         free_buffer_head(bh);
         bh = NULL;
         goto errorout;
     }
 
-    set_buffer_uptodate(bh);
     get_bh(bh);
 
     DEBUG(DL_BH, ("getblk: Vcb=%p bhcount=%u block=%u bh=%p mdl=%p (Flags:%xh VA:%p)\n",
@@ -468,6 +483,16 @@ errorout:
         CcUnpinData(bcb);
 
     return bh;
+}
+
+struct buffer_head *
+__getblk(
+    struct block_device *   bdev,
+    sector_t                block,
+    unsigned long           size
+)
+{
+    return get_block_bh(bdev, block, size, 0);
 }
 
 int submit_bh(int rw, struct buffer_head *bh)
