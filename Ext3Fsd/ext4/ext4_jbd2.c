@@ -15,7 +15,7 @@ int __ext4_journal_stop(const char *where, unsigned int line, void *icb, handle_
 }
 
 int __ext4_journal_get_write_access(const char *where, unsigned int line,
-				    void *icb, handle_t *handle, PPUBLIC_BCB Bcb)
+				    void *icb, handle_t *handle, struct buffer_head *bh)
 {
 	int err = 0;
 	return err;
@@ -26,7 +26,7 @@ int __ext4_journal_get_write_access(const char *where, unsigned int line,
  * which has been journaled.  Metadata (eg. indirect blocks) must be
  * revoked in all cases.
  *
- * "Bcb" may be NULL: a metadata block may have been freed from memory
+ * "bh" may be NULL: a metadata block may have been freed from memory
  * but there may still be a record of it in the journal, and that record
  * still needs to be revoked.
  *
@@ -35,14 +35,14 @@ int __ext4_journal_get_write_access(const char *where, unsigned int line,
  */
 int __ext4_forget(const char *where, unsigned int line, void *icb, handle_t *handle,
 		  int is_metadata, struct inode *inode,
-		  PPUBLIC_BCB Bcb, ext4_fsblk_t blocknr)
+		  struct buffer_head *bh, ext4_fsblk_t blocknr)
 {
 	int err = 0;
 	return err;
 }
 
 int __ext4_journal_get_create_access(const char *where, unsigned int line,
-				void *icb, handle_t *handle, PPUBLIC_BCB Bcb)
+				void *icb, handle_t *handle, struct buffer_head *bh)
 {
 	int err = 0;
 	return err;
@@ -50,10 +50,10 @@ int __ext4_journal_get_create_access(const char *where, unsigned int line,
 
 int __ext4_handle_dirty_metadata(const char *where, unsigned int line,
 				 void *icb, handle_t *handle, struct inode *inode,
-				 PPUBLIC_BCB Bcb)
+				 struct buffer_head *bh)
 {
 	int err = 0;
 
-	extents_mark_buffer_dirty(inode->i_sb, Bcb);
+	extents_mark_buffer_dirty(bh);
 	return err;
 }
