@@ -638,8 +638,10 @@ Again:
             Status = STATUS_INSUFFICIENT_RESOURCES;
             goto errorout;
         }
+        group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
         ext4_init_block_bitmap(sb, bh, Group, group_desc);
         set_buffer_uptodate(bh);
+        Ext2SaveGroup(IrpContext, Vcb, Group);
     } else {
         bh = sb_getblk(sb, bitmap_blk);
         if (!bh) {
@@ -1116,8 +1118,10 @@ repeat:
             Status = STATUS_INSUFFICIENT_RESOURCES;
             goto errorout;
         }
+        group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
         ext4_init_inode_bitmap(sb, bh, Group, group_desc);
         set_buffer_uptodate(bh);
+        Ext2SaveGroup(IrpContext, Vcb, Group);
     } else {
         bh = sb_getblk(sb, bitmap_blk);
         if (!bh) {
@@ -1215,6 +1219,7 @@ repeat:
                 if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
                     block_bitmap_bh = sb_getblk(sb, ext4_block_bitmap(sb, group_desc));
                     if (block_bitmap_bh) {
+                        group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
                         free = ext4_init_block_bitmap(sb, block_bitmap_bh, Group, group_desc);
                         group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
                         ext4_free_blks_set(sb, group_desc, free);
