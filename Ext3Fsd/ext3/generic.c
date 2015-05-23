@@ -632,7 +632,7 @@ Again:
     bitmap_blk = ext4_block_bitmap(sb, group_desc);
 
     if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
-        bh = sb_getblk_zero(sb, bitmap_blk);
+        bh = sb_getblk(sb, bitmap_blk);
         if (!bh) {
             DbgBreak();
             Status = STATUS_INSUFFICIENT_RESOURCES;
@@ -1110,7 +1110,7 @@ repeat:
     }
 
     if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_INODE_UNINIT)) {
-        bh = sb_getblk_zero(sb, bitmap_blk);
+        bh = sb_getblk(sb, bitmap_blk);
         if (!bh) {
             DbgBreak();
             Status = STATUS_INSUFFICIENT_RESOURCES;
@@ -1213,7 +1213,7 @@ repeat:
 
                 /* recheck and clear flag under lock if we still need to */
                 if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
-                    block_bitmap_bh = sb_getblk_zero(sb, ext4_block_bitmap(sb, group_desc));
+                    block_bitmap_bh = sb_getblk(sb, ext4_block_bitmap(sb, group_desc));
                     if (block_bitmap_bh) {
                         free = ext4_init_block_bitmap(sb, block_bitmap_bh, Group, group_desc);
                         group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
