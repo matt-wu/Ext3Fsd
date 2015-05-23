@@ -418,7 +418,7 @@ again:
         if (!CcPreparePinWrite(Vcb->Volume,
                             &offset,
                             bh->b_size,
-                            TRUE,
+                            FALSE,
                             PIN_WAIT | PIN_EXCLUSIVE,
                             &bcb,
                             &ptr)) {
