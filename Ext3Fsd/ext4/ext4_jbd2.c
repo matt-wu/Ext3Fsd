@@ -14,6 +14,12 @@ int __ext4_journal_stop(const char *where, unsigned int line, void *icb, handle_
 	return 0;
 }
 
+void ext4_journal_abort_handle(const char *caller, unsigned int line,
+			       const char *err_fn, struct buffer_head *bh,
+			       handle_t *handle, int err)
+{
+}
+
 int __ext4_journal_get_write_access(const char *where, unsigned int line,
 				    void *icb, handle_t *handle, struct buffer_head *bh)
 {
@@ -56,4 +62,10 @@ int __ext4_handle_dirty_metadata(const char *where, unsigned int line,
 
 	extents_mark_buffer_dirty(bh);
 	return err;
+}
+
+int __ext4_handle_dirty_super(const char *where, unsigned int line,
+			      handle_t *handle, struct super_block *sb)
+{
+    return 0;
 }
