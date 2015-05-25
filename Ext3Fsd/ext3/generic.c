@@ -1220,7 +1220,7 @@ repeat:
                 if (block_bitmap_bh) {
                     group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
                     free = ext4_init_block_bitmap(sb, block_bitmap_bh, Group, group_desc);
-                    set_buffer_uptodate(bh);
+                    set_buffer_uptodate(block_bitmap_bh);
                     brelse(block_bitmap_bh);
                     group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
                     ext4_free_blks_set(sb, group_desc, free);
@@ -2212,6 +2212,7 @@ unsigned ext4_init_inode_bitmap(struct super_block *sb, struct buffer_head *bh,
     memset(bh->b_data, 0, (EXT4_INODES_PER_GROUP(sb) + 7) / 8);
     mark_bitmap_end(EXT4_INODES_PER_GROUP(sb), sb->s_blocksize * 8,
                     bh->b_data);
+    ext4_itable_unused_set(sb, gdp, EXT4_INODES_PER_GROUP(sb));
 
     return EXT4_INODES_PER_GROUP(sb);
 }
