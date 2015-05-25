@@ -641,6 +641,7 @@ Again:
         group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
         ext4_init_block_bitmap(sb, bh, Group, group_desc);
         set_buffer_uptodate(bh);
+        group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
         Ext2SaveGroup(IrpContext, Vcb, Group);
     } else {
         bh = sb_getblk(sb, bitmap_blk);
@@ -729,9 +730,6 @@ Again:
 
         /* set block bitmap dirty in cache */
         mark_buffer_dirty(bh);
-
-        if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT))
-            group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
 
         /* update group description */
         ext4_free_blks_set(sb, group_desc, RtlNumberOfClearBits(&BlockBitmap));
@@ -1122,6 +1120,7 @@ repeat:
         group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
         ext4_init_inode_bitmap(sb, bh, Group, group_desc);
         set_buffer_uptodate(bh);
+        group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_INODE_UNINIT);
         Ext2SaveGroup(IrpContext, Vcb, Group);
     } else {
         bh = sb_getblk(sb, bitmap_blk);
@@ -1221,9 +1220,11 @@ repeat:
                 if (block_bitmap_bh) {
                     group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
                     free = ext4_init_block_bitmap(sb, block_bitmap_bh, Group, group_desc);
+                    set_buffer_uptodate(bh);
+                    brelse(block_bitmap_bh);
                     group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
                     ext4_free_blks_set(sb, group_desc, free);
-                    brelse(block_bitmap_bh);
+                    Ext2SaveGroup(IrpContext, Vcb, Group);
                 }
             }
         }
