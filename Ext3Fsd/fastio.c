@@ -44,7 +44,7 @@ Ext2IsFastIoPossible(
     IsPossible = FastIoIsQuestionable;
 
     if (!FsRtlAreThereCurrentFileLocks(&Fcb->FileLockAnchor)) {
-        if (!IsVcbReadOnly(Fcb->Vcb)) {
+        if (!IsVcbReadOnly(Fcb->Vcb) && !FlagOn(Fcb->Vcb->Flags, VCB_VOLUME_LOCKED)) {
             IsPossible = FastIoIsPossible;
         }
     }

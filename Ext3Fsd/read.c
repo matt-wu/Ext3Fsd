@@ -161,9 +161,9 @@ Ext2ReadVolume (IN PEXT2_IRP_CONTEXT IrpContext)
             }
             MainResourceAcquired = TRUE;
 
-            if (!IsFlagOn(Ccb->Flags, CCB_VOLUME_DASD_PURGE)) {
+            if (!FlagOn(Ccb->Flags, CCB_VOLUME_DASD_PURGE)) {
 
-                if (!IsFlagOn(Vcb->Flags, VCB_VOLUME_LOCKED)) {
+                if (!FlagOn(Vcb->Flags, VCB_VOLUME_LOCKED)) {
                     Ext2FlushVolume(IrpContext, Vcb, FALSE);
                 }
 
@@ -883,7 +883,6 @@ Ext2Read (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             Vcb = (PEXT2_VCB) DeviceObject->DeviceExtension;
-
             if (Vcb->Identifier.Type != EXT2VCB ||
                     Vcb->Identifier.Size != sizeof(EXT2_VCB) ) {
                 Status = STATUS_INVALID_DEVICE_REQUEST;
@@ -893,6 +892,12 @@ Ext2Read (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             FileObject = IrpContext->FileObject;
+
+            if (FlagOn(Vcb->Flags, VCB_VOLUME_LOCKED) &&
+                Vcb->LockFile != FileObject ) {
+                Status = STATUS_ACCESS_DENIED;
+                __leave;
+            }
 
             FcbOrVcb = (PEXT2_FCBVCB) FileObject->FsContext;
 

@@ -327,7 +327,7 @@ Ext2WriteVolume (IN PEXT2_IRP_CONTEXT IrpContext)
 
             if (!FlagOn(Ccb->Flags, CCB_VOLUME_DASD_PURGE)) {
 
-                if (!IsFlagOn(Vcb->Flags, VCB_VOLUME_LOCKED)) {
+                if (!FlagOn(Vcb->Flags, VCB_VOLUME_LOCKED)) {
                     Status = Ext2PurgeVolume( Vcb, TRUE);
                 }
 
@@ -572,8 +572,11 @@ Ext2WriteVolume (IN PEXT2_IRP_CONTEXT IrpContext)
         }
 
         if (!IrpContext->ExceptionInProgress) {
+
             if (Irp) {
+
                 if (Status == STATUS_PENDING) {
+
                     if (!bDeferred) {
                         Status = Ext2LockUserBuffer(
                                      IrpContext->Irp,
@@ -1278,6 +1281,7 @@ Ext2Write (IN PEXT2_IRP_CONTEXT IrpContext)
     PDEVICE_OBJECT      DeviceObject;
     PFILE_OBJECT        FileObject;
     PEXT2_VCB           Vcb;
+    BOOLEAN             bVcbAcquired = TRUE;
     BOOLEAN             bCompleteRequest = TRUE;
 
     ASSERT(IrpContext);
@@ -1295,11 +1299,11 @@ Ext2Write (IN PEXT2_IRP_CONTEXT IrpContext)
         } else {
 
             DeviceObject = IrpContext->DeviceObject;
-
             if (IsExt2FsDevice(DeviceObject)) {
                 Status = STATUS_INVALID_DEVICE_REQUEST;
                 __leave;
             }
+            FileObject = IrpContext->FileObject;
 
             Vcb = (PEXT2_VCB) DeviceObject->DeviceExtension;
 
@@ -1314,19 +1318,28 @@ Ext2Write (IN PEXT2_IRP_CONTEXT IrpContext)
                 __leave;
             }
 
-            FileObject = IrpContext->FileObject;
+            ExAcquireResourceExclusiveLite(&Vcb->MainResource, TRUE);
+            bVcbAcquired = TRUE;
+
+            if (FlagOn(Vcb->Flags, VCB_VOLUME_LOCKED) &&
+                Vcb->LockFile != FileObject ) {
+                Status = STATUS_ACCESS_DENIED;
+                __leave;
+            }
+            ExReleaseResourceLite(&Vcb->MainResource);
+            bVcbAcquired = FALSE;
+
 
             FcbOrVcb = (PEXT2_FCBVCB) FileObject->FsContext;
 
             if (FcbOrVcb->Identifier.Type == EXT2VCB) {
 
                 Status = Ext2WriteVolume(IrpContext);
-
                 if (!NT_SUCCESS(Status)) {
                     DbgBreak();
                 }
-
                 bCompleteRequest = FALSE;
+
             } else if (FcbOrVcb->Identifier.Type == EXT2FCB) {
 
                 if (IsFlagOn(Vcb->Flags, VCB_DISMOUNT_PENDING)) {
@@ -1346,6 +1359,10 @@ Ext2Write (IN PEXT2_IRP_CONTEXT IrpContext)
         }
 
     } __finally {
+
+        if (bVcbAcquired) {
+            ExReleaseResourceLite(&Vcb->MainResource);
+        }
 
         if (bCompleteRequest) {
             Ext2CompleteIrpContext(IrpContext, Status);

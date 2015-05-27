@@ -180,6 +180,12 @@ Ext2LockVolume (IN PEXT2_IRP_CONTEXT IrpContext)
 
         VcbResourceAcquired = TRUE;
 
+        /* flush dirty data before locking the volume */
+        if (!IsVcbReadOnly(Vcb)) {
+            Ext2FlushFiles(IrpContext, Vcb, FALSE);
+            Ext2FlushVolume(IrpContext, Vcb, FALSE);
+        }
+
         Status = Ext2LockVcb(Vcb, IrpSp->FileObject);
 
     } __finally {

@@ -553,6 +553,18 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             VcbMainResourceAcquired = TRUE;
         }
 
+        if (IsVcbReadOnly(Vcb)) {
+            if (FileInformationClass != FilePositionInformation) {
+                Status = STATUS_MEDIA_WRITE_PROTECTED;
+                __leave;
+            }
+        }
+
+        if (FlagOn(Vcb->Flags, VCB_VOLUME_LOCKED)) {
+            Status = STATUS_ACCESS_DENIED;
+            __leave;
+        }
+
         FileObject = IrpContext->FileObject;
         Fcb = (PEXT2_FCB) FileObject->FsContext;
 
@@ -617,13 +629,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             FcbMainResourceAcquired = TRUE;
-        }
-
-        if (IsVcbReadOnly(Vcb)) {
-            if (FileInformationClass != FilePositionInformation) {
-                Status = STATUS_MEDIA_WRITE_PROTECTED;
-                __leave;
-            }
         }
 
         if ( FileInformationClass == FileAllocationInformation ||

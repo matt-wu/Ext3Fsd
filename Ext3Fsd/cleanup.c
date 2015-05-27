@@ -80,8 +80,8 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
 
         if (Fcb->Identifier.Type == EXT2VCB) {
 
-            if (IsFlagOn(Vcb->Flags, VCB_VOLUME_LOCKED) &&
-                    (Vcb->LockFile == FileObject) ) {
+            if (FlagOn(Vcb->Flags, VCB_VOLUME_LOCKED) &&
+                Vcb->LockFile == FileObject ){
 
                 ClearFlag(Vcb->Flags, VCB_VOLUME_LOCKED);
                 Vcb->LockFile = NULL;

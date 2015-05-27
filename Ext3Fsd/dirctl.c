@@ -558,6 +558,11 @@ Ext2QueryDirectory (IN PEXT2_IRP_CONTEXT IrpContext)
             __leave;
         }
 
+        if (FlagOn(Vcb->Flags, VCB_VOLUME_LOCKED)) {
+            Status = STATUS_ACCESS_DENIED;
+            __leave;
+        }
+
         FileObject = IrpContext->FileObject;
         Fcb = (PEXT2_FCB) FileObject->FsContext;
         if (Fcb == NULL) {

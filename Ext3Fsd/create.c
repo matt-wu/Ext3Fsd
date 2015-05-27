@@ -1695,9 +1695,25 @@ Ext2CreateVolume(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb)
                           &(Vcb->ShareAccess)   );
     }
 
-    if (FlagOn(DesiredAccess, FILE_READ_DATA | FILE_WRITE_DATA | FILE_APPEND_DATA)) {
-        Ext2FlushFiles(IrpContext, Vcb, FALSE);
-        Ext2FlushVolume(IrpContext, Vcb, FALSE);
+
+    if (Vcb->OpenVolumeCount == 0 &&
+        !IsFlagOn(ShareAccess, FILE_SHARE_READ)  &&
+        !IsFlagOn(ShareAccess, FILE_SHARE_WRITE) ){
+
+        if (!IsVcbReadOnly(Vcb)) {
+            Ext2FlushFiles(IrpContext, Vcb, FALSE);
+            Ext2FlushVolume(IrpContext, Vcb, FALSE);
+        }
+
+        SetLongFlag(Vcb->Flags, VCB_VOLUME_LOCKED);
+        Vcb->LockFile = IrpSp->FileObject;
+    } else {
+        if (FlagOn(DesiredAccess, FILE_READ_DATA | FILE_WRITE_DATA | FILE_APPEND_DATA) ) {
+            if (!IsVcbReadOnly(Vcb)) {
+                Ext2FlushFiles(IrpContext, Vcb, FALSE);
+                Ext2FlushVolume(IrpContext, Vcb, FALSE);
+            }
+        }
     }
 
     IrpSp->FileObject->Flags |= FO_NO_INTERMEDIATE_BUFFERING;
@@ -1772,7 +1788,7 @@ Ext2Create (IN PEXT2_IRP_CONTEXT IrpContext)
 
         Ext2VerifyVcb(IrpContext, Vcb);
 
-        if (IsFlagOn(Vcb->Flags, VCB_VOLUME_LOCKED)) {
+        if (FlagOn(Vcb->Flags, VCB_VOLUME_LOCKED)) {
             Status = STATUS_ACCESS_DENIED;
             if (IsFlagOn(Vcb->Flags, VCB_DISMOUNT_PENDING)) {
                 Status = STATUS_VOLUME_DISMOUNTED;
