@@ -464,12 +464,6 @@ Ext2AllocateExtent ()
     RtlZeroMemory(Extent, sizeof(EXT2_EXTENT));
     INC_MEM_COUNT(PS_EXTENT, Extent, sizeof(EXT2_EXTENT));
 
-#if DBG
-    if (Ext2Global->PerfStat.Current.Slot[PS_EXTENT] >= 500) {
-        DbgBreak();
-    }
-#endif
-
     return Extent;
 }
 
