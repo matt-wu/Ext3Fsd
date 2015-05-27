@@ -1281,7 +1281,6 @@ Ext2Write (IN PEXT2_IRP_CONTEXT IrpContext)
     PDEVICE_OBJECT      DeviceObject;
     PFILE_OBJECT        FileObject;
     PEXT2_VCB           Vcb;
-    BOOLEAN             bVcbAcquired = TRUE;
     BOOLEAN             bCompleteRequest = TRUE;
 
     ASSERT(IrpContext);
@@ -1318,17 +1317,11 @@ Ext2Write (IN PEXT2_IRP_CONTEXT IrpContext)
                 __leave;
             }
 
-            ExAcquireResourceExclusiveLite(&Vcb->MainResource, TRUE);
-            bVcbAcquired = TRUE;
-
             if (FlagOn(Vcb->Flags, VCB_VOLUME_LOCKED) &&
                 Vcb->LockFile != FileObject ) {
                 Status = STATUS_ACCESS_DENIED;
                 __leave;
             }
-            ExReleaseResourceLite(&Vcb->MainResource);
-            bVcbAcquired = FALSE;
-
 
             FcbOrVcb = (PEXT2_FCBVCB) FileObject->FsContext;
 
@@ -1359,10 +1352,6 @@ Ext2Write (IN PEXT2_IRP_CONTEXT IrpContext)
         }
 
     } __finally {
-
-        if (bVcbAcquired) {
-            ExReleaseResourceLite(&Vcb->MainResource);
-        }
 
         if (bCompleteRequest) {
             Ext2CompleteIrpContext(IrpContext, Status);
