@@ -252,6 +252,7 @@ Ext2ReadWriteBlocks(
     PEXT2_EXTENT        Extent;
     KEVENT              Wait;
     NTSTATUS            Status = STATUS_SUCCESS;
+    BOOLEAN             bMasterCompleted = FALSE;
     BOOLEAN             bBugCheck = FALSE;
 
     ASSERT(MasterIrp);
@@ -324,7 +325,6 @@ Ext2ReadWriteBlocks(
             pContext->Blocks = 1;
 
         } else {
-
 
             for (Extent = Chain; Extent != NULL; Extent = Extent->Next) {
 
@@ -409,11 +409,12 @@ Ext2ReadWriteBlocks(
             Extent->Irp = NULL;
         }
 
-
         if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
             KeWaitForSingleObject( &(pContext->Event),
                                    Executive, KernelMode, FALSE, NULL );
             KeClearEvent( &(pContext->Event) );
+        } else {
+            bMasterCompleted = TRUE;
         }
 
     } __finally {
@@ -427,15 +428,10 @@ Ext2ReadWriteBlocks(
             }
         }
 
-        if (AbnormalTermination()) {
+        if (IrpContext->ExceptionInProgress) {
 
             if (bBugCheck) {
                 Ext2BugCheck(EXT2_BUGCHK_BLOCK, 0, 0, 0);
-            }
-
-            if (pContext) {
-                Ext2FreePool(pContext, EXT2_RWC_MAGIC);
-                DEC_MEM_COUNT(PS_RW_CONTEXT, pContext, sizeof(EXT2_RW_CONTEXT));
             }
 
         } else {
@@ -449,8 +445,10 @@ Ext2ReadWriteBlocks(
                     DEC_MEM_COUNT(PS_RW_CONTEXT, pContext, sizeof(EXT2_RW_CONTEXT));
                 }
             } else {
-                IrpContext->Irp = NULL;
-                Status = STATUS_PENDING;
+                if (bMasterCompleted) {
+                    IrpContext->Irp = NULL;
+                    Status = STATUS_PENDING;
+                }
             }
         }
     }
