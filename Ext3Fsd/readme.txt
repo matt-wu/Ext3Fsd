@@ -28,6 +28,32 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
  Revision history
 ======================
 
+45, V0.60:   2015-06-01
+
+Modifications from V0.53:
+
+
+    1, Ext4 extent writing support (developed by ngkaho1234 @ gmail.com)
+       See his repository for more details:
+       http://github.com/ngkaho1234/Ext3Fsd.git
+    2, Size manipulation and i/o path revised for support of indirect and
+       extent-based mappings
+    3, 16T volume supported (tested and confirmed with 4T volume)
+       Version 0.53 and previous versions only support up to 2T volume
+       ticket: https://sourceforge.net/p/ext2fsd/bugs/134/
+    4, Deletion acceleration: truncation optimized for indirect-based files
+    5, Size-expanding disabled in IRP_MJ_CREATE for better performance.
+       Windows sometimes would truncate file size back to 0
+    6, Support Volume exclusive-open for e2fsprogs utils. Any attempts
+       will be denied while EXT4 volume is being checked (e2fsck).
+    7, FIXME:  Possible zero-content returned (requesting data from file tail)
+    8, FIXME:  File ByteOffset updated for FO_SYNCHRONOUS_IO open (async i/o)
+       ticket: https://sourceforge.net/p/ext2fsd/bugs/133/
+    9, FIXME:  don't do byte or range round up for paging i/o requests
+       ticket: https://sourceforge.net/p/ext2fsd/bugs/129/
+   10, FIXME:  occasional block bitmap difference issue, cased by checksum
+               caculation in uninit_bg group initializing
+
 44, V0.53:   2014-08-25
 
 Modifications from V0.52:
