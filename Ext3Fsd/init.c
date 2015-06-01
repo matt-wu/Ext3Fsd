@@ -595,7 +595,6 @@ DriverEntry (
     Ext2Global->PerfStat.Unit.Slot[PS_EXT2_INODE] = 1;                          /* 10 */
     Ext2Global->PerfStat.Unit.Slot[PS_DENTRY] = sizeof(struct dentry);          /* 11 */
     Ext2Global->PerfStat.Unit.Slot[PS_BUFF_HEAD] = sizeof(struct buffer_head);  /* 12 */
-    Ext2Global->PerfStat.Unit.Slot[PS_EXTENTS_BUFF] = sizeof(struct buffer_head);  /* 13 */
 
     switch ( MmQuerySystemSize() ) {
 

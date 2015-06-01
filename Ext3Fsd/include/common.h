@@ -33,7 +33,6 @@ CTL_CODE(FILE_DEVICE_UNKNOWN, 2002, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #define PS_EXT2_INODE   0x10
 #define PS_DENTRY       0x11
 #define PS_BUFF_HEAD    0x12
-#define PS_EXTENTS_BUFF    0x13
 
 #define PS_MAX_TYPE_V1  (0x10)
 #define PS_MAX_TYPE_V2  (0x30)
@@ -87,7 +86,6 @@ typedef union {
         ULONG       Inodes;     /* inodes */
         ULONG       NameEntries;    /* name dentry */
         ULONG       BufferHead; /* Buffer Header allocations */
-        ULONG       ExtentsBuffer; /* Extents buffer allocations */
     };
 
 } EXT2_STAT_ARRAY_V2;
