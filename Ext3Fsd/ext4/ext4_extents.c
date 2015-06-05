@@ -2437,7 +2437,6 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 
 	/* find next allocated block so that we know how many
 	 * blocks we can allocate without ovelapping next extent */
-	/*BUG_ON(iblock < le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len));*/
 	next = ext4_ext_next_allocated_block(path);
 	BUG_ON(next <= iblock);
 	allocated = next - iblock;
@@ -2459,8 +2458,10 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	if (flags & EXT4_GET_BLOCKS_PRE_IO &&
 		flags & EXT4_GET_BLOCKS_CREATE_UNWRIT_EXT) {
 		ext4_ext_mark_unwritten(&newex);
-	}
-	err = ext4_ext_insert_extent(icb, handle, inode, &path, &newex, 0);
+		err = ext4_ext_insert_extent(icb, handle, inode, &path, &newex, EXT4_GET_BLOCKS_PRE_IO);
+	} else
+		err = ext4_ext_insert_extent(icb, handle, inode, &path, &newex, 0);
+
 	if (err) {
 		/* free data blocks we just allocated */
 		ext4_free_blocks(icb, handle, inode, NULL, ext4_ext_pblock(&newex),
@@ -2471,16 +2472,17 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	ext4_mark_inode_dirty(icb, handle, inode);
 
 	/* previous routine could use block we allocated */
-	if (ext4_ext_is_unwritten(&newex)) {
+	if (ext4_ext_is_unwritten(&newex))
 		newblock = 0;
-	} else {
+	else
 		newblock = ext4_ext_pblock(&newex);
-	}
+
 	set_buffer_new(bh_result);
 
 out:
 	if (allocated > max_blocks)
 		allocated = max_blocks;
+
 	ext4_ext_show_leaf(inode, path);
 	set_buffer_mapped(bh_result);
 	bh_result->b_bdev = inode->i_sb->s_bdev;
