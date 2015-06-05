@@ -630,7 +630,7 @@ Ext2WriteInode (
     IN PVOID                Buffer,
     IN ULONG                Size,
     IN BOOLEAN              bDirectIo,
-    OUT PULONG              dwRet
+    OUT PULONG              BytesWritten
 )
 {
     PEXT2_EXTENT    Chain = NULL;
@@ -638,8 +638,8 @@ Ext2WriteInode (
 
     __try {
 
-        if (dwRet) {
-            *dwRet = 0;
+        if (BytesWritten) {
+            *BytesWritten = 0;
         }
 
         Status = Ext2BuildExtents (
@@ -707,8 +707,8 @@ Ext2WriteInode (
             Ext2DestroyExtentChain(Chain);
         }
 
-        if (NT_SUCCESS(Status)) {
-            if (dwRet) *dwRet = Size;
+        if (NT_SUCCESS(Status) && BytesWritten) {
+            *BytesWritten = Size;
         }
     }
 
