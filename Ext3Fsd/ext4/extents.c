@@ -41,19 +41,17 @@ Ext2MapExtent(
 
     if (eh->eh_magic != EXT4_EXT_MAGIC) {
         if (Alloc) {
+            /* now initialize inode extent root node */
             ext4_ext_tree_init(IrpContext, NULL, &Mcb->Inode);
         } else {
+            /* return empty-mapping when inode extent isn't initialized */
             if (Block)
                 *Block = 0;
             if (Number) {
-                LONGLONG  _len;
-                if (Mcb->Fcb) {
-                    _len = Mcb->Fcb->Header.AllocationSize.QuadPart +
-                           BLOCK_SIZE - 1;
-                } else {
-                    _len = Mcb->Inode.i_size + BLOCK_SIZE - 1;
-                }
-                *Number = (ULONG)((_len) >> BLOCK_BITS);
+                LONGLONG  _len = _len = Mcb->Inode.i_size;
+                if (Mcb->Fcb)
+                    _len = Mcb->Fcb->Header.AllocationSize.QuadPart;
+                *Number = (ULONG)((_len + BLOCK_SIZE - 1) >> BLOCK_BITS);
             }
             return STATUS_SUCCESS;
         }
@@ -130,14 +128,6 @@ Ext2DoExtentExpand(
     if (Block)
         *Block = (ULONG)bh_got.b_blocknr;
 
-    if (bh_got.b_blocknr && IsZoneInited(Mcb)) {
-        if (!Ext2AddBlockExtent(Vcb, Mcb, Index, (*Block), *Number)) {
-            DbgBreak();
-            ClearFlag(Mcb->Flags, MCB_ZONE_INITED);
-            Ext2ClearAllExtents(&Mcb->Extents);
-        }
-    }
-
     Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
 
     return STATUS_SUCCESS;
@@ -172,6 +162,14 @@ Ext2ExpandExtent(
         if (Number == 0) {
             Status = STATUS_INSUFFICIENT_RESOURCES;
             break;
+        }
+
+        if (Block && IsZoneInited(Mcb)) {
+            if (!Ext2AddBlockExtent(Vcb, Mcb, Start + Count, Block, Number)) {
+                DbgBreak();
+                ClearFlag(Mcb->Flags, MCB_ZONE_INITED);
+                Ext2ClearAllExtents(&Mcb->Extents);
+            }
         }
         Count += Number;
     }

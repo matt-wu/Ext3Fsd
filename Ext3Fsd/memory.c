@@ -1187,8 +1187,6 @@ Ext2BuildExtents(
     PEXT2_EXTENT  Extent = NULL;
     PEXT2_EXTENT  List = *Chain;
 
-    BOOLEAN     IsFirstBlock = TRUE;
-
     if (!IsZoneInited(Mcb)) {
         Status = Ext2InitializeZone(IrpContext, Vcb, Mcb);
         if (!NT_SUCCESS(Status)) {
@@ -1249,6 +1247,12 @@ Ext2BuildExtents(
                 goto errorout;
             }
 
+            /* skip wrong blocks, in case wrongly treating symlink
+               target names as blocks, silly  */
+            if (Block >= TOTAL_BLOCKS) {
+                Block = 0;
+            }
+
             /* add new allocated blocks to Mcb zone */
             if (IsZoneInited(Mcb) && Block) {
                 if (!Ext2AddBlockExtent(Vcb, Mcb, Start, Block, Mapped)) {
@@ -1259,36 +1263,25 @@ Ext2BuildExtents(
             }
         }
 
-        /* Mapped is total number of continous blocks or NULL blocks */
-        Start += Mapped;
-        Length = (Mapped << BLOCK_BITS);
-
-        /* the first request's offset might not be BLOCK_SIZE aligned */
-        if (IsFirstBlock) {
-            Lba = ((ULONG)Offset & (BLOCK_SIZE - 1));
-            IsFirstBlock = FALSE;
-        } else {
-            Lba = 0;
-        }
-        Length -= (ULONG)Lba;
-
-        Lba += ((LONGLONG) Block) << BLOCK_BITS;
-        if (Size < Length) {
+        /* calculate i/o extent */
+        Lba = ((LONGLONG)Block << BLOCK_BITS) + Offset - ((LONGLONG)Start << BLOCK_BITS);
+        Length = (ULONG)(((LONGLONG)(Start + Mapped) << BLOCK_BITS) - Offset);
+        if (Length > Size) {
             Length = Size;
         }
 
-        /* skip wrong blocks, in case wrongly treating symlink
-           target names as blocks, silly  */
-        if (Block >= TOTAL_BLOCKS) {
-            Block = 0;
-        }
+        Start += Mapped;
+        Offset = (ULONGLONG)Start << BLOCK_BITS;
 
         if (Block != 0) {
 
             if (List && List->Lba + List->Length == Lba) {
+
                 /* it's continuous upon previous Extent */
                 List->Length += Length;
+
             } else {
+
                 /* have to allocate a new Extent */
                 Extent = Ext2AllocateExtent();
                 if (!Extent) {
