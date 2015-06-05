@@ -250,7 +250,7 @@ static inline uint64_t idx_to_block(EXT4_EXTENT_IDX *idx)
 
 int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_fsblk_t iblock,
 			unsigned long max_blocks, struct buffer_head *bh_result,
-			int create, int extend_disksize);
+			int create, int flags);
 int ext4_ext_tree_init(void *icb, handle_t *handle, struct inode *inode);
 int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start);
 

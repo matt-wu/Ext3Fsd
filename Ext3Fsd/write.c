@@ -636,19 +636,10 @@ Ext2WriteInode (
     PEXT2_EXTENT    Chain = NULL;
     NTSTATUS        Status = STATUS_UNSUCCESSFUL;
 
-    BOOLEAN         bAlloc = FALSE;
-
     __try {
 
         if (dwRet) {
             *dwRet = 0;
-        }
-
-        /* For file/non pagingio, we support the allocation on writing. */
-
-        if (!IsFlagOn(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY) &&
-            !IsFlagOn(IrpContext->Irp->Flags, IRP_PAGING_IO)) {
-            bAlloc = TRUE;
         }
 
         Status = Ext2BuildExtents (
@@ -657,7 +648,7 @@ Ext2WriteInode (
                      Mcb,
                      Offset,
                      Size,
-                     bAlloc,
+                     IsMcbDirectory(Mcb) ? FALSE : TRUE,
                      &Chain
                  );
 

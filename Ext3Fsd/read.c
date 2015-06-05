@@ -386,6 +386,7 @@ Ext2ReadInode (
         }
 
         if (Chain == NULL) {
+            SafeZeroMemory((PCHAR)Buffer, Size);
             Status = STATUS_SUCCESS;
             __leave;
         }

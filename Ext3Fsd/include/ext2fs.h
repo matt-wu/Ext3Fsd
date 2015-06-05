@@ -40,7 +40,7 @@
 
 /* STRUCTS & CONSTS******************************************************/
 
-#define EXT2FSD_VERSION  "0.60"
+#define EXT2FSD_VERSION                 "0.60"
 
 
 //
@@ -49,7 +49,11 @@
 
 // To support driver dynamics unload
 
-#define EXT2_UNLOAD     FALSE
+#define EXT2_UNLOAD                     FALSE
+
+// To support inode size expansion (fallocate)
+
+#define EXT2_PRE_ALLOCATION_SUPPORT     TRUE
 
 //
 // Constants

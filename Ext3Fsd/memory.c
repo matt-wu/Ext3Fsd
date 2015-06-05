@@ -1095,6 +1095,9 @@ Ext2InitializeZone(
     ULONG       Block;
     ULONG       Mapped;
 
+    Ext2ClearAllExtents(&Mcb->Extents);
+    Ext2ClearAllExtents(&Mcb->MetaExts);
+
     ASSERT(Mcb != NULL);
     End = (ULONG)((Mcb->Inode.i_size + BLOCK_SIZE - 1) >> BLOCK_BITS);
 
@@ -1156,6 +1159,11 @@ Ext2InitializeZone(
 
 errorout:
 
+    if (!IsZoneInited(Mcb)) {
+        Ext2ClearAllExtents(&Mcb->Extents);
+        Ext2ClearAllExtents(&Mcb->MetaExts);
+    }
+
     return Status;
 }
 
@@ -1185,8 +1193,6 @@ Ext2BuildExtents(
         Status = Ext2InitializeZone(IrpContext, Vcb, Mcb);
         if (!NT_SUCCESS(Status)) {
             DbgBreak();
-            ClearLongFlag(Mcb->Flags, MCB_ZONE_INITED);
-            goto errorout;
         }
     }
 
@@ -1242,6 +1248,15 @@ Ext2BuildExtents(
             if (!NT_SUCCESS(Status)) {
                 goto errorout;
             }
+
+            /* add new allocated blocks to Mcb zone */
+            if (IsZoneInited(Mcb) && Block) {
+                if (!Ext2AddBlockExtent(Vcb, Mcb, Start, Block, Mapped)) {
+                    DbgBreak();
+                    ClearFlag(Mcb->Flags, MCB_ZONE_INITED);
+                    Ext2ClearAllExtents(&Mcb->Extents);
+                }
+            }
         }
 
         /* Mapped is total number of continous blocks or NULL blocks */
@@ -1257,7 +1272,7 @@ Ext2BuildExtents(
         }
         Length -= (ULONG)Lba;
 
-        Lba += ((LONGLONG) Block) << BLOCK_BITS;;
+        Lba += ((LONGLONG) Block) << BLOCK_BITS;
         if (Size < Length) {
             Length = Size;
         }

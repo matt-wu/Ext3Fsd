@@ -32,9 +32,9 @@ Ext2MapExtent(
     OUT PULONG              Number
 )
 {
-    int continuous;
-    struct buffer_head bh_got;
     EXT4_EXTENT_HEADER *eh;
+    struct buffer_head bh_got;
+    int    flags, rc;
 
     memset(&bh_got, 0, sizeof(struct buffer_head));
     eh = get_ext4_header(&Mcb->Inode);
@@ -43,22 +43,46 @@ Ext2MapExtent(
         if (Alloc) {
             ext4_ext_tree_init(IrpContext, NULL, &Mcb->Inode);
         } else {
-            return STATUS_INVALID_PARAMETER;
+            if (Block)
+                *Block = 0;
+            if (Number) {
+                LONGLONG  _len;
+                if (Mcb->Fcb) {
+                    _len = Mcb->Fcb->Header.AllocationSize.QuadPart +
+                           BLOCK_SIZE - 1;
+                } else {
+                    _len = Mcb->Inode.i_size + BLOCK_SIZE - 1;
+                }
+                *Number = (ULONG)((_len) >> BLOCK_BITS);
+            }
+            return STATUS_SUCCESS;
         }
     }
-    
-    if((continuous = ext4_ext_get_blocks(IrpContext,
+
+    /* IrpContext is NULL when called during journal initialization */
+    if (IsMcbDirectory(Mcb) || IrpContext == NULL ||
+        IrpContext->MajorFunction == IRP_MJ_WRITE ){
+        flags = EXT4_GET_BLOCKS_IO_CONVERT_EXT;
+    } else {
+        flags = EXT4_GET_BLOCKS_IO_CREATE_EXT;
+    }
+
+    if ((rc = ext4_ext_get_blocks(
+                            IrpContext,
                             NULL,
-                            &Mcb->Inode,
+                           &Mcb->Inode,
                             Index,
-                            EXT_INIT_MAX_LEN, &bh_got, Alloc, 0)) < 0) {
-        DbgPrint("Block insufficient resources, err: %d\n", continuous);
-        return Ext2WinntError(continuous);
+                            EXT_INIT_MAX_LEN,
+                           &bh_got,
+                            Alloc,
+                            flags)) < 0) {
+        DEBUG(DL_ERR, ("Block insufficient resources, err: %d\n", rc));
+        return Ext2WinntError(rc);
     }
     if (Alloc)
         Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
     if (Number)
-        *Number = (continuous)?continuous:1;
+        *Number = rc ? rc : 1;
     if (Block)
         *Block = (ULONG)bh_got.b_blocknr;
 
@@ -67,7 +91,7 @@ Ext2MapExtent(
 
 
 NTSTATUS
-Ext2ExtentExpandOnce(
+Ext2DoExtentExpand(
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
     IN PEXT2_MCB            Mcb,
@@ -76,9 +100,15 @@ Ext2ExtentExpandOnce(
     IN OUT PULONG           Number
 )
 {
-    int continuous;
-    struct buffer_head bh_got;
     EXT4_EXTENT_HEADER *eh;
+    struct buffer_head bh_got;
+    int    rc, flags;
+
+    if (IsMcbDirectory(Mcb) || IrpContext->MajorFunction == IRP_MJ_WRITE) {
+        flags = EXT4_GET_BLOCKS_IO_CONVERT_EXT;
+    } else {
+        flags = EXT4_GET_BLOCKS_IO_CREATE_EXT;
+    }
 
     memset(&bh_got, 0, sizeof(struct buffer_head));
     eh = get_ext4_header(&Mcb->Inode);
@@ -87,25 +117,25 @@ Ext2ExtentExpandOnce(
         ext4_ext_tree_init(IrpContext, NULL, &Mcb->Inode);
     }
 
-    if((continuous = ext4_ext_get_blocks(IrpContext,
-                    NULL,
-                    &Mcb->Inode,
-                    Index,
-                    *Number, &bh_got, 1, 0)) < 0) {
-        DbgPrint("Expand Block insufficient resources, Number: %u, err: %d\n",
-                  *Number, continuous);
+    if ((rc = ext4_ext_get_blocks( IrpContext, NULL, &Mcb->Inode, Index,
+                                  *Number, &bh_got, 1, flags)) < 0) {
+        DEBUG(DL_ERR, ("Expand Block insufficient resources, Number: %u,"
+                       " err: %d\n", *Number, rc));
         DbgBreak();
-        return Ext2WinntError(continuous);
+        return Ext2WinntError(rc);
     }
+
     if (Number)
-        *Number = (continuous)?continuous:1;
+        *Number = rc ? rc : 1;
     if (Block)
         *Block = (ULONG)bh_got.b_blocknr;
-        
-    if (!Ext2AddBlockExtent(Vcb, Mcb, Index, (*Block), *Number)) {
-        DbgBreak();
-        ClearFlag(Mcb->Flags, MCB_ZONE_INITED);
-        Ext2ClearAllExtents(&Mcb->Extents);
+
+    if (bh_got.b_blocknr && IsZoneInited(Mcb)) {
+        if (!Ext2AddBlockExtent(Vcb, Mcb, Index, (*Block), *Number)) {
+            DbgBreak();
+            ClearFlag(Mcb->Flags, MCB_ZONE_INITED);
+            Ext2ClearAllExtents(&Mcb->Extents);
+        }
     }
 
     Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
@@ -133,7 +163,8 @@ Ext2ExpandExtent(
     while (End > Start + Count) {
 
         Number = End - Start - Count;
-        Status = Ext2ExtentExpandOnce(IrpContext, Vcb, Mcb, Start + Count, &Block, &Number);
+        Status = Ext2DoExtentExpand(IrpContext, Vcb, Mcb, Start + Count,
+                                    &Block, &Number);
         if (!NT_SUCCESS(Status)) {
             Status = STATUS_INSUFFICIENT_RESOURCES;
             break;

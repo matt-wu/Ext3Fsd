@@ -761,7 +761,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             if (AllocationSize.QuadPart > Fcb->Header.AllocationSize.QuadPart) {
 
-                Status = Ext2ExpandFile(IrpContext, Vcb, Mcb, &AllocationSize);
+                Status = Ext2ExpandFile(IrpContext, Vcb, Mcb, &AllocationSize); 
                 Fcb->Header.AllocationSize = AllocationSize;
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
 
@@ -877,11 +877,11 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
                 Fcb->Header.AllocationSize = NewSize;
                 Status = Ext2ExpandFile(
-                             IrpContext,
-                             Vcb,
-                             Mcb,
-                             &(Fcb->Header.AllocationSize)
-                         );
+                                 IrpContext,
+                                 Vcb,
+                                 Mcb,
+                                 &(Fcb->Header.AllocationSize)
+                             );
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
 
             } else if (NewSize.QuadPart == OldSize.QuadPart) {
@@ -1148,7 +1148,7 @@ Ext2ExpandFile(
     PLARGE_INTEGER    Size
 )
 {
-    NTSTATUS status;
+    NTSTATUS status = STATUS_SUCCESS;
     ULONG    Start = 0;
     ULONG    End = 0;
 
@@ -1168,13 +1168,29 @@ Ext2ExpandFile(
 
 	/* expandind file extents */ 
     if (INODE_HAS_EXTENT(&Mcb->Inode)) {
+
         status = Ext2ExpandExtent(IrpContext, Vcb, Mcb, Start, End, Size);
+
     } else {
+
+        BOOLEAN do_expand;
+
+#if EXT2_PRE_ALLOCATION_SUPPORT
+        do_expand = TRUE;
+#else
+        do_expand = (IrpContext->MajorFunction == IRP_MJ_WRITE) ||
+                    IsMcbDirectory(Mcb);
+#endif
+        if (!do_expand)
+            goto errorout;
+
         status = Ext2ExpandIndirect(IrpContext, Vcb, Mcb, Start, End, Size);
     }
 
+errorout:
     return status;
 }
+
 
 NTSTATUS
 Ext2TruncateFile(
