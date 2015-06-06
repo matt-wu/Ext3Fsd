@@ -597,6 +597,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
         if ( !IsDirectory(Fcb) && !FlagOn(Fcb->Flags, FCB_PAGE_FILE) &&
                 ((FileInformationClass == FileEndOfFileInformation) ||
+                 (FileInformationClass == FileValidDataLengthInformation) ||
                  (FileInformationClass == FileAllocationInformation))) {
 
             Status = FsRtlCheckOplock( &Fcb->Oplock,
@@ -632,7 +633,8 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
         }
 
         if ( FileInformationClass == FileAllocationInformation ||
-                FileInformationClass == FileEndOfFileInformation) {
+             FileInformationClass == FileEndOfFileInformation ||
+             FileInformationClass == FileValidDataLengthInformation) {
 
             if (!ExAcquireResourceExclusiveLite(
                         &Fcb->PagingIoResource,
@@ -958,6 +960,40 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                           &Fcb->Mcb->ShortName, EndOfFile.QuadPart, Fcb->Header.AllocationSize.QuadPart,
                           Fcb->Header.FileSize.QuadPart, Fcb->Header.ValidDataLength.QuadPart,
                           Mcb->Inode.i_size, Status));
+        }
+
+        break;
+
+        case FileValidDataLengthInformation:
+        {
+            PFILE_VALID_DATA_LENGTH_INFORMATION FVDL = (PFILE_VALID_DATA_LENGTH_INFORMATION) Buffer;
+            LARGE_INTEGER NewVDL;
+
+            if (IsMcbDirectory(Mcb) || IsMcbSpecialFile(Mcb)) {
+                Status = STATUS_INVALID_DEVICE_REQUEST;
+                __leave;
+            } else {
+                Status = STATUS_SUCCESS;
+            }
+
+            NewVDL = FVDL->ValidDataLength;
+            if ((NewVDL.QuadPart < Fcb->Header.ValidDataLength.QuadPart) ||
+                (NewVDL.QuadPart > Fcb->Header.FileSize.QuadPart)) {
+                Status = STATUS_INVALID_PARAMETER;
+                __leave;
+            }
+
+            if (!MmCanFileBeTruncated(FileObject->SectionObjectPointer,
+                                      &FVDL->ValidDataLength)) {
+                Status = STATUS_USER_MAPPED_FILE;
+                __leave;
+            }
+
+            Fcb->Header.ValidDataLength = NewVDL;
+            FileObject->Flags |= FO_FILE_MODIFIED;
+            if (CcIsFileCached(FileObject)) {
+                CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
+            }
         }
 
         break;
