@@ -177,7 +177,7 @@ Ext2ZeroHoles (
     End.QuadPart = Offset + Count;
 
     if (Count > 0) {
-        return CcZeroData(FileObject, &Start, &End, PIN_WAIT);
+        return CcZeroData(FileObject, &Start, &End, 0);
     }
 
     return TRUE;
@@ -1024,9 +1024,10 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
                 if (CcIsFileCached(FileObject)) {
                     CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
                     if (AllocationSize.QuadPart > Last.QuadPart)
-                        CcZeroData(FileObject, &Last, &AllocationSize, FALSE);
+                        CcZeroData(FileObject, &Last, &AllocationSize, 0);
                 }
 
+                FileObject->Flags |= FO_FILE_SIZE_CHANGED | FO_FILE_MODIFIED;
                 FileSizesChanged = TRUE;
 
                 if (Fcb->Header.FileSize.QuadPart >= 0x80000000 &&
@@ -1077,6 +1078,11 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
                     DbgBreak();
                     Status = STATUS_INVALID_USER_BUFFER;
                     __leave;
+                }
+
+                if (ByteOffset.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
+                    Ext2ZeroHoles( IrpContext, Vcb, FileObject, Fcb->Header.ValidDataLength.QuadPart,
+                                   ByteOffset.QuadPart - Fcb->Header.ValidDataLength.QuadPart );
                 }
 
                 if (!CcCopyWrite(
@@ -1135,6 +1141,8 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
                      );
 
             Irp = IrpContext->Irp;
+
+             FileObject->Flags |= FO_FILE_MODIFIED;
         }
 
         if (NT_SUCCESS(Status) && !PagingIo) {
@@ -1170,6 +1178,7 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
         }
 
         if (FileSizesChanged) {
+            FileObject->Flags |= FO_FILE_SIZE_CHANGED | FO_FILE_MODIFIED;
             Ext2NotifyReportChange( IrpContext,  Vcb, Fcb->Mcb,
                                     FILE_NOTIFY_CHANGE_SIZE,
                                     FILE_ACTION_MODIFIED );
