@@ -17,6 +17,7 @@
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/log2.h>
+#include <linux/rbtree.h>
 
 #if _WIN32_WINNT <= 0x500
 #define _WIN2K_TARGET_ 1
@@ -547,7 +548,7 @@ struct block_device {
 
     spinlock_t              bd_bh_lock;    /**/
     kmem_cache_t *          bd_bh_cache;   /* memory cache for buffer_head */
-    struct list_head        bd_bh_list;    /* buffer_head list header */
+    struct rb_root          bd_bh_root;    /* buffer_head red-black tree root */
 };
 
 //
@@ -719,7 +720,7 @@ struct buffer_head {
     // struct list_head b_assoc_buffers;    /* associated with another mapping */
     // struct address_space *b_assoc_map;   /* mapping this buffer is associated with */
     atomic_t b_count;		                /* users using this buffer_head */
-    struct list_head b_list;                /* list entry */
+    struct rb_node b_rb_node;                /* Red-black tree node entry */
 };
 
 

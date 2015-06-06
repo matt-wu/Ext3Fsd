@@ -157,4 +157,7 @@ static inline void rb_link_node(struct rb_node * node, struct rb_node * parent,
     *rb_link = node;
 }
 
+extern void rb_insert(struct rb_root *root, struct rb_node *node,
+         int (*cmp)(struct rb_node *, struct rb_node *));
+
 #endif	/* _LINUX_RBTREE_H */

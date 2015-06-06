@@ -20,7 +20,6 @@
   linux/lib/rbtree.c
 */
 
-#include <linux/rbtree.h>
 #include <linux/module.h>
 
 static void __rb_rotate_left(struct rb_node *node, struct rb_root *root)
@@ -389,3 +388,28 @@ void rb_replace_node(struct rb_node *victim, struct rb_node *new,
     *new = *victim;
 }
 EXPORT_SYMBOL(rb_replace_node);
+
+void rb_insert(struct rb_root *root, struct rb_node *node,
+         int (*cmp)(struct rb_node *, struct rb_node *))
+{
+    struct rb_node **new = &(root->rb_node), *parent = NULL;
+
+    /* Figure out where to put new node */
+    while (*new) {
+        int result = cmp(node, *new);
+
+        parent = *new;
+        if (result < 0)
+            new = &((*new)->rb_left);
+        else if (result > 0)
+            new = &((*new)->rb_right);
+        else
+            return;
+
+    }
+
+    /* Add new node and rebalance tree. */
+    rb_link_node(node, parent, new);
+    rb_insert_color(node, root);
+}
+EXPORT_SYMBOL(rb_insert);

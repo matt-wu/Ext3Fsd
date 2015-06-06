@@ -359,6 +359,66 @@ free_buffer_head(struct buffer_head * bh)
     }
 }
 
+//
+// Red-black tree insert routine.
+//
+
+static struct buffer_head *__buffer_head_search(struct rb_root *root,
+                       sector_t blocknr)
+{
+    struct rb_node *new = root->rb_node;
+
+    /* Figure out where to put new node */
+    while (new) {
+        struct buffer_head *bh =
+            container_of(new, struct buffer_head, b_rb_node);
+        s64 result = blocknr - bh->b_blocknr;
+
+        if (result < 0)
+            new = new->rb_left;
+        else if (result > 0)
+            new = new->rb_right;
+        else
+            return bh;
+
+    }
+
+    return NULL;
+}
+
+static int buffer_head_blocknr_cmp(struct rb_node *a, struct rb_node *b)
+{
+    struct buffer_head *a_bh, *b_bh;
+    s64 result;
+    a_bh = container_of(a, struct buffer_head, b_rb_node);
+    b_bh = container_of(b, struct buffer_head, b_rb_node);
+    result = a_bh->b_blocknr - b_bh->b_blocknr;
+
+    if (result < 0)
+        return -1;
+    if (result > 0)
+        return 1;
+    return 0;
+}
+
+static struct buffer_head *buffer_head_search(struct block_device *bdev,
+                     sector_t blocknr)
+{
+    struct rb_root *root;
+    root = &bdev->bd_bh_root;
+    return __buffer_head_search(root, blocknr);
+}
+
+static void buffer_head_insert(struct block_device *bdev, struct buffer_head *bh)
+{
+    rb_insert(&bdev->bd_bh_root, &bh->b_rb_node, buffer_head_blocknr_cmp);
+}
+
+static void buffer_head_remove(struct block_device *bdev, struct buffer_head *bh)
+{
+    rb_erase(&bh->b_rb_node, &bdev->bd_bh_root);
+}
+
 struct buffer_head *
 get_block_bh(
     struct block_device *   bdev,
@@ -376,7 +436,7 @@ get_block_bh(
     struct list_head *entry;
 
     /* allocate buffer_head and initialize it */
-    struct buffer_head * bh = NULL;
+    struct buffer_head *bh = NULL, *tbh = NULL;
 
     /* check the block is valid or not */
     if (block >= TOTAL_BLOCKS) {
@@ -386,15 +446,12 @@ get_block_bh(
 
     /* search the bdev bh list */
     spin_lock_irqsave(&bdev->bd_bh_lock, irql);
-    list_for_each(entry, &bdev->bd_bh_list) {
-        struct buffer_head * tbh =
-            list_entry(entry, struct buffer_head, b_list);
-        if (block == tbh->b_blocknr) {
-            bh = tbh;
-            get_bh(bh);
-            spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
-            goto errorout;
-        }
+    tbh = buffer_head_search(bdev, block);
+    if (tbh) {
+        bh = tbh;
+        get_bh(bh);
+        spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
+        goto errorout;
     }
     spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
 
@@ -460,20 +517,16 @@ again:
     spin_lock_irqsave(&bdev->bd_bh_lock, irql);
 
     /* do search again here */
-    list_for_each(entry, &bdev->bd_bh_list) {
-        struct buffer_head * tbh =
-            list_entry(entry, struct buffer_head, b_list);
-        if (block == tbh->b_blocknr) {
-            DEBUG(DL_BH, ("getblk:  got conflict: tbh=%p\n", tbh));
-            free_buffer_head(bh);
-            bh = tbh;
-            get_bh(bh);
-            spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
-            goto errorout;
-        }
-    }
+    tbh = buffer_head_search(bdev, block);
+    if (tbh) {
+        free_buffer_head(bh);
+        bh = tbh;
+        get_bh(bh);
+        spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
+        goto errorout;
+    } else
+        buffer_head_insert(bdev, bh);
 
-    list_add(&bh->b_list, &bdev->bd_bh_list);
     spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
 
     /* we get it */
@@ -572,7 +625,7 @@ void __brelse(struct buffer_head *bh)
         spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
         return;
     }
-    list_del(&bh->b_list);
+    buffer_head_remove(bdev, bh);
     spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
 
     DEBUG(DL_BH, ("brelse: cnt=%u size=%u blk=%10.10xh bh=%p ptr=%p\n",
