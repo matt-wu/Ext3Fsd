@@ -2478,7 +2478,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         Vcb->bd.bd_part = Vcb->PartitionInformation;
         Vcb->bd.bd_volume = Vcb->Volume;
         Vcb->bd.bd_priv = (void *) Vcb;
-	memset(&Vcb->bd.bd_bh_root, 0, sizeof(struct rb_root));
+        memset(&Vcb->bd.bd_bh_root, 0, sizeof(struct rb_root));
         spin_lock_init(&Vcb->bd.bd_bh_lock);
         Vcb->bd.bd_bh_cache = kmem_cache_create("bd_bh_buffer",
                                                 Vcb->BlockSize, 0, 0, NULL);
