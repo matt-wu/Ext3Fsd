@@ -2458,7 +2458,7 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	ext4_ext_store_pblock(&newex, newblock);
 	newex.ee_len = cpu_to_le16(allocated);
 	/* if it's fallocate, mark ex as unwritten */
-	if (flags & EXT4_GET_BLOCKS_IO_CREATE_EXT) {
+	if (flags & EXT4_GET_BLOCKS_PRE_IO) {
 		ext4_ext_mark_unwritten(&newex);
 		err = ext4_ext_insert_extent(icb, handle, inode, &path, &newex, EXT4_GET_BLOCKS_PRE_IO);
 	} else
