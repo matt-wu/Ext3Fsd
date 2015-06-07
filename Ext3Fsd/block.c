@@ -269,7 +269,7 @@ Ext2ReadWriteBlocks(
 
         INC_MEM_COUNT(PS_RW_CONTEXT, pContext, sizeof(EXT2_RW_CONTEXT));
         RtlZeroMemory(pContext, sizeof(EXT2_RW_CONTEXT));
-        pContext->Wait = IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT);
+        pContext->Wait = Ext2CanIWait();
         pContext->MasterIrp = MasterIrp;
         pContext->Length = Length;
 
@@ -312,7 +312,7 @@ Ext2ReadWriteBlocks(
 
             IoSetCompletionRoutine(
                     MasterIrp,
-                    IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) ?
+                    Ext2CanIWait() ?
                     Ext2ReadWriteBlockSyncCompletionRoutine :
                     Ext2ReadWriteBlockAsyncCompletionRoutine,
                     (PVOID) pContext,
@@ -363,7 +363,7 @@ Ext2ReadWriteBlocks(
 
                 IoSetCompletionRoutine(
                     Irp,
-                    IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) ?
+                    Ext2CanIWait() ?
                     Ext2ReadWriteBlockSyncCompletionRoutine :
                     Ext2ReadWriteBlockAsyncCompletionRoutine,
                     (PVOID) pContext,
@@ -392,11 +392,11 @@ Ext2ReadWriteBlocks(
             }
 
             MasterIrp->AssociatedIrp.IrpCount = pContext->Blocks;
-            if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
+            if (Ext2CanIWait()) {
                 MasterIrp->AssociatedIrp.IrpCount += 1;
             }
         }
-        if (!IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
+        if (!Ext2CanIWait()) {
             /* mark MasterIrp pending */
             IoMarkIrpPending(pContext->MasterIrp);
         }
@@ -409,7 +409,7 @@ Ext2ReadWriteBlocks(
             Extent->Irp = NULL;
         }
 
-        if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
+        if (Ext2CanIWait()) {
             KeWaitForSingleObject( &(pContext->Event),
                                    Executive, KernelMode, FALSE, NULL );
             KeClearEvent( &(pContext->Event) );
@@ -436,7 +436,7 @@ Ext2ReadWriteBlocks(
 
         } else {
 
-            if (IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)) {
+            if (Ext2CanIWait()) {
                 if (MasterIrp) {
                     Status = MasterIrp->IoStatus.Status;
                 }
