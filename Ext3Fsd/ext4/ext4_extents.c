@@ -2440,8 +2440,7 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	next = ext4_ext_next_allocated_block(path);
 	BUG_ON(next <= iblock);
 	allocated = next - iblock;
-	if (flags & EXT4_GET_BLOCKS_PRE_IO &&
-		max_blocks > EXT_UNWRITTEN_MAX_LEN)
+	if (flags & EXT4_GET_BLOCKS_PRE_IO && max_blocks > EXT_UNWRITTEN_MAX_LEN)
 		max_blocks = EXT_UNWRITTEN_MAX_LEN;
 	if (allocated > max_blocks)
 		allocated = max_blocks;
@@ -2460,9 +2459,9 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	/* if it's fallocate, mark ex as unwritten */
 	if (flags & EXT4_GET_BLOCKS_PRE_IO) {
 		ext4_ext_mark_unwritten(&newex);
-		err = ext4_ext_insert_extent(icb, handle, inode, &path, &newex, EXT4_GET_BLOCKS_PRE_IO);
-	} else
-		err = ext4_ext_insert_extent(icb, handle, inode, &path, &newex, 0);
+	}
+	err = ext4_ext_insert_extent(icb, handle, inode, &path, &newex,
+                                 flags & EXT4_GET_BLOCKS_PRE_IO);
 
 	if (err) {
 		/* free data blocks we just allocated */

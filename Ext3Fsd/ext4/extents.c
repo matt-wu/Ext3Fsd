@@ -60,15 +60,13 @@ Ext2MapExtent(
 
     /* IrpContext is NULL when called during journal initialization */
     if (IsMcbDirectory(Mcb) || IrpContext == NULL ||
-        IrpContext->MajorFunction == IRP_MJ_WRITE ){
+        IrpContext->MajorFunction == IRP_MJ_WRITE || !Alloc){
         flags = EXT4_GET_BLOCKS_IO_CONVERT_EXT;
 		max_blocks = EXT_INIT_MAX_LEN;
     } else {
         flags = EXT4_GET_BLOCKS_IO_CREATE_EXT;
 		max_blocks = EXT_UNWRITTEN_MAX_LEN;
     }
-	if (!Alloc)
-		max_blocks = EXT_INIT_MAX_LEN;
 
     if ((rc = ext4_ext_get_blocks(
                             IrpContext,
