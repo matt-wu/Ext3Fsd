@@ -2440,7 +2440,7 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	next = ext4_ext_next_allocated_block(path);
 	BUG_ON(next <= iblock);
 	allocated = next - iblock;
-	if (flags & EXT4_GET_BLOCKS_CREATE_UNWRIT_EXT &&
+	if (flags & EXT4_GET_BLOCKS_PRE_IO &&
 		max_blocks > EXT_UNWRITTEN_MAX_LEN)
 		max_blocks = EXT_UNWRITTEN_MAX_LEN;
 	if (allocated > max_blocks)
