@@ -224,13 +224,13 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 }
 
 //
-// Define IsEndofFile for read and write operations
+// Define IsWritingToEof for write (append) operations
 //
 
 #define FILE_WRITE_TO_END_OF_FILE       0xffffffff
 
-#define IsEndOfFile(Pos) (((Pos).LowPart == FILE_WRITE_TO_END_OF_FILE) && \
-                          ((Pos).HighPart == -1 ))
+#define IsWritingToEof(Pos) (((Pos).LowPart == FILE_WRITE_TO_END_OF_FILE) && \
+                             ((Pos).HighPart == -1 ))
 
 #define IsDirectory(Fcb)    IsMcbDirectory((Fcb)->Mcb)
 #define IsSpecialFile(Fcb)  IsMcbSpecialFile((Fcb)->Mcb)
@@ -723,7 +723,7 @@ typedef struct _EXT2_VCB {
 #define IsExt3ForceWrite()   (IsFlagOn(Ext2Global->Flags, EXT3_FORCE_WRITING))
 #define IsVcbForceWrite(Vcb) (IsFlagOn((Vcb)->Flags, VCB_FORCE_WRITING))
 #define CanIWrite(Vcb)       (IsExt3ForceWrite() || (!IsVcbReadOnly(Vcb) && IsVcbForceWrite(Vcb)))
-
+#define IsLazyWriter(Fcb)    ((Fcb)->LazyWriterThread == PsGetCurrentThread())
 //
 // EXT2_FCB File Control Block
 //
@@ -786,7 +786,9 @@ typedef struct _EXT2_FCB {
 #define FCB_STATE_BUSY              0x00000040
 #define FCB_ALLOC_IN_CREATE         0x00000080
 #define FCB_ALLOC_IN_WRITE          0x00000100
-#define FCB_DELETE_PENDING          0x00000200
+#define FCB_ALLOC_IN_SETINFO        0x00000200
+
+#define FCB_DELETE_PENDING          0x80000000
 
 //
 // Mcb Node
@@ -2830,12 +2832,12 @@ Ext2StartFloppyFlushDpc (
     PFILE_OBJECT FileObject );
 
 BOOLEAN
-Ext2ZeroHoles (
+Ext2ZeroData (
     IN PEXT2_IRP_CONTEXT IrpContext,
     IN PEXT2_VCB Vcb,
     IN PFILE_OBJECT FileObject,
-    IN LONGLONG Offset,
-    IN LONGLONG Count );
+    IN PLARGE_INTEGER Start,
+    IN PLARGE_INTEGER End );
 
 NTSTATUS
 Ext2Write (IN PEXT2_IRP_CONTEXT IrpContext);

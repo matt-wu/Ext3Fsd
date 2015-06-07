@@ -230,33 +230,46 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                 }
             }
 
-            if (Fcb->OpenHandleCount == 0 &&
-                    (IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE) ||
-                     IsFlagOn(Fcb->Flags, FCB_ALLOC_IN_WRITE)) ) {
+            if (Fcb->OpenHandleCount == 0 && FlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE |
+                                                                FCB_ALLOC_IN_SETINFO) ){
 
-                LARGE_INTEGER Size;
-
-                ExAcquireResourceExclusiveLite(&Fcb->PagingIoResource, TRUE);
-                FcbPagingIoResourceAcquired = TRUE;
-
-                Size.QuadPart = CEILING_ALIGNED(ULONGLONG,
-                                                (ULONGLONG)Fcb->Mcb->Inode.i_size,
-                                                (ULONGLONG)BLOCK_SIZE);
-                if (!IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
-
-                    Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &Size);
-                    Fcb->Header.AllocationSize = Size;
-                    Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size;
-                    if (Fcb->Header.ValidDataLength.QuadPart > Fcb->Header.FileSize.QuadPart)
-                        Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
-                    if (CcIsFileCached(FileObject)) {
-                        CcSetFileSizes(FileObject,
-                                       (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
+                if (FlagOn(Fcb->Flags, FCB_ALLOC_IN_SETINFO)) {
+                    if (Fcb->Header.ValidDataLength.QuadPart < Fcb->Header.FileSize.QuadPart) {
+                        if (!INODE_HAS_EXTENT(Fcb->Inode)) {
+                        #if EXT2_PRE_ALLOCATION_SUPPORT
+                            CcZeroData(FileObject, &Fcb->Header.ValidDataLength,
+                                       &Fcb->Header.AllocationSize, TRUE);
+                        #endif
+                        }
                     }
                 }
-                ClearLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE|FCB_ALLOC_IN_WRITE);
-                ExReleaseResourceLite(&Fcb->PagingIoResource);
-                FcbPagingIoResourceAcquired = FALSE;
+
+                if (FlagOn(Fcb->Flags, FCB_ALLOC_IN_CREATE)) {
+
+                    LARGE_INTEGER Size;
+
+                    ExAcquireResourceExclusiveLite(&Fcb->PagingIoResource, TRUE);
+                    FcbPagingIoResourceAcquired = TRUE;
+
+                    Size.QuadPart = CEILING_ALIGNED(ULONGLONG,
+                                                    (ULONGLONG)Fcb->Mcb->Inode.i_size,
+                                                    (ULONGLONG)BLOCK_SIZE);
+                    if (!IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
+
+                        Ext2TruncateFile(IrpContext, Vcb, Fcb->Mcb, &Size);
+                        Fcb->Header.AllocationSize = Size;
+                        Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size;
+                        if (Fcb->Header.ValidDataLength.QuadPart > Fcb->Header.FileSize.QuadPart)
+                            Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
+                        if (CcIsFileCached(FileObject)) {
+                            CcSetFileSizes(FileObject,
+                                           (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
+                        }
+                    }
+                    ClearLongFlag(Fcb->Flags, FCB_ALLOC_IN_CREATE|FCB_ALLOC_IN_WRITE|FCB_ALLOC_IN_SETINFO);
+                    ExReleaseResourceLite(&Fcb->PagingIoResource);
+                    FcbPagingIoResourceAcquired = FALSE;
+                }
             }
         }
 
@@ -305,10 +318,10 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                         IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)
                     );
 
+                SetFlag(FileObject->Flags, FO_FILE_MODIFIED);
                 if (CcIsFileCached(FileObject)) {
                     CcSetFileSizes(FileObject,
                                    (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
-                    SetFlag(FileObject->Flags, FO_FILE_MODIFIED);
                 }
             }
         }

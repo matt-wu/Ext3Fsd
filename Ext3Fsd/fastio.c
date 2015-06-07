@@ -216,8 +216,9 @@ Ext2FastIoWrite (
         ExAcquireResourceSharedLite(&Fcb->MainResource, TRUE);
         Locked = TRUE;
 
-        if (IsEndOfFile(*FileOffset) || ((LONGLONG)(Fcb->Inode->i_size) <
-                                         (FileOffset->QuadPart + Length)) ) {
+        if (IsWritingToEof(*FileOffset) ||
+            Fcb->Header.ValidDataLength.QuadPart < FileOffset->QuadPart ||
+            Fcb->Header.FileSize.QuadPart < FileOffset->QuadPart + Length ) {
             Status = FALSE;
         } else {
             ExReleaseResourceLite(&Fcb->MainResource);

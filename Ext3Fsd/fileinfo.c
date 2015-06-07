@@ -630,31 +630,22 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             FcbMainResourceAcquired = TRUE;
-        }
 
-        if ( FileInformationClass == FileAllocationInformation ||
-             FileInformationClass == FileEndOfFileInformation ||
-             FileInformationClass == FileValidDataLengthInformation) {
+            if ( FileInformationClass == FileAllocationInformation ||
+                 FileInformationClass == FileEndOfFileInformation ||
+                 FileInformationClass == FileValidDataLengthInformation) {
 
-            if (!ExAcquireResourceExclusiveLite(
-                        &Fcb->PagingIoResource,
-                        IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) )) {
-                Status = STATUS_PENDING;
-                DbgBreak();
-                __leave;
-            }
-
-            FcbPagingIoResourceAcquired = TRUE;
-        }
-
-        /*
-                if (FileInformationClass != FileDispositionInformation
-                    && IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING))
-                {
-                    Status = STATUS_DELETE_PENDING;
+                if (!ExAcquireResourceExclusiveLite(
+                            &Fcb->PagingIoResource,
+                            IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) )) {
+                    Status = STATUS_PENDING;
+                    DbgBreak();
                     __leave;
                 }
-        */
+                FcbPagingIoResourceAcquired = TRUE;
+            }
+        }
+
         switch (FileInformationClass) {
 
         case FileBasicInformation:
@@ -766,6 +757,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 Status = Ext2ExpandFile(IrpContext, Vcb, Mcb, &AllocationSize); 
                 Fcb->Header.AllocationSize = AllocationSize;
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
+                SetLongFlag(Fcb->Flags, FCB_ALLOC_IN_SETINFO);
 
             } else if (AllocationSize.QuadPart < Fcb->Header.AllocationSize.QuadPart) {
 
@@ -864,11 +856,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                     EndOfFile.QuadPart = Fcb->Header.FileSize.QuadPart;
                 }
 
-                if (Fcb->Header.ValidDataLength.QuadPart > EndOfFile.QuadPart) {
-                    Fcb->Header.ValidDataLength.QuadPart = EndOfFile.QuadPart;
-                    NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
-                }
-
                 __leave;
             }
 
@@ -885,6 +872,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                                  &(Fcb->Header.AllocationSize)
                              );
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
+                SetLongFlag(Fcb->Flags, FCB_ALLOC_IN_SETINFO);
 
             } else if (NewSize.QuadPart == OldSize.QuadPart) {
 
