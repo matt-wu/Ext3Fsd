@@ -35,6 +35,7 @@ Ext2MapExtent(
     EXT4_EXTENT_HEADER *eh;
     struct buffer_head bh_got;
     int    flags, rc;
+	ULONG max_blocks = 0;
 
     memset(&bh_got, 0, sizeof(struct buffer_head));
     eh = get_ext4_header(&Mcb->Inode);
@@ -61,17 +62,21 @@ Ext2MapExtent(
     if (IsMcbDirectory(Mcb) || IrpContext == NULL ||
         IrpContext->MajorFunction == IRP_MJ_WRITE ){
         flags = EXT4_GET_BLOCKS_IO_CONVERT_EXT;
+		max_blocks = EXT_INIT_MAX_LEN;
     } else {
         flags = EXT4_GET_BLOCKS_IO_CREATE_EXT;
+		max_blocks = EXT_UNWRITTEN_MAX_LEN;
     }
+	if (!Alloc)
+		max_blocks = EXT_INIT_MAX_LEN;
 
     if ((rc = ext4_ext_get_blocks(
                             IrpContext,
                             NULL,
-                           &Mcb->Inode,
+                            &Mcb->Inode,
                             Index,
-                            EXT_INIT_MAX_LEN,
-                           &bh_got,
+                            max_blocks,
+                            &bh_got,
                             Alloc,
                             flags)) < 0) {
         DEBUG(DL_ERR, ("Block insufficient resources, err: %d\n", rc));
