@@ -1056,7 +1056,7 @@ Dissecting:
             if (OpenTargetDirectory) {
 
                 UNICODE_STRING  RealName = FileName;
-                LONG            i = 0;
+                USHORT          i = 0;
 
                 while (RealName.Buffer[RealName.Length/2 - 1] == L'\\') {
                     RealName.Length -= sizeof(WCHAR);
