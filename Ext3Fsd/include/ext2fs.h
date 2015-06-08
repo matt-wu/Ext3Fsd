@@ -40,7 +40,7 @@
 
 /* STRUCTS & CONSTS******************************************************/
 
-#define EXT2FSD_VERSION                 "0.60"
+#define EXT2FSD_VERSION                 "0.61"
 
 
 //

@@ -28,10 +28,20 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
  Revision history
 ======================
 
+46, V0.61:   2015-06-08
+
+Modifications from V0.60:
+
+    1, FIXME: Ext4 unwritten-extent supported to avoid possible data corruption
+              MSB of ee_len field of unwritten extent is used as only a flag. It
+              was mistakenly treated as extent length (block numbers) in V0.60
+    2, FIXME: Manually clear file to zero for indirect-block file that is newly
+              created but not yet written
+
+
 45, V0.60:   2015-06-01
 
 Modifications from V0.53:
-
 
     1, Ext4 extent writing support (developed by ngkaho1234 @ gmail.com)
        See his repository for more details:
