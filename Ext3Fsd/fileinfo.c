@@ -1504,7 +1504,7 @@ Ext2SetRenameInfo(
                  0
              );
 
-    if (NT_SUCCESS(Status)) {
+    if (NT_SUCCESS(Status) && ExistingMcb != Mcb) {
 
         if (!ReplaceIfExists) {
 
@@ -1537,11 +1537,21 @@ Ext2SetRenameInfo(
         }
     }
 
+    /* remove directory entry of old name */
+    Status = Ext2RemoveEntry(IrpContext, Vcb, ParentDcb, Mcb);
+    if (!NT_SUCCESS(Status)) {
+        DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to remove entry %wZ with status %xh.\n",
+                       &Mcb->FullName, Status));
+        DbgBreak();
+        goto errorout;
+    }
+
     /* add new entry for new target name */
     Status = Ext2AddEntry(IrpContext, Vcb, TargetDcb, &Mcb->Inode, &FileName, &NewEntry);
     if (!NT_SUCCESS(Status)) {
         DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to add entry for %wZ with status: %xh.\n",
                        &FileName, Status));
+        Ext2AddEntry(IrpContext, Vcb, ParentDcb, &Mcb->Inode, &Mcb->ShortName, &NewEntry);
         goto errorout;
     }
 
@@ -1557,15 +1567,6 @@ Ext2SetRenameInfo(
             DbgBreak();
             goto errorout;
         }
-    }
-
-    /* remove directory entry of old name */
-    Status = Ext2RemoveEntry(IrpContext, Vcb, ParentDcb, Mcb);
-    if (!NT_SUCCESS(Status)) {
-        DEBUG(DL_REN, ("Ext2SetRenameInfo: Failed to remove entry %wZ with status %xh.\n",
-                       &Mcb->FullName, Status));
-        DbgBreak();
-        goto errorout;
     }
 
     /* Update current dentry from the newly created one. We need keep the original

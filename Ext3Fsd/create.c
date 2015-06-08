@@ -1055,6 +1055,17 @@ Dissecting:
             /* here already get Mcb referred */
             if (OpenTargetDirectory) {
 
+                UNICODE_STRING  RealName = FileName;
+                LONG            i = 0;
+
+                while (RealName.Buffer[RealName.Length/2 - 1] == L'\\') {
+                    RealName.Length -= sizeof(WCHAR);
+                    RealName.Buffer[RealName.Length/2] = 0;
+                }
+                i = RealName.Length/2;
+                while (i > 0 && RealName.Buffer[i - 1] != L'\\')
+                    i--;
+
                 if (IsVcbReadOnly(Vcb)) {
                     Status = STATUS_MEDIA_WRITE_PROTECTED;
                     Ext2DerefMcb(Mcb);
@@ -1066,11 +1077,9 @@ Dissecting:
 
                 RtlZeroMemory( IrpSp->FileObject->FileName.Buffer,
                                IrpSp->FileObject->FileName.MaximumLength);
-                IrpSp->FileObject->FileName.Length = Mcb->ShortName.Length;
-
-                RtlCopyMemory( IrpSp->FileObject->FileName.Buffer,
-                               Mcb->ShortName.Buffer,
-                               Mcb->ShortName.Length );
+                IrpSp->FileObject->FileName.Length = RealName.Length - i * sizeof(WCHAR);
+                RtlCopyMemory( IrpSp->FileObject->FileName.Buffer, &RealName.Buffer[i],
+                               IrpSp->FileObject->FileName.Length );
 
                 // use's it's parent since it's open-target operation
                 Ext2ReferMcb(Mcb->Parent);

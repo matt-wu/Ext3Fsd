@@ -1530,6 +1530,10 @@ Ext2SetParentEntry (
         return STATUS_NOT_A_DIRECTORY;
     }
 
+    if (OldParent == NewParent) {
+        return STATUS_SUCCESS;
+    }
+
     MainResourceAcquired =
         ExAcquireResourceExclusiveLite(&Dcb->MainResource, TRUE);
 
