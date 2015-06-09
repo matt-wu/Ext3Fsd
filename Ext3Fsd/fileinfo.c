@@ -881,6 +881,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
                 if (NT_SUCCESS(Status)) {
 
+                    Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size = EndOfFile.QuadPart;
                     if (CcIsFileCached(FileObject)) {
                         CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
                     }
