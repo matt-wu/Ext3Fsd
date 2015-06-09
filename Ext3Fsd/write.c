@@ -732,22 +732,22 @@ Ext2WriteInode (
 NTSTATUS
 Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
 {
-    NTSTATUS            Status = STATUS_UNSUCCESSFUL;
-
     PEXT2_VCB           Vcb;
     PEXT2_FCB           Fcb;
     PEXT2_CCB           Ccb;
     PFILE_OBJECT        FileObject;
-    PFILE_OBJECT        CacheObject;
 
     PDEVICE_OBJECT      DeviceObject;
 
     PIRP                Irp;
     PIO_STACK_LOCATION  IoStackLocation;
+    PUCHAR              Buffer;
 
-    ULONG               Length;
     LARGE_INTEGER       ByteOffset;
     ULONG               ReturnedLength = 0;
+    ULONG               Length;
+
+    NTSTATUS            Status = STATUS_UNSUCCESSFUL;
 
     BOOLEAN             OpPostIrp = FALSE;
     BOOLEAN             PagingIo = FALSE;
@@ -761,8 +761,8 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
     BOOLEAN             bDeferred = FALSE;
     BOOLEAN             UpdateFileValidSize = FALSE;
     BOOLEAN             FileSizesChanged = FALSE;
+    BOOLEAN             rc;
 
-    PUCHAR              Buffer;
 
     __try {
 
@@ -950,7 +950,7 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
                 ExReleaseResourceLite(&Fcb->PagingIoResource);
 
                 CcPurgeCacheSection( &(Fcb->SectionObject),
-                                     (PLARGE_INTEGER)&(ByteOffset),
+                                     &(ByteOffset),
                                      CEILING_ALIGNED(ULONG, Length, BLOCK_SIZE),
                                      FALSE );
             }
@@ -988,19 +988,6 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
                 LARGE_INTEGER AllocationSize, Last;
 
-                if (!Nocache && FileObject->PrivateCacheMap == NULL) {
-                    CcInitializeCacheMap(
-                        FileObject,
-                        (PCC_FILE_SIZES)(&Fcb->Header.AllocationSize),
-                        FALSE,
-                        &Ext2Global->CacheManagerCallbacks,
-                        Fcb );
-
-                    CcSetReadAheadGranularity(
-                        FileObject,
-                        READ_AHEAD_GRANULARITY );
-                }
-
                 if (!ExAcquireResourceExclusiveLite(&Fcb->PagingIoResource, TRUE)) {
                     Status = STATUS_PENDING;
                     __leave;
@@ -1015,7 +1002,12 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
                 AllocationSize.QuadPart = CEILING_ALIGNED(ULONGLONG,
                                           (ULONGLONG)AllocationSize.QuadPart,
                                           (ULONGLONG)BLOCK_SIZE);
+
+                /* tell Ext2ExpandFile to allocate unwritten extent or NULL blocks
+                   for indirect files, otherwise we might get gabage data in holes */
+                IrpContext->MajorFunction += IRP_MJ_MAXIMUM_FUNCTION;
                 Status = Ext2ExpandFile(IrpContext, Vcb, Fcb->Mcb, &AllocationSize);
+                IrpContext->MajorFunction -= IRP_MJ_MAXIMUM_FUNCTION;
                 if (AllocationSize.QuadPart > Last.QuadPart) {
                     Fcb->Header.AllocationSize.QuadPart = AllocationSize.QuadPart;
                     SetLongFlag(Fcb->Flags, FCB_ALLOC_IN_WRITE);
@@ -1074,13 +1066,11 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
                     READ_AHEAD_GRANULARITY );
             }
 
-            CacheObject = FileObject;
-
             if (FlagOn(IrpContext->MinorFunction, IRP_MN_MDL)) {
 
                 CcPrepareMdlWrite(
-                    CacheObject,
-                    (&ByteOffset),
+                    FileObject,
+                    &ByteOffset,
                     Length,
                     &Irp->MdlAddress,
                     &Irp->IoStatus );
@@ -1097,19 +1087,26 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
                 }
 
                 if (ByteOffset.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
-                    Ext2ZeroData(IrpContext, Vcb, FileObject,
-                                 &Fcb->Header.ValidDataLength, &ByteOffset);
+
+                    /* let this irp wait, since it has to be synchronous */
+                    SetFlag(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT);
+
+                    rc = Ext2ZeroData(IrpContext, Vcb, FileObject,
+                                      &Fcb->Header.ValidDataLength, &ByteOffset);
+                    if (!rc) {
+                        Status = STATUS_PENDING;
+                        DbgBreak();
+                        __leave;
+                    }
                 }
 
-                if (!CcCopyWrite(
-                            CacheObject,
-                            (PLARGE_INTEGER)&ByteOffset,
-                            Length,
-                            IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT),
-                            Buffer  )) {
-                    Status = STATUS_PENDING;
-                    DbgBreak();
-                    __leave;
+                if (!CcCopyWrite(FileObject, &ByteOffset, Length, Ext2CanIWait(), Buffer)) {
+                    if (Ext2CanIWait() || 
+                        !CcCopyWrite(FileObject,  &ByteOffset, Length, TRUE, Buffer)) {
+                        Status = STATUS_PENDING;
+                        DbgBreak();
+                        __leave;
+                    }
                 }
 
                 if (ByteOffset.QuadPart + Length > Fcb->Header.ValidDataLength.QuadPart ) {
@@ -1129,7 +1126,6 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             if (NT_SUCCESS(Status)) {
-
                 Irp->IoStatus.Information = Length;
                 if (IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK)) {
                     DEBUG(DL_FLP, ("Ext2WriteFile is starting FlushingDpc...\n"));
@@ -1140,16 +1136,19 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
         } else {
 
             if (!PagingIo && !RecursiveWriteThrough && !IsLazyWriter(Fcb)) {
-
                 if (ByteOffset.QuadPart + Length > Fcb->Header.ValidDataLength.QuadPart ) {
-
-                    /* let this irp wait, since it has to be synchronous */
-                    SetFlag(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT);
-
                     if (ByteOffset.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
-                        Ext2ZeroData(IrpContext, Vcb, FileObject,
-                                     &Fcb->Header.ValidDataLength,
-                                     &ByteOffset);
+
+                        /* let this irp wait, since it has to be synchronous */
+                        SetFlag(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT);
+                        rc = Ext2ZeroData(IrpContext, Vcb, FileObject,
+                                          &Fcb->Header.ValidDataLength,
+                                          &ByteOffset);
+                        if (!rc) {
+                            Status = STATUS_PENDING;
+                            DbgBreak();
+                            __leave;
+                        }
                     }
                 }
             }
@@ -1211,6 +1210,15 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
         }
 
     } __finally {
+
+        /*
+         *  in case we got excpetions, we need revert MajorFunction
+         *  back to IRP_MJ_WRITE. The reason we do this, if to tell
+         *  Ext2ExpandFile to allocate unwritten extent or don't add
+         *  new blocks for indirect files.
+         */
+        if (IrpContext->MajorFunction > IRP_MJ_MAXIMUM_FUNCTION)
+            IrpContext->MajorFunction -= IRP_MJ_MAXIMUM_FUNCTION;
 
         if (Irp) {
             if (PagingIoResourceAcquired) {

@@ -204,9 +204,9 @@ Ext2ReadVolume (IN PEXT2_IRP_CONTEXT IrpContext)
 
                 if (!CcCopyRead(
                             Vcb->Volume,
-                            (PLARGE_INTEGER)&ByteOffset,
+                            &ByteOffset,
                             Length,
-                            IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT),
+                            Ext2CanIWait(),
                             Buffer,
                             &Irp->IoStatus )) {
                     Status = STATUS_PENDING;
@@ -316,17 +316,18 @@ Ext2ReadInode (
     IN PVOID                Buffer,
     IN ULONG                Size,
     IN BOOLEAN              bDirectIo,
-    OUT PULONG              dwRet
+    OUT PULONG              BytesRead
 )
 {
     PEXT2_EXTENT    Chain = NULL;
     PEXT2_EXTENT    Extent = NULL, Prev = NULL;
 
     IO_STATUS_BLOCK IoStatus;
-    NTSTATUS Status = STATUS_UNSUCCESSFUL;
+    NTSTATUS        Status = STATUS_UNSUCCESSFUL;
+    ULONG           RealSize ;
 
-    if (dwRet) {
-        *dwRet = 0;
+    if (BytesRead) {
+        *BytesRead = 0;
     }
 
     __try {
@@ -371,12 +372,18 @@ Ext2ReadInode (
         // Build the scatterred block ranges to be read
         //
 
+        if (bDirectIo) {
+            RealSize = CEILING_ALIGNED(ULONG, Size, SECTOR_SIZE - 1);
+        } else {
+            RealSize = Size;
+        }
+
         Status = Ext2BuildExtents(
                      IrpContext,
                      Vcb,
                      Mcb,
                      Offset,
-                     Size,
+                     RealSize,
                      FALSE,
                      &Chain
                  );
@@ -455,7 +462,8 @@ Ext2ReadInode (
     }
 
     if (NT_SUCCESS(Status)) {
-        if (dwRet) *dwRet = Size;
+        if (BytesRead)
+            *BytesRead = Size;
     }
 
     return Status;
@@ -470,7 +478,6 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
     PEXT2_FCB           Fcb;
     PEXT2_CCB           Ccb;
     PFILE_OBJECT        FileObject;
-    PFILE_OBJECT        CacheObject;
 
     PDEVICE_OBJECT      DeviceObject;
 
@@ -577,14 +584,6 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
             }
             PagingIoResourceAcquired = TRUE;
 
-            if ((ByteOffset.QuadPart + (LONGLONG)Length) > Fcb->Header.FileSize.QuadPart) {
-                if (ByteOffset.QuadPart >= Fcb->Header.FileSize.QuadPart) {
-                    Irp->IoStatus.Information = 0;
-                    Status = STATUS_END_OF_FILE;
-                    __leave;
-                }
-                ReturnedLength = (ULONG)(Fcb->Header.FileSize.QuadPart - ByteOffset.QuadPart);
-            }
         } else {
 
             if (Nocache) {
@@ -606,15 +605,6 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
                     __leave;
                 }
                 MainResourceAcquired = TRUE;
-
-                if ((ByteOffset.QuadPart + (LONGLONG)Length) > Fcb->Header.FileSize.QuadPart) {
-                    if (ByteOffset.QuadPart >= Fcb->Header.FileSize.QuadPart) {
-                        Irp->IoStatus.Information = 0;
-                        Status = STATUS_END_OF_FILE;
-                        __leave;
-                    }
-                    ReturnedLength = (ULONG)(Fcb->Header.FileSize.QuadPart - ByteOffset.QuadPart);
-                }
             }
 
             if (!FsRtlCheckLockForReadAccess(
@@ -624,6 +614,16 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
                 __leave;
             }
         }
+
+        if ((ByteOffset.QuadPart + (LONGLONG)Length) > Fcb->Header.FileSize.QuadPart) {
+            if (ByteOffset.QuadPart >= Fcb->Header.FileSize.QuadPart) {
+                Irp->IoStatus.Information = 0;
+                Status = STATUS_END_OF_FILE;
+                __leave;
+            }
+            ReturnedLength = (ULONG)(Fcb->Header.FileSize.QuadPart - ByteOffset.QuadPart);
+        }
+
 
         if (!IsDirectory(Fcb) && Ccb != NULL) {
 
@@ -651,25 +651,21 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
                 __leave;
             }
 
-            {
-                if (FileObject->PrivateCacheMap == NULL) {
-                    CcInitializeCacheMap(
+            if (FileObject->PrivateCacheMap == NULL) {
+                CcInitializeCacheMap(
                         FileObject,
                         (PCC_FILE_SIZES)(&Fcb->Header.AllocationSize),
                         FALSE,
                         &Ext2Global->CacheManagerCallbacks,
                         Fcb );
-                    CcSetReadAheadGranularity(
+                CcSetReadAheadGranularity(
                         FileObject,
                         READ_AHEAD_GRANULARITY );
-                }
-
-                CacheObject = FileObject;
             }
 
             if (FlagOn(IrpContext->MinorFunction, IRP_MN_MDL)) {
                 CcMdlRead(
-                    CacheObject,
+                    FileObject,
                     (&ByteOffset),
                     ReturnedLength,
                     &Irp->MdlAddress,
@@ -686,18 +682,17 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
                     __leave;
                 }
 
-                if (!CcCopyRead(
-                            CacheObject,
-                            (PLARGE_INTEGER)&ByteOffset,
-                            ReturnedLength,
-                            IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT),
-                            Buffer,
-                            &Irp->IoStatus )) {
-                    Status = STATUS_PENDING;
-                    DbgBreak();
-                    __leave;
-                }
+                if (!CcCopyRead(FileObject, &ByteOffset, ReturnedLength,
+                                Ext2CanIWait(), Buffer, &Irp->IoStatus)) {
 
+                    if (Ext2CanIWait() || !CcCopyRead(FileObject, &ByteOffset,
+                                                      ReturnedLength, TRUE,
+                                                      Buffer, &Irp->IoStatus)) {
+                        Status = STATUS_PENDING;
+                        DbgBreak();
+                        __leave;
+                    }
+                }
                 Status = Irp->IoStatus.Status;
             }
 
