@@ -506,7 +506,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
     BOOLEAN                 VcbMainResourceAcquired = FALSE;
     BOOLEAN                 FcbMainResourceAcquired = FALSE;
     BOOLEAN                 FcbPagingIoResourceAcquired = FALSE;
-    BOOLEAN                 CacheInitialized = FALSE;
 
     __try {
 
@@ -730,23 +729,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
             Mcb = Fcb->Mcb;
 
-            /* initialize cache map if needed */
-            if ((FileObject->SectionObjectPointer->DataSectionObject != NULL) &&
-                    (FileObject->SectionObjectPointer->SharedCacheMap == NULL) &&
-                    !IsFlagOn(Irp->Flags, IRP_PAGING_IO)) {
-
-                ASSERT(!IsFlagOn( FileObject->Flags, FO_CLEANUP_COMPLETE));
-
-                CcInitializeCacheMap(
-                    FileObject,
-                    (PCC_FILE_SIZES)&(Fcb->Header.AllocationSize),
-                    FALSE,
-                    &(Ext2Global->CacheManagerNoOpCallbacks),
-                    Fcb );
-
-                CacheInitialized = TRUE;
-            }
-
             /* get user specified allocationsize aligned with BLOCK_SIZE */
             AllocationSize.QuadPart = CEILING_ALIGNED(ULONGLONG,
                                       (ULONGLONG)FAI->AllocationSize.QuadPart,
@@ -826,23 +808,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
             Mcb = Fcb->Mcb;
 
-            /* initialize cache map if needed */
-            if ((FileObject->SectionObjectPointer->DataSectionObject != NULL) &&
-                    (FileObject->SectionObjectPointer->SharedCacheMap == NULL) &&
-                    !IsFlagOn(Irp->Flags, IRP_PAGING_IO)) {
-
-                ASSERT(!IsFlagOn( FileObject->Flags, FO_CLEANUP_COMPLETE));
-
-                CcInitializeCacheMap(
-                    FileObject,
-                    (PCC_FILE_SIZES)&(Fcb->Header.AllocationSize),
-                    FALSE,
-                    &(Ext2Global->CacheManagerNoOpCallbacks),
-                    Fcb );
-
-                CacheInitialized = TRUE;
-            }
-
             OldSize = Fcb->Header.AllocationSize;
             EndOfFile = FEOFI->EndOfFile;
 
@@ -878,20 +843,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                              );
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
                 SetLongFlag(Fcb->Flags, FCB_ALLOC_IN_SETINFO);
-
-                if (NT_SUCCESS(Status)) {
-
-                    Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size = EndOfFile.QuadPart;
-                    if (CcIsFileCached(FileObject)) {
-                        CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
-                    }
-
-                    if (Fcb->Header.ValidDataLength.QuadPart < EndOfFile.QuadPart &&
-                        Fcb->Header.ValidDataLength.QuadPart < Fcb->Header.AllocationSize.QuadPart ) {
-                        Ext2ZeroData(IrpContext, Vcb, FileObject, &Fcb->Header.ValidDataLength,
-                                     &Fcb->Header.AllocationSize);
-                    }
-                }
 
 
             } else if (NewSize.QuadPart == OldSize.QuadPart) {
@@ -943,7 +894,9 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             if (NT_SUCCESS(Status)) {
 
                 Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size = EndOfFile.QuadPart;
-                Fcb->Header.ValidDataLength = Fcb->Header.FileSize;
+                if (CcIsFileCached(FileObject)) {
+                    CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
+                }
 
                 if (Fcb->Header.FileSize.QuadPart >= 0x80000000 &&
                         !IsFlagOn(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE)) {
@@ -956,9 +909,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
             }
 
-            if (CcIsFileCached(FileObject)) {
-                CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
-            }
 
             Ext2SaveInode( IrpContext, Vcb, &Mcb->Inode);
 
@@ -1085,10 +1035,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
         if (FcbMainResourceAcquired) {
             ExReleaseResourceLite(&Fcb->MainResource);
-        }
-
-        if (CacheInitialized) {
-            CcUninitializeCacheMap(FileObject, NULL, NULL);
         }
 
         if (VcbMainResourceAcquired) {
