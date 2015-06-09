@@ -28,6 +28,14 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
  Revision history
 ======================
 
+47, V0.62:   2015-06-09
+
+Modifications from V0.61:
+
+    1, FIXME: STEAM game cache (data) validation failures
+              for direct-io mode, wrong reading length in bytes reported
+    2, FIXME: WDK sources compiling random failures
+
 46, V0.61:   2015-06-08
 
 Modifications from V0.60:

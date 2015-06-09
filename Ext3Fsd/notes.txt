@@ -1,41 +1,14 @@
 
 ==================================
-Release Notes for Ext2Fsd V0.61
+Release Notes for Ext2Fsd V0.62
 ==================================
 
-Features implemented or bugfix since V0.53:
+Features implemented or bugfix since V0.61:
 
-    1, Ext4 extent writing support (developed by ngkaho1234 @ gmail.com).
-       See his repository for more details:
-       http://github.com/ngkaho1234/Ext3Fsd.git
-    2, Size manipulation and i/o path revised for support of both indirect and
-       extent-based mappings
-    3, 16T volume supported (tested with 4T volume / 4K block-size)
-       Version 0.53 and previous versions only support up to 2T volume
-       ticket: https://sourceforge.net/p/ext2fsd/bugs/134/
-    4, Deletion acceleration: truncation optimized for indirect-based files
-    5, Size-expanding disabled in IRP_MJ_CREATE for better performance.
-       Windows sometimes would truncate file size back to 0
-    6, Support Volume exclusive-open for e2fsprogs utils. Any attempts
-       will be denied while EXT4 volume is being checked (e2fsck).
-    7, FIXME:  Possible zero-content returned (requesting data from file tail)
-    8, FIXME:  File ByteOffset updated for FO_SYNCHRONOUS_IO open (async i/o)
-       ticket: https://sourceforge.net/p/ext2fsd/bugs/133/
-    9, FIXME:  don't do byte or range round up for paging i/o requests
-       ticket: https://sourceforge.net/p/ext2fsd/bugs/129/
-   10, FIXME:  occasional block bitmap difference issue, cased by checksum
-               caculation in uninit_bg group initializing
-   11, FIXME: Ext4 unwritten-extent supported to avoid possible data corruption
-              MSB of ee_len field of unwritten extent is used as only a flag. It
-              was mistakenly treated as extent length (block numbers) in V0.60
-   12, FIXME: Manually clear file to zero for indirect-block file that is newly
-              created but not yet written
-   13, Renaming supported: with names only diffs in lower or upper cases
-   14, I/o path revised to correctly handle ValidDataLength & unwritten holes
-   15, e2fsprogs utils for Windows (e2fsck, mke2fs, tune2fs, debugfs) included
+    1, FIXME: STEAM game cache (data) validation failures
+    2, FIXME: WDK sources compiling random failures
 
-
-Supported Ext3/4 features by 0.61:
+Supported Ext3/4 features by 0.62:
 
     1, flexible inode size: > 128 bytes, up to block size
     2, dir_index:    htree directory index
