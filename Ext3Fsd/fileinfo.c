@@ -856,6 +856,11 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                     EndOfFile.QuadPart = Fcb->Header.FileSize.QuadPart;
                 }
 
+                if (EndOfFile.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
+                    Fcb->Header.ValidDataLength.QuadPart = EndOfFile.QuadPart;
+                    NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
+                }
+
                 __leave;
             }
 
@@ -873,6 +878,20 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                              );
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
                 SetLongFlag(Fcb->Flags, FCB_ALLOC_IN_SETINFO);
+
+                if (NT_SUCCESS(Status)) {
+
+                    if (CcIsFileCached(FileObject)) {
+                        CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
+                    }
+
+                    if (Fcb->Header.ValidDataLength.QuadPart < EndOfFile.QuadPart &&
+                        Fcb->Header.ValidDataLength.QuadPart < Fcb->Header.AllocationSize.QuadPart ) {
+                        Ext2ZeroData(IrpContext, Vcb, FileObject, &Fcb->Header.ValidDataLength,
+                                     &Fcb->Header.AllocationSize);
+                    }
+                }
+
 
             } else if (NewSize.QuadPart == OldSize.QuadPart) {
 
@@ -923,8 +942,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             if (NT_SUCCESS(Status)) {
 
                 Fcb->Header.FileSize.QuadPart = Mcb->Inode.i_size = EndOfFile.QuadPart;
-                if (Fcb->Header.ValidDataLength.QuadPart > Fcb->Header.FileSize.QuadPart)
-                    Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
+                Fcb->Header.ValidDataLength = Fcb->Header.FileSize;
 
                 if (Fcb->Header.FileSize.QuadPart >= 0x80000000 &&
                         !IsFlagOn(SUPER_BLOCK->s_feature_ro_compat, EXT2_FEATURE_RO_COMPAT_LARGE_FILE)) {
@@ -937,11 +955,11 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 NotifyFilter = FILE_NOTIFY_CHANGE_SIZE;
             }
 
-            Ext2SaveInode( IrpContext, Vcb, &Mcb->Inode);
-
             if (CcIsFileCached(FileObject)) {
                 CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
             }
+
+            Ext2SaveInode( IrpContext, Vcb, &Mcb->Inode);
 
             DEBUG(DL_IO, ("Ext2SetInformation: FileEndOfFileInformation %wZ EndofFile=%I64xh "
                           "AllocatieonSize=%I64xh FileSize=%I64xh VDL=%I64xh i_size=%I64xh status = %xh\n",
@@ -965,14 +983,15 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             NewVDL = FVDL->ValidDataLength;
-            if ((NewVDL.QuadPart < Fcb->Header.ValidDataLength.QuadPart) ||
-                (NewVDL.QuadPart > Fcb->Header.FileSize.QuadPart)) {
+            if ((NewVDL.QuadPart < Fcb->Header.ValidDataLength.QuadPart)) {
                 Status = STATUS_INVALID_PARAMETER;
                 __leave;
             }
+            if (NewVDL.QuadPart > Fcb->Header.FileSize.QuadPart)
+                NewVDL = Fcb->Header.FileSize;
 
             if (!MmCanFileBeTruncated(FileObject->SectionObjectPointer,
-                                      &FVDL->ValidDataLength)) {
+                                      &NewVDL)) {
                 Status = STATUS_USER_MAPPED_FILE;
                 __leave;
             }
