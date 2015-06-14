@@ -211,15 +211,15 @@ Ext2WriteVolume (IN PEXT2_IRP_CONTEXT IrpContext)
 {
     NTSTATUS            Status = STATUS_UNSUCCESSFUL;
 
-    PEXT2_VCB           Vcb;
-    PEXT2_CCB           Ccb;
-    PEXT2_FCBVCB        FcbOrVcb;
-    PFILE_OBJECT        FileObject;
+    PEXT2_VCB           Vcb = NULL;
+    PEXT2_CCB           Ccb = NULL;
+    PEXT2_FCBVCB        FcbOrVcb = NULL;
+    PFILE_OBJECT        FileObject = NULL;
 
-    PDEVICE_OBJECT      DeviceObject;
+    PDEVICE_OBJECT      DeviceObject = NULL;
 
     PIRP                Irp = NULL;
-    PIO_STACK_LOCATION  IoStackLocation;
+    PIO_STACK_LOCATION  IoStackLocation = NULL;
 
     ULONG               Length;
     LARGE_INTEGER       ByteOffset;
@@ -732,16 +732,16 @@ Ext2WriteInode (
 NTSTATUS
 Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
 {
-    PEXT2_VCB           Vcb;
-    PEXT2_FCB           Fcb;
-    PEXT2_CCB           Ccb;
-    PFILE_OBJECT        FileObject;
+    PEXT2_VCB           Vcb = NULL;
+    PEXT2_FCB           Fcb = NULL;
+    PEXT2_CCB           Ccb = NULL;
+    PFILE_OBJECT        FileObject = NULL;
 
-    PDEVICE_OBJECT      DeviceObject;
+    PDEVICE_OBJECT      DeviceObject = NULL;
 
-    PIRP                Irp;
-    PIO_STACK_LOCATION  IoStackLocation;
-    PUCHAR              Buffer;
+    PIRP                Irp = NULL;
+    PIO_STACK_LOCATION  IoStackLocation = NULL;
+    PUCHAR              Buffer = NULL;
 
     LARGE_INTEGER       ByteOffset;
     ULONG               ReturnedLength = 0;

@@ -500,13 +500,13 @@ Ext2QueryDirectory (IN PEXT2_IRP_CONTEXT IrpContext)
 {
     PDEVICE_OBJECT          DeviceObject;
     NTSTATUS                Status = STATUS_UNSUCCESSFUL;
-    PEXT2_VCB               Vcb;
-    PFILE_OBJECT            FileObject;
-    PEXT2_FCB               Fcb;
-    PEXT2_MCB               Mcb;
-    PEXT2_CCB               Ccb;
-    PIRP                    Irp;
-    PIO_STACK_LOCATION      IoStackLocation;
+    PEXT2_VCB               Vcb = NULL;
+    PFILE_OBJECT            FileObject = NULL;
+    PEXT2_FCB               Fcb = NULL;
+    PEXT2_MCB               Mcb = NULL;
+    PEXT2_CCB               Ccb = NULL;
+    PIRP                    Irp = NULL;
+    PIO_STACK_LOCATION      IoStackLocation = NULL;
 
     ULONG                   Length;
     ULONG                   FileIndex;
@@ -1007,12 +1007,12 @@ Ext2NotifyChangeDirectory (
     PDEVICE_OBJECT      DeviceObject;
     BOOLEAN             CompleteRequest = TRUE;
     NTSTATUS            Status = STATUS_UNSUCCESSFUL;
-    PEXT2_VCB           Vcb;
-    PFILE_OBJECT        FileObject;
-    PEXT2_FCB           Fcb;
-    PEXT2_CCB           Ccb;
-    PIRP                Irp;
+    PEXT2_VCB           Vcb = NULL;
+    PEXT2_FCB           Fcb = NULL;
+    PEXT2_CCB           Ccb = NULL;
+    PIRP                Irp = NULL;
     PIO_STACK_LOCATION  IrpSp;
+    PFILE_OBJECT        FileObject;
     ULONG               CompletionFilter;
     BOOLEAN             WatchTree;
 

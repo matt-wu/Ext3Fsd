@@ -14,7 +14,8 @@
 /* INCLUDES *************************************************************/
 #include <linux/module.h>
 #include <ntdddisk.h>
-#include "stdio.h"
+#include <stdio.h>
+#include <time.h>
 #include <string.h>
 #include <linux/ext2_fs.h>
 #include <linux/ext3_fs.h>

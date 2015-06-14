@@ -18,9 +18,11 @@ PEXT2_GLOBAL    Ext2Global   = NULL;
 /*
  *   Ext2Fsd version, building date/time
  */
+
 CHAR            gVersion[]   = EXT2FSD_VERSION;
 CHAR            gTime[] = __TIME__;
 CHAR            gDate[] = __DATE__;
+
 
 /* DEFINITIONS ***********************************************************/
 
@@ -415,8 +417,8 @@ DriverEntry (
         " Free"
 #endif
         " -- "
-        __DATE__" "
-        __TIME__".\n");
+        __DATE__ " "
+        __TIME__ ".\n");
 
     DEBUG(DL_FUN, ( "Ext2 DriverEntry ...\n"));
 

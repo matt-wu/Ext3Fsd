@@ -28,11 +28,11 @@ Ext2Close (IN PEXT2_IRP_CONTEXT IrpContext)
     PDEVICE_OBJECT  DeviceObject;
     NTSTATUS        Status = STATUS_SUCCESS;
     PEXT2_VCB       Vcb = NULL;
-    BOOLEAN         VcbResourceAcquired = FALSE;
     PFILE_OBJECT    FileObject;
-    PEXT2_FCB       Fcb;
+    PEXT2_FCB       Fcb = NULL;
+    PEXT2_CCB       Ccb = NULL;
+    BOOLEAN         VcbResourceAcquired = FALSE;
     BOOLEAN         FcbResourceAcquired = FALSE;
-    PEXT2_CCB       Ccb;
     BOOLEAN         bDeleteVcb = FALSE;
     BOOLEAN         bBeingClosed = FALSE;
     BOOLEAN         bSkipLeave = FALSE;

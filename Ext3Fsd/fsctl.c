@@ -137,7 +137,7 @@ Ext2LockVolume (IN PEXT2_IRP_CONTEXT IrpContext)
 {
     PIO_STACK_LOCATION IrpSp;
     PDEVICE_OBJECT  DeviceObject;
-    PEXT2_VCB       Vcb;
+    PEXT2_VCB       Vcb = NULL;
     NTSTATUS        Status;
     BOOLEAN VcbResourceAcquired = FALSE;
 
@@ -242,10 +242,10 @@ Ext2UnlockVolume (
     IN PEXT2_IRP_CONTEXT IrpContext
 )
 {
-    PIO_STACK_LOCATION IrpSp;
-    PDEVICE_OBJECT  DeviceObject;
+    PIO_STACK_LOCATION IrpSp = NULL;
+    PDEVICE_OBJECT  DeviceObject = NULL;
+    PEXT2_VCB       Vcb = NULL;
     NTSTATUS        Status;
-    PEXT2_VCB       Vcb;
     BOOLEAN         VcbResourceAcquired = FALSE;
 
     __try {
@@ -1889,7 +1889,7 @@ Ext2DismountVolume (IN PEXT2_IRP_CONTEXT IrpContext)
 {
     PDEVICE_OBJECT  DeviceObject;
     NTSTATUS        Status = STATUS_UNSUCCESSFUL;
-    PEXT2_VCB       Vcb;
+    PEXT2_VCB       Vcb = NULL;
     BOOLEAN         VcbResourceAcquired = FALSE;
 
     __try {

@@ -1,0 +1,835 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="FAQ.txt" />
+    <None Include="notes.txt" />
+    <None Include="readme.txt" />
+    <None Include="TODO.txt" />
+    <None Include="FAQ.txt" />
+    <None Include="notes.txt" />
+    <None Include="readme.txt" />
+    <None Include="TODO.txt" />
+    <None Include="FAQ.txt" />
+    <None Include="notes.txt" />
+    <None Include="readme.txt" />
+    <None Include="TODO.txt" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="*.def;*.bat;*.hpj;*.asmx" />
+    <None Include="*.def;*.bat;*.hpj;*.asmx" />
+    <None Include="*.def;*.bat;*.hpj;*.asmx" />
+    <None Include="*.def;*.bat;*.hpj;*.asmx" />
+    <None Include="*.def;*.bat;*.hpj;*.asmx" />
+    <None Include="*.def;*.bat;*.hpj;*.asmx" />
+    <None Include="*.def;*.bat;*.hpj;*.asmx" />
+    <None Include="*.def;*.bat;*.hpj;*.asmx" />
+    <None Include="ext3\MAKEFILE">
+      <Filter>ext3</Filter>
+    </None>
+    <None Include="ext3\sources">
+      <Filter>ext3</Filter>
+    </None>
+    <None Include="FAQ.txt" />
+    <None Include="notes.txt" />
+    <None Include="readme.txt" />
+    <None Include="TODO.txt" />
+    <None Include="FAQ.txt" />
+    <None Include="notes.txt" />
+    <None Include="readme.txt" />
+    <None Include="TODO.txt" />
+    <None Include="FAQ.txt" />
+    <None Include="notes.txt" />
+    <None Include="readme.txt" />
+    <None Include="TODO.txt" />
+    <None Include="FAQ.txt" />
+    <None Include="notes.txt" />
+    <None Include="readme.txt" />
+    <None Include="TODO.txt" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
+    <None Include="ext4\MAKEFILE">
+      <Filter>ext4</Filter>
+    </None>
+    <None Include="ext4\Sources">
+      <Filter>ext4</Filter>
+    </None>
+    <None Include="COPYRIGHT.TXT">
+      <Filter>documents</Filter>
+    </None>
+    <None Include="FAQ.txt" />
+    <None Include="notes.txt" />
+    <None Include="readme.txt" />
+    <None Include="TODO.txt" />
+    <None Include="COPYRIGHT.TXT">
+      <Filter>documents</Filter>
+    </None>
+    <None Include="FAQ.txt" />
+    <None Include="notes.txt" />
+    <None Include="readme.txt" />
+    <None Include="TODO.txt" />
+    <None Include="COPYRIGHT.TXT">
+      <Filter>documents</Filter>
+    </None>
+    <None Include="FAQ.txt" />
+    <None Include="notes.txt" />
+    <None Include="readme.txt" />
+    <None Include="TODO.txt" />
+    <None Include="COPYRIGHT.TXT">
+      <Filter>documents</Filter>
+    </None>
+    <None Include="FAQ.txt" />
+    <None Include="notes.txt" />
+    <None Include="readme.txt" />
+    <None Include="TODO.txt" />
+    <None Include="DIRS" />
+    <None Include="jbd\MAKEFILE">
+      <Filter>jbd</Filter>
+    </None>
+    <None Include="jbd\sources">
+      <Filter>jbd</Filter>
+    </None>
+    <None Include="nls\MAKEFILE">
+      <Filter>nls</Filter>
+    </None>
+    <None Include="nls\sources">
+      <Filter>nls</Filter>
+    </None>
+    <None Include="sys\MAKEFILE">
+      <Filter>sys</Filter>
+    </None>
+    <None Include="sys\sources">
+      <Filter>sys</Filter>
+    </None>
+    <None Include="TODO.txt">
+      <Filter>documents</Filter>
+    </None>
+    <None Include="notes.txt">
+      <Filter>documents</Filter>
+    </None>
+    <None Include="FAQ.txt">
+      <Filter>documents</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="ext3">
+      <UniqueIdentifier>{9472ae84-72f8-4a0c-b1f5-facadbe76b0f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext4">
+      <UniqueIdentifier>{621bab59-4de9-4263-8c8c-3fdece60e4e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="jbd">
+      <UniqueIdentifier>{3715f6b2-0195-4dd9-88fc-9360096c01e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="nls">
+      <UniqueIdentifier>{38546a89-db96-4e30-a960-19e384235eaa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="inc">
+      <UniqueIdentifier>{863c3530-1902-490b-b3e0-4d6e1f4bc8a4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="sys">
+      <UniqueIdentifier>{5db68b79-6dcb-4030-ab0d-25689366ecac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="inc\asm">
+      <UniqueIdentifier>{3e13b5bf-2352-4bf4-9c88-a9dc82f40068}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="inc\linux">
+      <UniqueIdentifier>{ee6107a6-737e-48a4-bc5e-d8ad435b7585}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="documents">
+      <UniqueIdentifier>{698db3f2-13ae-4242-86c4-d029338ca26f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\common.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ext2fs.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ntifs.gnu.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="include\resource.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asm\page.h">
+      <Filter>inc\asm</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asm\semaphore.h">
+      <Filter>inc\asm</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asm\uaccess.h">
+      <Filter>inc\asm</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\atomic.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\bit_spinlock.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\bitops.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\buffer_head.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\config.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\debugfs.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\errno.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\Ext2_fs.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\ext3_fs.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\ext3_fs_i.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\ext3_fs_sb.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\ext3_jbd.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\ext4.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\ext4_ext.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\ext4_jbd2.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\freezer.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\fs.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\group.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\highmem.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\init.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\jbd.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\journal-head.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\kernel.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\kthread.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\list.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\lockdep.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\log2.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\magic.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\mm.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\module.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\mutex.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\nls.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\pagemap.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\poison.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\proc_fs.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\rbtree.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\sched.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\slab.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\spinlock.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\stddef.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\string.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\time.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\timer.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\types.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+    <ClInclude Include="include\linux\version.h">
+      <Filter>inc\linux</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ext3\generic.c">
+      <Filter>ext3</Filter>
+    </ClCompile>
+    <ClCompile Include="ext3\htree.c">
+      <Filter>ext3</Filter>
+    </ClCompile>
+    <ClCompile Include="ext3\indirect.c">
+      <Filter>ext3</Filter>
+    </ClCompile>
+    <ClCompile Include="ext3\recover.c">
+      <Filter>ext3</Filter>
+    </ClCompile>
+    <ClCompile Include="ext4\ext4_bh.c">
+      <Filter>ext4</Filter>
+    </ClCompile>
+    <ClCompile Include="ext4\ext4_extents.c">
+      <Filter>ext4</Filter>
+    </ClCompile>
+    <ClCompile Include="ext4\ext4_jbd2.c">
+      <Filter>ext4</Filter>
+    </ClCompile>
+    <ClCompile Include="ext4\extents.c">
+      <Filter>ext4</Filter>
+    </ClCompile>
+    <ClCompile Include="block.c" />
+    <ClCompile Include="cleanup.c" />
+    <ClCompile Include="close.c" />
+    <ClCompile Include="cmcb.c" />
+    <ClCompile Include="create.c" />
+    <ClCompile Include="debug.c" />
+    <ClCompile Include="devctl.c" />
+    <ClCompile Include="dirctl.c" />
+    <ClCompile Include="dispatch.c" />
+    <ClCompile Include="except.c" />
+    <ClCompile Include="fastio.c" />
+    <ClCompile Include="fileinfo.c" />
+    <ClCompile Include="flush.c" />
+    <ClCompile Include="fsctl.c" />
+    <ClCompile Include="init.c" />
+    <ClCompile Include="linux.c" />
+    <ClCompile Include="lock.c" />
+    <ClCompile Include="memory.c" />
+    <ClCompile Include="misc.c" />
+    <ClCompile Include="nls.c" />
+    <ClCompile Include="pnp.c" />
+    <ClCompile Include="rbtree.c" />
+    <ClCompile Include="read.c" />
+    <ClCompile Include="shutdown.c" />
+    <ClCompile Include="volinfo.c" />
+    <ClCompile Include="write.c" />
+    <ClCompile Include="jbd\recovery.c">
+      <Filter>jbd</Filter>
+    </ClCompile>
+    <ClCompile Include="jbd\replay.c">
+      <Filter>jbd</Filter>
+    </ClCompile>
+    <ClCompile Include="jbd\revoke.c">
+      <Filter>jbd</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_ascii.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_base.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp437.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp737.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp775.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp850.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp852.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp855.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp857.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp860.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp861.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp862.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp863.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp864.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp865.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp866.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp869.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp874.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp932.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp936.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp949.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp950.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp1250.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp1251.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_cp1255.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_euc-jp.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_iso8859-1.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_iso8859-2.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_iso8859-3.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_iso8859-4.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_iso8859-5.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_iso8859-6.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_iso8859-7.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_iso8859-9.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_iso8859-13.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_iso8859-14.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_iso8859-15.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_koi8-r.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_koi8-ru.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_koi8-u.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+    <ClCompile Include="nls\nls_utf8.c">
+      <Filter>nls</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ext3fsd.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="FAQ.txt">
+      <Filter>documents</Filter>
+    </Text>
+    <Text Include="notes.txt">
+      <Filter>documents</Filter>
+    </Text>
+    <Text Include="readme.txt">
+      <Filter>documents</Filter>
+    </Text>
+    <Text Include="TODO.txt">
+      <Filter>documents</Filter>
+    </Text>
+  </ItemGroup>
+</Project>

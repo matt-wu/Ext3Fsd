@@ -1,0 +1,616 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Win8.1 Debug|Win32">
+      <Configuration>Win8.1 Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win8 Debug|Win32">
+      <Configuration>Win8 Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win7 Debug|Win32">
+      <Configuration>Win7 Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win8.1 Release|Win32">
+      <Configuration>Win8.1 Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win8 Release|Win32">
+      <Configuration>Win8 Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win7 Release|Win32">
+      <Configuration>Win7 Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win8.1 Debug|x64">
+      <Configuration>Win8.1 Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win8 Debug|x64">
+      <Configuration>Win8 Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win7 Debug|x64">
+      <Configuration>Win7 Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win8.1 Release|x64">
+      <Configuration>Win8.1 Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win8 Release|x64">
+      <Configuration>Win8 Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win7 Release|x64">
+      <Configuration>Win7 Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{436B9F7D-EE22-44BB-837A-EA319A14BA35}</ProjectGuid>
+    <RootNamespace>$(MSBuildProjectName)</RootNamespace>
+    <Configuration Condition="'$(Configuration)' == ''">Win8.1 Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">Win32</Platform>
+    <SampleGuid>{E03CD624-F999-4AC6-8742-6FE38CE413F2}</SampleGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win7 Release|x64'">
+    <TargetVersion>Win7</TargetVersion>
+    <UseDebugLibraries>False</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <DriverType>WDM</DriverType>
+    <ConfigurationType>Driver</ConfigurationType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win8 Release|x64'">
+    <TargetVersion>Win8</TargetVersion>
+    <UseDebugLibraries>False</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <DriverType>WDM</DriverType>
+    <ConfigurationType>Driver</ConfigurationType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|x64'">
+    <TargetVersion>WindowsV6.3</TargetVersion>
+    <UseDebugLibraries>False</UseDebugLibraries>
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|x64'">
+    <TargetVersion>Win7</TargetVersion>
+    <UseDebugLibraries>True</UseDebugLibraries>
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'">
+    <TargetVersion>Win8</TargetVersion>
+    <UseDebugLibraries>True</UseDebugLibraries>
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|x64'">
+    <TargetVersion>WindowsV6.3</TargetVersion>
+    <UseDebugLibraries>True</UseDebugLibraries>
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win7 Release|Win32'">
+    <TargetVersion>Win7</TargetVersion>
+    <UseDebugLibraries>False</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win8 Release|Win32'">
+    <TargetVersion>Win8</TargetVersion>
+    <UseDebugLibraries>False</UseDebugLibraries>
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|Win32'">
+    <TargetVersion>WindowsV6.3</TargetVersion>
+    <UseDebugLibraries>False</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>WDM</DriverType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|Win32'">
+    <TargetVersion>Win7</TargetVersion>
+    <UseDebugLibraries>True</UseDebugLibraries>
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|Win32'">
+    <TargetVersion>Win8</TargetVersion>
+    <UseDebugLibraries>True</UseDebugLibraries>
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|Win32'">
+    <TargetVersion>WindowsV6.3</TargetVersion>
+    <UseDebugLibraries>True</UseDebugLibraries>
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <ALLOW_DATE_TIME>1</ALLOW_DATE_TIME>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <OutDir>$(IntDir)</OutDir>
+  </PropertyGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win7 Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win8 Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win7 Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win8 Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ItemGroup Label="WrappedTaskItems">
+    <ClCompile Include="block.c" />
+    <ClCompile Include="cleanup.c" />
+    <ClCompile Include="close.c" />
+    <ClCompile Include="cmcb.c" />
+    <ClCompile Include="create.c" />
+    <ClCompile Include="debug.c" />
+    <ClCompile Include="devctl.c" />
+    <ClCompile Include="dirctl.c" />
+    <ClCompile Include="dispatch.c" />
+    <ClCompile Include="except.c" />
+    <ClCompile Include="ext3\generic.c" />
+    <ClCompile Include="ext3\htree.c" />
+    <ClCompile Include="ext3\indirect.c" />
+    <ClCompile Include="ext3\recover.c" />
+    <ClCompile Include="ext4\ext4_bh.c" />
+    <ClCompile Include="ext4\ext4_extents.c" />
+    <ClCompile Include="ext4\ext4_jbd2.c" />
+    <ClCompile Include="ext4\extents.c" />
+    <ClCompile Include="fastio.c" />
+    <ClCompile Include="fileinfo.c" />
+    <ClCompile Include="flush.c" />
+    <ClCompile Include="fsctl.c" />
+    <ClCompile Include="init.c" />
+    <ClCompile Include="jbd\recovery.c" />
+    <ClCompile Include="jbd\replay.c" />
+    <ClCompile Include="jbd\revoke.c" />
+    <ClCompile Include="linux.c" />
+    <ClCompile Include="lock.c" />
+    <ClCompile Include="memory.c" />
+    <ClCompile Include="misc.c" />
+    <ClCompile Include="nls.c" />
+    <ClCompile Include="nls\nls_ascii.c" />
+    <ClCompile Include="nls\nls_base.c" />
+    <ClCompile Include="nls\nls_cp1250.c" />
+    <ClCompile Include="nls\nls_cp1251.c" />
+    <ClCompile Include="nls\nls_cp1255.c" />
+    <ClCompile Include="nls\nls_cp437.c" />
+    <ClCompile Include="nls\nls_cp737.c" />
+    <ClCompile Include="nls\nls_cp775.c" />
+    <ClCompile Include="nls\nls_cp850.c" />
+    <ClCompile Include="nls\nls_cp852.c" />
+    <ClCompile Include="nls\nls_cp855.c" />
+    <ClCompile Include="nls\nls_cp857.c" />
+    <ClCompile Include="nls\nls_cp860.c" />
+    <ClCompile Include="nls\nls_cp861.c" />
+    <ClCompile Include="nls\nls_cp862.c" />
+    <ClCompile Include="nls\nls_cp863.c" />
+    <ClCompile Include="nls\nls_cp864.c" />
+    <ClCompile Include="nls\nls_cp865.c" />
+    <ClCompile Include="nls\nls_cp866.c" />
+    <ClCompile Include="nls\nls_cp869.c" />
+    <ClCompile Include="nls\nls_cp874.c" />
+    <ClCompile Include="nls\nls_cp932.c" />
+    <ClCompile Include="nls\nls_cp936.c" />
+    <ClCompile Include="nls\nls_cp949.c" />
+    <ClCompile Include="nls\nls_cp950.c" />
+    <ClCompile Include="nls\nls_euc-jp.c" />
+    <ClCompile Include="nls\nls_iso8859-1.c" />
+    <ClCompile Include="nls\nls_iso8859-13.c" />
+    <ClCompile Include="nls\nls_iso8859-14.c" />
+    <ClCompile Include="nls\nls_iso8859-15.c" />
+    <ClCompile Include="nls\nls_iso8859-2.c" />
+    <ClCompile Include="nls\nls_iso8859-3.c" />
+    <ClCompile Include="nls\nls_iso8859-4.c" />
+    <ClCompile Include="nls\nls_iso8859-5.c" />
+    <ClCompile Include="nls\nls_iso8859-6.c" />
+    <ClCompile Include="nls\nls_iso8859-7.c" />
+    <ClCompile Include="nls\nls_iso8859-9.c" />
+    <ClCompile Include="nls\nls_koi8-r.c" />
+    <ClCompile Include="nls\nls_koi8-ru.c" />
+    <ClCompile Include="nls\nls_koi8-u.c" />
+    <ClCompile Include="nls\nls_utf8.c" />
+    <ClCompile Include="pnp.c" />
+    <ClCompile Include="rbtree.c" />
+    <ClCompile Include="read.c" />
+    <ClCompile Include="shutdown.c" />
+    <ClCompile Include="volinfo.c" />
+    <ClCompile Include="write.c" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|x64'">
+    <TargetName>ext3fsd</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|x64'">
+    <TargetName>ext3fsd</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|x64'">
+    <TargetName>ext3fsd</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|x64'">
+    <TargetName>ext3fsd</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'">
+    <TargetName>ext3fsd</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|x64'">
+    <TargetName>ext3fsd</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|Win32'">
+    <TargetName>ext3fsd</TargetName>
+    <TargetExt>.sys</TargetExt>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|Win32'">
+    <TargetName>ext3fsd</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|Win32'">
+    <TargetName>ext3fsd</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|Win32'">
+    <TargetName>ext3fsd</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|Win32'">
+    <TargetName>ext3fsd</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|Win32'">
+    <TargetName>ext3fsd</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|x64'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level1</WarningLevel>
+      <ShowIncludes>false</ShowIncludes>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|x64'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|x64'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|x64'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|x64'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|Win32'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+      <CompileAs>
+      </CompileAs>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|Win32'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|Win32'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|Win32'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|Win32'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|Win32'">
+    <ClCompile>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <AdditionalIncludeDirectories>./include;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__KERNEL__;__X86_=1;i386=1;STD_CALL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <WarningLevel>Level1</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <Inf Exclude="@(Inf)" Include="*.inf" />
+    <FilesToPackage Include="$(TargetPath)" Condition="'$(ConfigurationType)'=='Driver' or '$(ConfigurationType)'=='DynamicLibrary'" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="COPYRIGHT.TXT" />
+    <None Include="DIRS" />
+    <None Include="jbd\MAKEFILE" />
+    <None Include="jbd\sources" />
+    <None Include="nls\MAKEFILE" />
+    <None Include="nls\sources" />
+    <None Include="sys\MAKEFILE" />
+    <None Include="sys\sources" />
+    <None Exclude="@(None)" Include="*.ico;*.cur;*.bmp;*.dlg;*.rct;*.gif;*.jpg;*.jpeg;*.wav;*.jpe;*.tiff;*.tif;*.png;*.rc2" />
+    <None Include="ext3\MAKEFILE" />
+    <None Include="ext3\sources" />
+    <None Include="ext4\MAKEFILE" />
+    <None Include="ext4\Sources" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Exclude="@(ClInclude)" Include="*.h;*.hpp;*.hxx;*.hm;*.inl;*.xsd" />
+    <ClInclude Include="include\asm\page.h" />
+    <ClInclude Include="include\asm\semaphore.h" />
+    <ClInclude Include="include\asm\uaccess.h" />
+    <ClInclude Include="include\common.h" />
+    <ClInclude Include="include\ext2fs.h" />
+    <ClInclude Include="include\linux\atomic.h" />
+    <ClInclude Include="include\linux\bitops.h" />
+    <ClInclude Include="include\linux\bit_spinlock.h" />
+    <ClInclude Include="include\linux\buffer_head.h" />
+    <ClInclude Include="include\linux\config.h" />
+    <ClInclude Include="include\linux\debugfs.h" />
+    <ClInclude Include="include\linux\errno.h" />
+    <ClInclude Include="include\linux\Ext2_fs.h" />
+    <ClInclude Include="include\linux\ext3_fs.h" />
+    <ClInclude Include="include\linux\ext3_fs_i.h" />
+    <ClInclude Include="include\linux\ext3_fs_sb.h" />
+    <ClInclude Include="include\linux\ext3_jbd.h" />
+    <ClInclude Include="include\linux\ext4.h" />
+    <ClInclude Include="include\linux\ext4_ext.h" />
+    <ClInclude Include="include\linux\ext4_jbd2.h" />
+    <ClInclude Include="include\linux\freezer.h" />
+    <ClInclude Include="include\linux\fs.h" />
+    <ClInclude Include="include\linux\group.h" />
+    <ClInclude Include="include\linux\highmem.h" />
+    <ClInclude Include="include\linux\init.h" />
+    <ClInclude Include="include\linux\jbd.h" />
+    <ClInclude Include="include\linux\journal-head.h" />
+    <ClInclude Include="include\linux\kernel.h" />
+    <ClInclude Include="include\linux\kthread.h" />
+    <ClInclude Include="include\linux\list.h" />
+    <ClInclude Include="include\linux\lockdep.h" />
+    <ClInclude Include="include\linux\log2.h" />
+    <ClInclude Include="include\linux\magic.h" />
+    <ClInclude Include="include\linux\mm.h" />
+    <ClInclude Include="include\linux\module.h" />
+    <ClInclude Include="include\linux\mutex.h" />
+    <ClInclude Include="include\linux\nls.h" />
+    <ClInclude Include="include\linux\pagemap.h" />
+    <ClInclude Include="include\linux\poison.h" />
+    <ClInclude Include="include\linux\proc_fs.h" />
+    <ClInclude Include="include\linux\rbtree.h" />
+    <ClInclude Include="include\linux\sched.h" />
+    <ClInclude Include="include\linux\slab.h" />
+    <ClInclude Include="include\linux\spinlock.h" />
+    <ClInclude Include="include\linux\stddef.h" />
+    <ClInclude Include="include\linux\string.h" />
+    <ClInclude Include="include\linux\time.h" />
+    <ClInclude Include="include\linux\timer.h" />
+    <ClInclude Include="include\linux\types.h" />
+    <ClInclude Include="include\linux\version.h" />
+    <ClInclude Include="include\ntifs.gnu.h" />
+    <ClInclude Include="include\resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ext3fsd.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="FAQ.txt" />
+    <Text Include="notes.txt" />
+    <Text Include="readme.txt" />
+    <Text Include="TODO.txt" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

@@ -368,8 +368,8 @@ Ext2FastIoQueryStandardInfo (
 {
 
     BOOLEAN     Status = FALSE;
-    PEXT2_VCB   Vcb;
-    PEXT2_FCB   Fcb;
+    PEXT2_VCB   Vcb = NULL;
+    PEXT2_FCB   Fcb = NULL;
     BOOLEAN     FcbMainResourceAcquired = FALSE;
 
     __try {

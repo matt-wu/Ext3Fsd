@@ -22,12 +22,12 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
 {
     PDEVICE_OBJECT  DeviceObject;
     NTSTATUS        Status = STATUS_SUCCESS;
-    PEXT2_VCB       Vcb;
+    PEXT2_VCB       Vcb = NULL;
     PFILE_OBJECT    FileObject;
-    PEXT2_FCB       Fcb;
-    PEXT2_CCB       Ccb;
-    PIRP            Irp;
-    PEXT2_MCB       Mcb;
+    PEXT2_FCB       Fcb = NULL;
+    PEXT2_CCB       Ccb = NULL;
+    PIRP            Irp = NULL;
+    PEXT2_MCB       Mcb = NULL;
 
 
     BOOLEAN         VcbResourceAcquired = FALSE;
