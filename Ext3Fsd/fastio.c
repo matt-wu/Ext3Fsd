@@ -302,16 +302,10 @@ Ext2FastIoQueryBasicInfo (
             } FILE_BASIC_INFORMATION, *PFILE_BASIC_INFORMATION;
             */
 
-            if (IsRoot(Fcb)) {
-                Buffer->CreationTime = Buffer->LastAccessTime =
-                                           Buffer->LastWriteTime = Buffer->ChangeTime = Ext2NtTime(0);
-            } else {
-                Buffer->CreationTime = Fcb->Mcb->CreationTime;
-                Buffer->LastAccessTime = Fcb->Mcb->LastAccessTime;
-                Buffer->LastWriteTime = Fcb->Mcb->LastWriteTime;
-                Buffer->ChangeTime = Fcb->Mcb->ChangeTime;
-            }
-
+            Buffer->CreationTime = Fcb->Mcb->CreationTime;
+            Buffer->LastAccessTime = Fcb->Mcb->LastAccessTime;
+            Buffer->LastWriteTime = Fcb->Mcb->LastWriteTime;
+            Buffer->ChangeTime = Fcb->Mcb->ChangeTime;
             Buffer->FileAttributes = Fcb->Mcb->FileAttr;
             if (Buffer->FileAttributes == 0) {
                 Buffer->FileAttributes = FILE_ATTRIBUTE_NORMAL;
@@ -950,17 +944,10 @@ Ext2FastIoQueryNetworkOpenInfo (
             PFNOI->FileAttributes = FILE_ATTRIBUTE_NORMAL;
         }
 
-        if (IsRoot(Fcb)) {
-            PFNOI->CreationTime =
-                PFNOI->LastAccessTime =
-                    PFNOI->LastWriteTime =
-                        PFNOI->ChangeTime = Ext2NtTime(0);
-        } else {
-            PFNOI->CreationTime   = Fcb->Mcb->CreationTime;
-            PFNOI->LastAccessTime = Fcb->Mcb->LastAccessTime;
-            PFNOI->LastWriteTime  = Fcb->Mcb->LastWriteTime;
-            PFNOI->ChangeTime     = Fcb->Mcb->ChangeTime;
-        }
+        PFNOI->CreationTime   = Fcb->Mcb->CreationTime;
+        PFNOI->LastAccessTime = Fcb->Mcb->LastAccessTime;
+        PFNOI->LastWriteTime  = Fcb->Mcb->LastWriteTime;
+        PFNOI->ChangeTime     = Fcb->Mcb->ChangeTime;
 
         bResult = TRUE;
 
