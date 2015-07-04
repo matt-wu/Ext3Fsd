@@ -1410,8 +1410,10 @@ Ext2AddEntry (
             ext3_inc_count(Inode);
             ext3_mark_inode_dirty(IrpContext, Inode);
 
-            *Dentry = de;
-            de = NULL;
+            if (Dentry) {
+                *Dentry = de;
+                de = NULL;
+            }
         }
 
     } __finally {

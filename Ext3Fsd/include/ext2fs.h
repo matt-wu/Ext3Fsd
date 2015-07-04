@@ -2086,6 +2086,14 @@ Ext2SetRenameInfo(
     PEXT2_CCB Ccb
 );
 
+NTSTATUS
+Ext2SetLinkInfo(
+    PEXT2_IRP_CONTEXT IrpContext,
+    PEXT2_VCB Vcb,
+    PEXT2_FCB Fcb,
+    PEXT2_CCB Ccb
+);
+
 ULONG
 Ext2InodeType(PEXT2_MCB Mcb);
 
