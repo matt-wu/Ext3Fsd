@@ -921,7 +921,7 @@ Ext2FastIoQueryNetworkOpenInfo (
               ));
 #endif
 
-        if (FileObject->FsContext2) {
+        if (!FileObject->FsContext2) {
             __leave;
         }
 
