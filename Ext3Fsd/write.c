@@ -823,8 +823,16 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             __leave;
         }
 
-        if (Nocache && ( (ByteOffset.LowPart & (SECTOR_SIZE - 1)) ||
-                         (Length & (SECTOR_SIZE - 1))) ) {
+        if (ByteOffset.LowPart == FILE_USE_FILE_POINTER_POSITION &&
+            ByteOffset.HighPart == -1) {
+            ByteOffset = FileObject->CurrentByteOffset;
+        } else if (IsWritingToEof(ByteOffset)) {
+            ByteOffset.QuadPart = Fcb->Header.FileSize.QuadPart;
+        }
+
+        if (Nocache && !PagingIo &&
+            ( (ByteOffset.LowPart & (SECTOR_SIZE - 1)) ||
+               (Length & (SECTOR_SIZE - 1))) ) {
             Status = STATUS_INVALID_PARAMETER;
             __leave;
         }
