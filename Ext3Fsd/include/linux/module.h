@@ -15,9 +15,9 @@
 
 #include <linux/types.h>
 #include <linux/errno.h>
+#include <linux/rbtree.h>
 #include <linux/fs.h>
 #include <linux/log2.h>
-#include <linux/rbtree.h>
 
 #if _WIN32_WINNT <= 0x500
 #define _WIN2K_TARGET_ 1

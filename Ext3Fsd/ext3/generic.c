@@ -273,11 +273,14 @@ void Ext2DecodeInode(struct inode *dst, struct ext3_inode *src)
     if (S_ISREG(src->i_mode)) {
         dst->i_size |= (loff_t)src->i_size_high << 32;
     }
+    dst->i_file_acl = src->i_file_acl_lo;
+    dst->i_file_acl |= (ext4_fsblk_t)src->osd2.linux2.l_i_file_acl_high << 32;
     dst->i_atime = src->i_atime;
     dst->i_ctime = src->i_ctime;
     dst->i_mtime = src->i_mtime;
     dst->i_dtime = src->i_dtime;
     dst->i_blocks = ext3_inode_blocks(src, dst);
+    dst->i_extra_isize = src->i_extra_isize;
     memcpy(&dst->i_block[0], &src->i_block[0], sizeof(__u32) * 15);
 }
 
@@ -293,10 +296,13 @@ void Ext2EncodeInode(struct ext3_inode *dst,  struct inode *src)
     if (S_ISREG(src->i_mode)) {
         dst->i_size_high = (__u32)(src->i_size >> 32);
     }
+    dst->i_file_acl_lo = (__u32)src->i_file_acl;
+    dst->osd2.linux2.l_i_file_acl_high |= (__u16)(src->i_file_acl >> 32);
     dst->i_atime = src->i_atime;
     dst->i_ctime = src->i_ctime;
     dst->i_mtime = src->i_mtime;
     dst->i_dtime = src->i_dtime;
+    dst->i_extra_isize = src->i_extra_isize;
     ASSERT(src->i_sb);
     ext3_inode_blocks_set(dst, src);
     memcpy(&dst->i_block[0], &src->i_block[0], sizeof(__u32) * 15);
