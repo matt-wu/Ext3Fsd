@@ -1152,19 +1152,17 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
         } else {
 
             if (!PagingIo && !RecursiveWriteThrough && !IsLazyWriter(Fcb)) {
-                if (ByteOffset.QuadPart + Length > Fcb->Header.ValidDataLength.QuadPart ) {
-                    if (ByteOffset.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
+                if (ByteOffset.QuadPart > Fcb->Header.ValidDataLength.QuadPart) {
 
-                        /* let this irp wait, since it has to be synchronous */
-                        SetFlag(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT);
-                        rc = Ext2ZeroData(IrpContext, Vcb, FileObject,
-                                          &Fcb->Header.ValidDataLength,
-                                          &ByteOffset);
-                        if (!rc) {
-                            Status = STATUS_PENDING;
-                            DbgBreak();
-                            __leave;
-                        }
+                    /* let this irp wait, since it has to be synchronous */
+                    SetFlag(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT);
+                    rc = Ext2ZeroData(IrpContext, Vcb, FileObject,
+                                      &Fcb->Header.ValidDataLength,
+                                      &ByteOffset);
+                    if (!rc) {
+                        Status = STATUS_PENDING;
+                        DbgBreak();
+                        __leave;
                     }
                 }
             }
