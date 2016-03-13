@@ -1888,9 +1888,9 @@ Ext2CreateInode(
     Inode.i_sb = &Vcb->sb;
     Inode.i_ino = iNo;
     Inode.i_ctime = Inode.i_mtime =
-                        Inode.i_atime = Ext2LinuxTime(SysTime);
-    Inode.i_uid = Parent->Inode->i_uid;
-    Inode.i_gid = Parent->Inode->i_gid;
+    Inode.i_atime = Ext2LinuxTime(SysTime);
+    Inode.i_uid = Vcb->uid;
+    Inode.i_gid = Vcb->gid;
     Inode.i_generation = Parent->Inode->i_generation;
     Inode.i_mode = S_IPERMISSION_MASK &
                    Parent->Inode->i_mode;
