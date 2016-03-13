@@ -2174,7 +2174,7 @@ struct buffer_head * ext3_find_entry (struct ext2_icb *icb,
         return NULL;
 
 #ifdef EXT2_HTREE_INDEX
-    if (is_dx(dir)) {
+    if (icb->MajorFunction != IRP_MJ_CREATE && is_dx(dir)) {
         bh = ext3_dx_find_entry(icb, dentry, res_dir, &err);
         /*
          * On success, or if the error was file not found,
