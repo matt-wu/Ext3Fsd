@@ -213,18 +213,24 @@ Ext2FastIoWrite (
             __leave;
         }
 
-        ExAcquireResourceSharedLite(&Fcb->MainResource, TRUE);
-        Locked = TRUE;
+        if (ExAcquireResourceExclusiveLite(&Fcb->MainResource, Wait))
+            Locked = TRUE;
+        else
+            __leave;
 
         if (IsWritingToEof(*FileOffset) ||
-            Fcb->Header.ValidDataLength.QuadPart < FileOffset->QuadPart ||
             Fcb->Header.FileSize.QuadPart < FileOffset->QuadPart + Length ) {
             Status = FALSE;
-        } else {
-            ExReleaseResourceLite(&Fcb->MainResource);
-            Locked = FALSE;
-            Status = FsRtlCopyWrite(FileObject, FileOffset, Length, Wait,
-                                    LockKey, Buffer, IoStatus, DeviceObject);
+            __leave;
+        }
+
+        Status = FsRtlCopyWrite(FileObject, FileOffset, Length, Wait,
+                                LockKey, Buffer, IoStatus, DeviceObject);
+        if (Status) {
+            if (IoStatus)
+                Length = (ULONG)IoStatus->Information;
+            if (Fcb->Header.ValidDataLength.QuadPart < FileOffset->QuadPart + Length)
+                Fcb->Header.ValidDataLength.QuadPart = FileOffset->QuadPart + Length;
         }
 
     } __finally {
