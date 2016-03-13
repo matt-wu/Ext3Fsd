@@ -805,7 +805,7 @@ struct _EXT2_MCB {
 
     // Link List Info
     PEXT2_MCB                       Parent; // Parent
-    PEXT2_MCB                       Next;   // Brothers
+    PEXT2_MCB                       Next;   // Siblings
 
     union {
         PEXT2_MCB                   Child;  // Children Mcb nodes
@@ -929,7 +929,7 @@ typedef struct _EXT2_CCB {
 #define CCB_FROM_POOL               0x00000001
 #define CCB_VOLUME_DASD_PURGE       0x00000002
 #define CCB_LAST_WRITE_UPDATED      0x00000004
-
+#define CCB_OPEN_REPARSE_POINT      0x00000008
 #define CCB_DELETE_ON_CLOSE         0x00000010
 
 #define CCB_ALLOW_EXTENDED_DASD_IO  0x80000000
@@ -1248,7 +1248,7 @@ Ext2FollowLink (
     IN PEXT2_VCB            Vcb,
     IN PEXT2_MCB            Parent,
     IN PEXT2_MCB            Mcb,
-    IN USHORT               Linkdep
+    IN ULONG                Linkdep
 );
 
 NTSTATUS
@@ -1267,6 +1267,9 @@ Ext2IsSpecialSystemFile(
     IN BOOLEAN         bDirectory
 );
 
+#define EXT2_LOOKUP_FLAG_MASK   (0xFF00000)
+#define EXT2_LOOKUP_NOT_FOLLOW  (0x8000000)
+
 NTSTATUS
 Ext2LookupFile (
     IN PEXT2_IRP_CONTEXT    IrpContext,
@@ -1274,7 +1277,7 @@ Ext2LookupFile (
     IN PUNICODE_STRING      FullName,
     IN PEXT2_MCB            Parent,
     OUT PEXT2_MCB *         Ext2Mcb,
-    IN USHORT               Linkdep
+    IN ULONG                Linkdep
 );
 
 NTSTATUS
@@ -1859,6 +1862,14 @@ Ext2AddEntry (
 );
 
 NTSTATUS
+Ext2SetFileType (
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_FCB            Dcb,
+    IN PEXT2_MCB            Mcb
+);
+
+NTSTATUS
 Ext2RemoveEntry (
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
@@ -2139,6 +2150,34 @@ Ext2Flush (IN PEXT2_IRP_CONTEXT IrpContext);
 // Fsctl.c
 //
 
+NTSTATUS
+Ext2ReadSymlink (
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_MCB            Mcb,
+    IN PVOID                Buffer,
+    IN ULONG                Size,
+    OUT PULONG              BytesRead
+    );
+
+NTSTATUS
+Ext2WriteSymlink (
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_MCB            Mcb,
+    IN PVOID                Buffer,
+    IN ULONG                Size,
+    OUT PULONG              BytesWritten
+);
+
+NTSTATUS
+Ext2TruncateSymlink(
+    PEXT2_IRP_CONTEXT IrpContext,
+    PEXT2_VCB         Vcb,
+    PEXT2_MCB         Mcb,
+    ULONG             Size
+);
+
 //
 // MountPoint process workitem
 //
@@ -2375,7 +2414,7 @@ VOID
 Ext2RemoveFcb(PEXT2_VCB Vcb, PEXT2_FCB Fcb);
 
 PEXT2_CCB
-Ext2AllocateCcb (PEXT2_MCB  SymLink);
+Ext2AllocateCcb (ULONG Flags, PEXT2_MCB SymLink);
 
 VOID
 Ext2FreeMcb (

@@ -138,8 +138,6 @@ Ext2AllocateFcb (
 {
     PEXT2_FCB Fcb;
 
-    ASSERT(!IsMcbSymLink(Mcb));
-
     Fcb = (PEXT2_FCB) ExAllocateFromNPagedLookasideList(
               &(Ext2Global->Ext2FcbLookasideList));
 
@@ -216,7 +214,7 @@ Ext2FreeFcb (IN PEXT2_FCB Fcb)
 #endif
 
     if ((Fcb->Mcb->Identifier.Type == EXT2MCB) &&
-            (Fcb->Mcb->Identifier.Size == sizeof(EXT2_MCB))) {
+        (Fcb->Mcb->Identifier.Size == sizeof(EXT2_MCB))) {
 
         ASSERT (Fcb->Mcb->Fcb == Fcb);
         if (IsMcbSpecialFile(Fcb->Mcb) || IsFileDeleted(Fcb->Mcb)) {
@@ -283,7 +281,7 @@ Ext2RemoveFcb(PEXT2_VCB Vcb, PEXT2_FCB Fcb)
 }
 
 PEXT2_CCB
-Ext2AllocateCcb (PEXT2_MCB  SymLink)
+Ext2AllocateCcb (ULONG Flags, PEXT2_MCB SymLink)
 {
     PEXT2_CCB Ccb;
 
@@ -299,6 +297,7 @@ Ext2AllocateCcb (PEXT2_MCB  SymLink)
 
     Ccb->Identifier.Type = EXT2CCB;
     Ccb->Identifier.Size = sizeof(EXT2_CCB);
+    Ccb->Flags = Flags;
 
     Ccb->SymLink = SymLink;
     if (SymLink) {

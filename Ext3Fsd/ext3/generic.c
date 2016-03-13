@@ -1433,6 +1433,69 @@ Ext2AddEntry (
 
 
 NTSTATUS
+Ext2SetFileType (
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_FCB            Dcb,
+    IN PEXT2_MCB            Mcb
+    )
+{
+    struct inode *dir = Dcb->Inode;
+    struct buffer_head *bh = NULL;
+    struct ext3_dir_entry_2 *de;
+    struct inode *inode;
+    NTSTATUS Status = STATUS_UNSUCCESSFUL;
+    BOOLEAN  MainResourceAcquired = FALSE;
+
+    if (!EXT3_HAS_INCOMPAT_FEATURE(dir->i_sb, EXT3_FEATURE_INCOMPAT_FILETYPE)) {
+        return STATUS_SUCCESS;
+    }
+
+    if (!IsDirectory(Dcb)) {
+        return STATUS_NOT_A_DIRECTORY;
+    }
+
+    ExAcquireResourceExclusiveLite(&Dcb->MainResource, TRUE);
+    MainResourceAcquired = TRUE;
+
+    __try {
+
+        Ext2ReferXcb(&Dcb->ReferenceCount);
+
+        bh = ext3_find_entry(IrpContext, Mcb->de, &de);
+        if (!bh)
+            __leave;
+
+        inode = &Mcb->Inode;
+        if (le32_to_cpu(de->inode) != inode->i_ino)
+            __leave;
+
+        ext3_set_de_type(inode->i_sb, de, inode->i_mode);
+        mark_buffer_dirty(bh);
+        
+        //if (!inode->i_nlink)
+        //    ext3_orphan_add(handle, inode);
+
+        dir->i_ctime = dir->i_mtime = ext3_current_time(dir);
+        ext3_mark_inode_dirty(IrpContext, dir);
+
+        Status = STATUS_SUCCESS;
+
+    } __finally {
+
+        Ext2DerefXcb(&Dcb->ReferenceCount);
+
+        if (MainResourceAcquired)
+            ExReleaseResourceLite(&Dcb->MainResource);
+
+        if (bh)
+            brelse(bh);
+    }
+
+    return Status;
+}
+
+NTSTATUS
 Ext2RemoveEntry (
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,

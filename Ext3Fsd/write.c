@@ -651,7 +651,7 @@ Ext2WriteInode (
     IN ULONG                Size,
     IN BOOLEAN              bDirectIo,
     OUT PULONG              BytesWritten
-)
+    )
 {
     PEXT2_EXTENT    Chain = NULL;
     NTSTATUS        Status = STATUS_UNSUCCESSFUL;
@@ -668,7 +668,7 @@ Ext2WriteInode (
                      Mcb,
                      Offset,
                      Size,
-                     IsMcbDirectory(Mcb) ? FALSE : TRUE,
+                     S_ISDIR(Mcb->Inode.i_mode) ? FALSE : TRUE,
                      &Chain
                  );
 
@@ -734,6 +734,7 @@ Ext2WriteInode (
 
     return Status;
 }
+
 
 NTSTATUS
 Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
@@ -806,7 +807,7 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
         DEBUG(DL_INF, ("Ext2WriteFile: %wZ Offset=%I64xh Length=%xh Paging=%xh Nocache=%xh\n",
                        &Fcb->Mcb->ShortName, ByteOffset.QuadPart, Length, PagingIo, Nocache));
 
-        if (IsSpecialFile(Fcb)) {
+        if (IsSpecialFile(Fcb) || IsInodeSymLink(Fcb->Inode) ) {
             Status = STATUS_INVALID_DEVICE_REQUEST;
             __leave;
         }

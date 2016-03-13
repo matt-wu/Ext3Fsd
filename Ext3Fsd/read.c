@@ -347,11 +347,9 @@ Ext2ReadInode (
 
 
         /* handle fast symlinks */
-        if (S_ISLNK(Mcb->Inode.i_mode) &&
-                Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
+        if (S_ISLNK(Mcb->Inode.i_mode) && 0 == Mcb->Inode.i_blocks) {
 
             PUCHAR Data = (PUCHAR) (&Mcb->Inode.i_block[0]);
-
             if (!Buffer) {
                 Status = STATUS_INSUFFICIENT_RESOURCES;
                 __leave;
@@ -533,6 +531,11 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
         DEBUG(DL_INF, ("Ext2ReadFile: reading %wZ Off=%I64xh Len=%xh Paging=%xh Nocache=%xh\n",
                        &Fcb->Mcb->ShortName, ByteOffset.QuadPart, Length, PagingIo, Nocache));
+
+        if (IsSpecialFile(Fcb) || IsInodeSymLink(Fcb->Inode) ) {
+            Status = STATUS_INVALID_DEVICE_REQUEST;
+            __leave;
+        }
 
         if ((IsSymLink(Fcb) && IsFileDeleted(Fcb->Mcb->Target)) ||
             IsFileDeleted(Fcb->Mcb)) {
