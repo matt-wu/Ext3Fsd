@@ -41,8 +41,13 @@
 
 /* STRUCTS & CONSTS******************************************************/
 
-#define EXT2FSD_VERSION                 "0.62"
+#define EXT2FSD_VERSION                 "0.63"
 
+
+/* WDK DEFINITIONS ******************************************************/
+
+
+/* COMPILER SWITCH / OPTIONS ********************************************/
 
 //
 // Ext2Fsd build options

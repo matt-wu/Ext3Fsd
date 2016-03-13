@@ -28,6 +28,24 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
  Revision history
 ======================
 
+48, V0.63:   2016-03-12
+
+Modifications from V0.62:
+
+Features:
+    1, Symlink (ReparsePoint) support implemented by ngkaho1234. See his
+       repository for more details: http://github.com/ngkaho1234/Ext3Fsd.git
+    2, Hard links support implemented
+    3, Win10 TH2 drive letter assignment supported
+    4, Case-insensitive-search supported (caused by dentry hash)
+    5, Peformance improvements for metadata operations
+
+Bugs fixed:
+    1, BSOD when trying to format or dismount EXT4 volumes
+    2, invalid extent content for newly created inodes
+    3, Possible data corruption (zero data) under high pressure (WDK building)
+    4, Splash screen of Ext2Mgr removed 
+
 47, V0.62:   2015-06-09
 
 Modifications from V0.61:

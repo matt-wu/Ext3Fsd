@@ -1,14 +1,25 @@
 
 ==================================
-Release Notes for Ext2Fsd V0.62
+Release Notes for Ext2Fsd V0.63
 ==================================
 
-Features implemented or bugfix since V0.61:
+Features implemented or bugfix since V0.62:
 
-    1, FIXME: STEAM game cache (data) validation failures
-    2, FIXME: WDK sources compiling random failures
+  Features:
+    1, Symlink (ReparsePoint) support implemented by ngkaho1234. See his
+       repository for more details: http://github.com/ngkaho1234/Ext3Fsd.git
+    2, Hard links support implemented
+    3, Win10 TH2 drive letter assignment supported
+    4, Case-insensitive-search supported (caused by dentry hash)
+    5, Peformance improvements for metadata operations
 
-Supported Ext3/4 features by 0.62:
+  Bugs fixed:
+    1, BSOD when trying to format or dismount EXT4 volumes
+    2, invalid extent content for newly created inodes
+    3, Possible data corruption (zero data) under high pressure (WDK building)
+    4, Splash screen of Ext2Mgr removed
+
+Supported Ext3/4 features by 0.63:
 
     1, flexible inode size: > 128 bytes, up to block size
     2, dir_index:    htree directory index
@@ -19,17 +30,17 @@ Supported Ext3/4 features by 0.62:
     7, extent:       full support with extending and shrinking.
     8, journal:      only support replay for internal journal
     9, flex_bg:      first flexible metadata group
+   10, symlink and hardlink
 
 Unsupported Ext3/4 features:
 
     1, journal: log-based operations, external journal
     2, EA (extended attributes), ACL support
-    3, symlink creation
 
 Features to be implemented in next release:
 
-    1, Reparse point support (hardlink, symbolic link etc)
-    2, mounted as given user: privilege checking with given uid & gid
+    1, mounted as given user: privilege checking with given uid & gid
+    2, EA and ACL security checking
 
 WARNINGS:
  
