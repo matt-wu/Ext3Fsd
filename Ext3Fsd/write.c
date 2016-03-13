@@ -875,10 +875,6 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             }
         }
 
-        if (IsWritingToEof(ByteOffset)) {
-            ByteOffset.QuadPart = Fcb->Header.FileSize.QuadPart;
-        }
-
         if (IsDirectory(Fcb) && !PagingIo) {
             Status = STATUS_INVALID_DEVICE_REQUEST;
             __leave;
