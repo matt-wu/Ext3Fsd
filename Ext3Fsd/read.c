@@ -568,17 +568,6 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
             __leave;
         }
 
-        if (!PagingIo && Nocache && (FileObject->SectionObjectPointer->DataSectionObject != NULL)) {
-            CcFlushCache( FileObject->SectionObjectPointer,
-                          &ByteOffset,
-                          Length,
-                          &Irp->IoStatus );
-
-            if (!NT_SUCCESS(Irp->IoStatus.Status)) {
-                __leave;
-            }
-        }
-
         ReturnedLength = Length;
 
         if (PagingIo) {
@@ -602,6 +591,15 @@ Ext2ReadFile(IN PEXT2_IRP_CONTEXT IrpContext)
                     __leave;
                 }
                 MainResourceAcquired = TRUE;
+
+                if (FileObject->SectionObjectPointer->DataSectionObject != NULL) {
+                    CcFlushCache( FileObject->SectionObjectPointer,
+                                 &ByteOffset,
+                                  Length,
+                                 &Irp->IoStatus );
+                    if (!NT_SUCCESS(Irp->IoStatus.Status))
+                        __leave;
+                }
 
             } else {
 
