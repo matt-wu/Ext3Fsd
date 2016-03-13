@@ -1511,6 +1511,10 @@ Ext2MountVolume (IN PEXT2_IRP_CONTEXT IrpContext)
         VolumeDeviceObject->StackSize = (CCHAR)(TargetDeviceObject->StackSize + 1);
         ClearFlag(VolumeDeviceObject->Flags, DO_DEVICE_INITIALIZING);
 
+/*
+        These are for buffer-address alignment requirements.
+        Never do this check, unless you want fail user requests :)
+
         if (TargetDeviceObject->AlignmentRequirement >
                 VolumeDeviceObject->AlignmentRequirement) {
 
@@ -1518,6 +1522,14 @@ Ext2MountVolume (IN PEXT2_IRP_CONTEXT IrpContext)
                 TargetDeviceObject->AlignmentRequirement;
         }
 
+        if (DiskGeometry.BytesPerSector - 1 >
+                VolumeDeviceObject->AlignmentRequirement) {
+            VolumeDeviceObject->AlignmentRequirement =
+                DiskGeometry.BytesPerSector - 1;
+            TargetDeviceObject->AlignmentRequirement =
+                DiskGeometry.BytesPerSector - 1;
+        }
+*/
         (IoStackLocation->Parameters.MountVolume.Vpb)->DeviceObject =
             VolumeDeviceObject;
         Vpb = IoStackLocation->Parameters.MountVolume.Vpb;
