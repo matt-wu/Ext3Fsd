@@ -237,8 +237,14 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                     if (Fcb->Header.ValidDataLength.QuadPart < Fcb->Header.FileSize.QuadPart) {
                         if (!INODE_HAS_EXTENT(Fcb->Inode)) {
                         #if EXT2_PRE_ALLOCATION_SUPPORT
-                            CcZeroData(FileObject, &Fcb->Header.ValidDataLength,
-                                       &Fcb->Header.AllocationSize, TRUE);
+                            __try {
+                                CcZeroData( FileObject,
+                                           &Fcb->Header.ValidDataLength,
+                                           &Fcb->Header.AllocationSize,
+                                           TRUE);
+                            } __except (EXCEPTION_EXECUTE_HANDLER) {
+                                DbgBreak();
+                            }
                         #endif
                         }
                     }

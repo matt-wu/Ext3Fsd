@@ -194,7 +194,13 @@ Ext2ZeroData (
     }
 
     /* clear data in range [Start, End) */
-    return CcZeroData(FileObject, Start, End, Ext2CanIWait());
+    __try {
+        rc = CcZeroData(FileObject, Start, End, Ext2CanIWait());
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        DbgBreak();
+    }
+
+    return rc;
 }
 
 VOID
