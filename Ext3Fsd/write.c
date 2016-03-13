@@ -911,18 +911,24 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
             }
             PagingIoResourceAcquired = TRUE;
 
-            if ( (ByteOffset.QuadPart + Length) > Fcb->Header.AllocationSize.QuadPart) {
+            if ( (ByteOffset.QuadPart + Length) > Fcb->Header.FileSize.QuadPart) {
 
-                if ( ByteOffset.QuadPart >= Fcb->Header.AllocationSize.QuadPart) {
+                if (ByteOffset.QuadPart >= Fcb->Header.AllocationSize.QuadPart) {
 
-                    Status = STATUS_END_OF_FILE;
+                    Status = STATUS_SUCCESS;
                     Irp->IoStatus.Information = 0;
                     __leave;
 
                 } else {
 
-                    Length = (ULONG)(Fcb->Header.AllocationSize.QuadPart - ByteOffset.QuadPart);
+                    ReturnedLength = (ULONG)(Fcb->Header.FileSize.QuadPart - ByteOffset.QuadPart);
+                    if (ByteOffset.QuadPart + Length > Fcb->Header.AllocationSize.QuadPart)
+                        Length = (ULONG)(Fcb->Header.AllocationSize.QuadPart - ByteOffset.QuadPart);
                 }
+
+            } else {
+
+                ReturnedLength = Length;
             }
 
         } else {
@@ -1057,9 +1063,9 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
                               &Fcb->Mcb->ShortName, Fcb->Header.FileSize.QuadPart,
                               Fcb->Header.AllocationSize.QuadPart));
             }
-        }
 
-        ReturnedLength = Length;
+            ReturnedLength = Length;
+        }
 
         if (!Nocache) {
 
