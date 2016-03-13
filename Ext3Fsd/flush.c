@@ -96,38 +96,47 @@ Ext2FlushFile (
     IN PEXT2_CCB            Ccb
 )
 {
-    IO_STATUS_BLOCK    IoStatus;
+    IO_STATUS_BLOCK     IoStatus;
 
     ASSERT(Fcb != NULL);
     ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
-    /* update timestamp and achieve attribute */
-    if (Ccb != NULL) {
+    __try {
 
-        if (!IsFlagOn(Ccb->Flags, CCB_LAST_WRITE_UPDATED)) {
+        /* update timestamp and achieve attribute */
+        if (Ccb != NULL) {
 
-            LARGE_INTEGER   SysTime;
-            KeQuerySystemTime(&SysTime);
+            if (!IsFlagOn(Ccb->Flags, CCB_LAST_WRITE_UPDATED)) {
 
-            Fcb->Inode->i_mtime = Ext2LinuxTime(SysTime);
-            Fcb->Mcb->LastWriteTime = Ext2NtTime(Fcb->Inode->i_mtime);
-            Ext2SaveInode(IrpContext, Fcb->Vcb, Fcb->Inode);
+                LARGE_INTEGER   SysTime;
+                KeQuerySystemTime(&SysTime);
+
+                Fcb->Inode->i_mtime = Ext2LinuxTime(SysTime);
+                Fcb->Mcb->LastWriteTime = Ext2NtTime(Fcb->Inode->i_mtime);
+                Ext2SaveInode(IrpContext, Fcb->Vcb, Fcb->Inode);
+            }
         }
+
+        if (IsDirectory(Fcb)) {
+            IoStatus.Status = STATUS_SUCCESS;
+            __leave;
+        }
+
+        DEBUG(DL_INF, ( "Ext2FlushFile: Flushing File Inode=%xh %S ...\n",
+                        Fcb->Inode->i_ino, Fcb->Mcb->ShortName.Buffer));
+
+        CcFlushCache(&(Fcb->SectionObject), NULL, 0, &IoStatus);
+        ClearFlag(Fcb->Flags, FCB_FILE_MODIFIED);
+
+    } __finally {
+
+        /* do cleanup here */
     }
-
-    if (IsDirectory(Fcb)) {
-        return STATUS_SUCCESS;
-    }
-
-    DEBUG(DL_INF, ( "Ext2FlushFile: Flushing File Inode=%xh %S ...\n",
-                    Fcb->Inode->i_ino, Fcb->Mcb->ShortName.Buffer));
-
-    CcFlushCache(&(Fcb->SectionObject), NULL, 0, &IoStatus);
-    ClearFlag(Fcb->Flags, FCB_FILE_MODIFIED);
 
     return IoStatus.Status;
 }
+
 
 NTSTATUS
 Ext2Flush (IN PEXT2_IRP_CONTEXT IrpContext)
