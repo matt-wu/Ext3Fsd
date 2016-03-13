@@ -335,7 +335,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
         if (!IsDirectory(Fcb)) {
 
             if ( IsFlagOn(FileObject->Flags, FO_CACHE_SUPPORTED) &&
-                    (Fcb->NonCachedOpenCount + 1 == Fcb->ReferenceCount) &&
+                    (Fcb->NonCachedOpenCount == Fcb->OpenHandleCount) &&
                     (Fcb->SectionObject.DataSectionObject != NULL)) {
 
                 if (!IsVcbReadOnly(Vcb)) {
@@ -343,14 +343,17 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                     ClearLongFlag(Fcb->Flags, FCB_FILE_MODIFIED);
                 }
 
-                if (ExAcquireResourceExclusiveLite(&(Fcb->PagingIoResource), TRUE)) {
-                    ExReleaseResourceLite(&(Fcb->PagingIoResource));
-                }
+                /* purge cache if all remaining openings are non-cached */
+                if (Fcb->NonCachedOpenCount > 0) {
+                    if (ExAcquireResourceExclusiveLite(&(Fcb->PagingIoResource), TRUE)) {
+                        ExReleaseResourceLite(&(Fcb->PagingIoResource));
+                    }
 
-                CcPurgeCacheSection( &Fcb->SectionObject,
-                                     NULL,
-                                     0,
-                                     FALSE );
+                    CcPurgeCacheSection( &Fcb->SectionObject,
+                                         NULL,
+                                         0,
+                                         FALSE );
+                }
             }
 
             CcUninitializeCacheMap(FileObject, NULL, NULL);
