@@ -178,7 +178,7 @@ Ext2Close (IN PEXT2_IRP_CONTEXT IrpContext)
 
         if (NT_SUCCESS(Status) && Vcb != NULL && IsVcbInited(Vcb)) {
             /* for Ext2Fsd driver open/close, Vcb is NULL */
-            if ((!bBeingClosed) && (Vcb->ReferenceCount == 0)&&
+            if ((!bBeingClosed) && (Vcb->ReferenceCount == 0) &&
                 (!IsMounted(Vcb) || IsDispending(Vcb))) {
                 bDeleteVcb = TRUE;
             }
