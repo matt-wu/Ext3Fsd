@@ -1192,20 +1192,22 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
             Irp = IrpContext->Irp;
 
-            if (NT_SUCCESS(Status) && !PagingIo && !RecursiveWriteThrough && !IsLazyWriter(Fcb)) {
+            if (NT_SUCCESS(Status) && !RecursiveWriteThrough && !IsLazyWriter(Fcb)) {
 
                 if (ByteOffset.QuadPart + Length > Fcb->Header.ValidDataLength.QuadPart ) {
 
                     FileSizesChanged = TRUE;
 
                     if (Fcb->Header.FileSize.QuadPart < ByteOffset.QuadPart + Length) {
+                        if (!PagingIo)
+                            Fcb->Header.FileSize.QuadPart = ByteOffset.QuadPart + Length;
                         Fcb->Header.ValidDataLength.QuadPart = Fcb->Header.FileSize.QuadPart;
                     } else {
                         if (Fcb->Header.ValidDataLength.QuadPart < ByteOffset.QuadPart + Length)
                             Fcb->Header.ValidDataLength.QuadPart = ByteOffset.QuadPart + Length;
                     }
 
-                    if (CcIsFileCached(FileObject)) {
+                    if (!PagingIo && CcIsFileCached(FileObject)) {
                         CcSetFileSizes(FileObject, (PCC_FILE_SIZES)(&(Fcb->Header.AllocationSize)));
                     }
 
