@@ -1743,6 +1743,9 @@ Ext2LoadGroup(IN PEXT2_VCB Vcb);
 VOID
 Ext2PutGroup(IN PEXT2_VCB Vcb);
 
+VOID
+Ext2DropGroup(IN PEXT2_VCB Vcb);
+
 BOOLEAN
 Ext2SaveGroup(
     IN PEXT2_IRP_CONTEXT    IrpContext,

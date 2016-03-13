@@ -622,7 +622,7 @@ Ext2ScanDir (
         Ext2DerefMcb(Parent);
 
         if (bh)
-            brelse(bh);
+            __brelse(bh);
 
         if (!NT_SUCCESS(Status)) {
             if (de)
@@ -665,7 +665,7 @@ NTSTATUS Ext2AddDotEntries(struct ext2_icb *icb, struct inode *dir,
 
 errorout:
     if (bh)
-        brelse (bh);
+        __brelse (bh);
 
     return Ext2WinntError(rc);
 }

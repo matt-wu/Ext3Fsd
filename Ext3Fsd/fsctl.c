@@ -2700,8 +2700,6 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
             FlushBeforePurge = FALSE;
         }
 
-        Ext2PutGroup(Vcb);
-
         FcbListEntry= NULL;
         InitializeListHead(&FcbList);
 

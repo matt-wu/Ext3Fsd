@@ -1184,7 +1184,7 @@ Ext2BuildExtents(
     NTSTATUS    Status = STATUS_SUCCESS;
 
     PEXT2_EXTENT  Extent = NULL;
-    PEXT2_EXTENT  List = *Chain;
+    PEXT2_EXTENT  List = *Chain = NULL;
 
     if (!IsZoneInited(Mcb)) {
         Status = Ext2InitializeZone(IrpContext, Vcb, Mcb);
@@ -1243,7 +1243,7 @@ Ext2BuildExtents(
                              &Mapped
                      );
             if (!NT_SUCCESS(Status)) {
-                goto errorout;
+                break;
             }
 
             /* skip wrong blocks, in case wrongly treating symlink
@@ -1269,6 +1269,11 @@ Ext2BuildExtents(
             Length = Size;
         }
 
+        if (0 == Length) {
+            DbgBreak();
+            break;
+        }
+
         Start += Mapped;
         Offset = (ULONGLONG)Start << BLOCK_BITS;
 
@@ -1285,7 +1290,8 @@ Ext2BuildExtents(
                 Extent = Ext2AllocateExtent();
                 if (!Extent) {
                     Status = STATUS_INSUFFICIENT_RESOURCES;
-                    goto errorout;
+                    DbgBreak();
+                    break;
                 }
 
                 Extent->Lba = Lba;
@@ -1300,13 +1306,15 @@ Ext2BuildExtents(
                     *Chain = List = Extent;
                 }
             }
+        } else {
+            if (bAlloc) {
+                DbgBreak();
+            }
         }
 
         Total += Length;
         Size  -= Length;
     }
-
-errorout:
 
     return Status;
 }
@@ -1796,29 +1804,23 @@ Ext2CleanupAllMcbs(PEXT2_VCB Vcb)
 BOOLEAN
 Ext2CheckSetBlock(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb, LONGLONG Block)
 {
-    PEXT2_GROUP_DESC gd;
-    ULONG           Group, dwBlk, Length;
+    PEXT2_GROUP_DESC    gd;
+    struct buffer_head *gb = NULL;
+    struct buffer_head *bh = NULL;
+    ULONG               group, dwBlk, Length;
+    RTL_BITMAP          bitmap;
+    BOOLEAN             bModified = FALSE;
 
-    RTL_BITMAP      BlockBitmap;
-    PVOID           BitmapCache;
-    PBCB            BitmapBcb;
-
-    LARGE_INTEGER   Offset;
-
-    BOOLEAN         bModified = FALSE;
-
-
-    Group = (ULONG)(Block - EXT2_FIRST_DATA_BLOCK) / BLOCKS_PER_GROUP;
+    group = (ULONG)(Block - EXT2_FIRST_DATA_BLOCK) / BLOCKS_PER_GROUP;
     dwBlk = (ULONG)(Block - EXT2_FIRST_DATA_BLOCK) % BLOCKS_PER_GROUP;
 
-    gd = ext4_get_group_desc(&Vcb->sb, Group, NULL);
+    gd = ext4_get_group_desc(&Vcb->sb, group, &gb);
     if (!gd) {
         return FALSE;
     }
-    Offset.QuadPart = ext4_block_bitmap(&Vcb->sb, gd);
-    Offset.QuadPart <<= BLOCK_BITS;
+    bh = sb_getblk(&Vcb->sb, ext4_block_bitmap(&Vcb->sb, gd));
 
-    if (Group == Vcb->sbi.s_groups_count - 1) {
+    if (group == Vcb->sbi.s_groups_count - 1) {
         Length = (ULONG)(TOTAL_BLOCKS % BLOCKS_PER_GROUP);
 
         /* s_blocks_count is integer multiple of s_blocks_per_group */
@@ -1828,43 +1830,24 @@ Ext2CheckSetBlock(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb, LONGLONG Block)
         Length = BLOCKS_PER_GROUP;
     }
 
-    if (dwBlk >= Length)
-        return FALSE;
-
-    if (!CcPinRead( Vcb->Volume,
-                    &Offset,
-                    Vcb->BlockSize,
-                    PIN_WAIT,
-                    &BitmapBcb,
-                    &BitmapCache ) ) {
-
-        DEBUG(DL_ERR, ( "Ext2CheckSetBlock: Failed to PinLock block %xh ...\n",
-                        ext4_block_bitmap(&Vcb->sb, gd)));
+    if (dwBlk >= Length) {
+        fini_bh(&gb);
+        fini_bh(&bh);
         return FALSE;
     }
 
-    RtlInitializeBitMap( &BlockBitmap,
-                         BitmapCache,
-                         Length );
 
-    if (RtlCheckBit(&BlockBitmap, dwBlk) == 0) {
+    RtlInitializeBitMap(&bitmap, (PULONG)bh->b_data, Length);
+
+    if (RtlCheckBit(&bitmap, dwBlk) == 0) {
         DbgBreak();
-        RtlSetBits(&BlockBitmap, dwBlk, 1);
+        RtlSetBits(&bitmap, dwBlk, 1);
         bModified = TRUE;
+        mark_buffer_dirty(bh);
     }
 
-    if (bModified) {
-        CcSetDirtyPinnedData(BitmapBcb, NULL );
-        Ext2AddVcbExtent(Vcb, Offset.QuadPart, (LONGLONG)BLOCK_SIZE);
-    }
-
-    {
-        CcUnpinData(BitmapBcb);
-        BitmapBcb = NULL;
-        BitmapCache = NULL;
-
-        RtlZeroMemory(&BlockBitmap, sizeof(RTL_BITMAP));
-    }
+    fini_bh(&gb);
+    fini_bh(&bh);
 
     return (!bModified);
 }
@@ -1877,8 +1860,9 @@ Ext2CheckBitmapConsistency(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb)
     for (i = 0; i < Vcb->sbi.s_groups_count; i++) {
 
         PEXT2_GROUP_DESC    gd;
+        struct buffer_head  *bh = NULL;
 
-        gd = ext4_get_group_desc(&Vcb->sb, i, NULL);
+        gd = ext4_get_group_desc(&Vcb->sb, i, &bh);
         if (!gd)
             continue;
         Ext2CheckSetBlock(IrpContext, Vcb, ext4_block_bitmap(&Vcb->sb, gd));
@@ -1896,6 +1880,8 @@ Ext2CheckBitmapConsistency(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb)
 
         for (j = 0; j < InodeBlocks; j++ )
             Ext2CheckSetBlock(IrpContext, Vcb, ext4_inode_table(&Vcb->sb, gd) + j);
+
+        fini_bh(&bh);
     }
 
     return TRUE;
@@ -2678,7 +2664,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             }
 
             if (ExtentsInitialized) {
-                Ext2PutGroup(Vcb);
+                Ext2DropGroup(Vcb);
                 if (Vcb->bd.bd_bh_cache)
                     kmem_cache_destroy(Vcb->bd.bd_bh_cache);
                 FsRtlUninitializeLargeMcb(&(Vcb->Extents));
@@ -2755,7 +2741,7 @@ Ext2DestroyVcb (IN PEXT2_VCB Vcb)
 
     Ext2CleanupAllMcbs(Vcb);
 
-    Ext2PutGroup(Vcb);
+    Ext2DropGroup(Vcb);
 
     if (Vcb->bd.bd_bh_cache)
         kmem_cache_destroy(Vcb->bd.bd_bh_cache);

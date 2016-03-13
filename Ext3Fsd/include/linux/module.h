@@ -707,7 +707,7 @@ struct buffer_head {
     unsigned long b_state;		            /* buffer state bitmap (see above) */
     struct page *b_page;                    /* the page this bh is mapped to */
     PMDL         b_mdl;                     /* MDL of the locked buffer */
-    void	*b_bcb;			    /* BCB of the buffer */
+    void	    *b_bcb;                     /* BCB of the buffer */
 
     // kdev_t b_dev;                        /* device (B_FREE = free) */
     struct block_device *b_bdev;            /* block device object */
@@ -931,6 +931,14 @@ static inline void brelse(struct buffer_head *bh)
 {
     if (bh)
         __brelse(bh);
+}
+
+static inline void fini_bh(struct buffer_head **bh)
+{
+    if (bh && *bh) {
+        brelse(*bh);
+        *bh = NULL;
+    }
 }
 
 static inline void bforget(struct buffer_head *bh)
