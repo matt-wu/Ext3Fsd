@@ -57,7 +57,7 @@ Ext2Close (IN PEXT2_IRP_CONTEXT IrpContext)
 
         if (!ExAcquireResourceExclusiveLite(
                     &Vcb->MainResource,
-                    IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) )) {
+                    TRUE )) {
             DEBUG(DL_INF, ("Ext2Close: PENDING ... Vcb: %xh/%xh\n",
                            Vcb->OpenHandleCount, Vcb->ReferenceCount));
 
@@ -118,7 +118,7 @@ Ext2Close (IN PEXT2_IRP_CONTEXT IrpContext)
 
         if (!ExAcquireResourceExclusiveLite(
                     &Fcb->MainResource,
-                    IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) )) {
+                    TRUE )) {
             Status = STATUS_PENDING;
             __leave;
         }

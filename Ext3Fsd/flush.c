@@ -189,9 +189,7 @@ Ext2Flush (IN PEXT2_IRP_CONTEXT IrpContext)
         }
 
         MainResourceAcquired =
-            ExAcquireResourceExclusiveLite(&FcbOrVcb->MainResource,
-                                           IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT));
-
+            ExAcquireResourceExclusiveLite(&FcbOrVcb->MainResource, TRUE);
         ASSERT(MainResourceAcquired);
         DEBUG(DL_INF, ("Ext2Flush-pre:  total mcb records=%u\n",
                        FsRtlNumberOfRunsInLargeMcb(&Vcb->Extents)));

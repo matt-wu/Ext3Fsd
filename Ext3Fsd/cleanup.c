@@ -75,7 +75,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
         VcbResourceAcquired =
             ExAcquireResourceExclusiveLite(
                 &Vcb->MainResource,
-                IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)
+                TRUE
             );
 
         if (Fcb->Identifier.Type == EXT2VCB) {
@@ -143,7 +143,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
         FcbResourceAcquired =
             ExAcquireResourceExclusiveLite(
                 &Fcb->MainResource,
-                IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)
+                TRUE
             );
 
         ASSERT((Ccb->Identifier.Type == EXT2CCB) &&
@@ -315,7 +315,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                 FcbResourceAcquired =
                     ExAcquireResourceExclusiveLite(
                         &Fcb->MainResource,
-                        IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT)
+                        TRUE
                     );
 
                 SetFlag(FileObject->Flags, FO_FILE_MODIFIED);
