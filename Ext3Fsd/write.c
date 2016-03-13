@@ -1213,7 +1213,7 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
         /*
          *  in case we got excpetions, we need revert MajorFunction
-         *  back to IRP_MJ_WRITE. The reason we do this, if to tell
+         *  back to IRP_MJ_WRITE. The reason we do this, is to tell
          *  Ext2ExpandFile to allocate unwritten extent or don't add
          *  new blocks for indirect files.
          */
