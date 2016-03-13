@@ -33,6 +33,7 @@ TARGETLIBS= $(TARGETLIBS)              \
 
 # The source code:
 SOURCES=    ..\Ext3fsd.rc   \
+            ..\access.c     \
             ..\fastio.c     \
             ..\memory.c     \
             ..\close.c      \

@@ -79,23 +79,6 @@
     <None Include="vm1.bat" />
     <None Include="vm2.bat" />
     <None Include="win7.bat" />
-    <None Include="auto.bat" />
-    <None Include="bscmake.bat" />
-    <None Include="bscold.bat" />
-    <None Include="clean.bat" />
-    <None Include="cp.bat" />
-    <None Include="ddkbuild.bat" />
-    <None Include="exclude.bat" />
-    <None Include="FilesChanged.bat" />
-    <None Include="mingw.bat" />
-    <None Include="odyfre.bat" />
-    <None Include="vm1.bat" />
-    <None Include="vm2.bat" />
-    <None Include="win7.bat" />
-    <None Include="FAQ.txt" />
-    <None Include="notes.txt" />
-    <None Include="readme.txt" />
-    <None Include="TODO.txt" />
     <None Include="FAQ.txt" />
     <None Include="notes.txt" />
     <None Include="readme.txt" />
@@ -182,7 +165,19 @@
     <None Include="vm1.bat" />
     <None Include="vm2.bat" />
     <None Include="win7.bat" />
-    <None Include="*.def;*.bat;*.hpj;*.asmx" />
+    <None Include="auto.bat" />
+    <None Include="bscmake.bat" />
+    <None Include="bscold.bat" />
+    <None Include="clean.bat" />
+    <None Include="cp.bat" />
+    <None Include="ddkbuild.bat" />
+    <None Include="exclude.bat" />
+    <None Include="FilesChanged.bat" />
+    <None Include="mingw.bat" />
+    <None Include="odyfre.bat" />
+    <None Include="vm1.bat" />
+    <None Include="vm2.bat" />
+    <None Include="win7.bat" />
     <None Include="*.def;*.bat;*.hpj;*.asmx" />
     <None Include="*.def;*.bat;*.hpj;*.asmx" />
     <None Include="*.def;*.bat;*.hpj;*.asmx" />
@@ -814,6 +809,7 @@
     <ClCompile Include="nls\nls_utf8.c">
       <Filter>nls</Filter>
     </ClCompile>
+    <ClCompile Include="access.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ext3fsd.rc" />

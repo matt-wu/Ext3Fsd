@@ -334,6 +334,10 @@ SOURCE=.\jbd\revoke.c
 # End Group
 # Begin Source File
 
+SOURCE=.\access.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\block.c
 # End Source File
 # Begin Source File

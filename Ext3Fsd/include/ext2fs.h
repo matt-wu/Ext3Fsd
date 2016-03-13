@@ -367,9 +367,24 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 #define Ext2SetOwnerReadOnly(m) do {(m) &= ~S_IWUSR;} while(0)
 
 #define Ext2IsOwnerWritable(m)  (((m) & S_IWUSR) == S_IWUSR)
-#define Ext2IsOwnerReadOnly(m)  (!(Ext2IsOwnerWritable(m)))
+#define Ext2IsOwnerReadable(m)  (((m) & S_IRUSR) == S_IRUSR)
+#define Ext2IsOwnerReadOnly(m)  (!(Ext2IsOwnerWritable(m)) && Ext2IsOwnerReadable(m))
+
+#define Ext2IsGroupWritable(m)  (((m) & S_IWGRP) == S_IWGRP)
+#define Ext2IsGroupReadable(m)  (((m) & S_IRGRP) == S_IRGRP)
+#define Ext2IsGroupReadOnly(m)  (!(Ext2IsGroupWritable(m)) && Ext2IsGroupReadable(m))
+
+#define Ext2IsOtherWritable(m)  (((m) & S_IWOTH) == S_IWOTH)
+#define Ext2IsOtherReadable(m)  (((m) & S_IROTH) == S_IROTH)
+#define Ext2IsOtherReadOnly(m)  (!(Ext2IsOtherWritable(m)) && Ext2IsOtherReadable(m))
 
 #define Ext2SetReadOnly(m) do {(m) &= ~(S_IWUSR | S_IWGRP | S_IWOTH);} while(0)
+
+
+#define Ext2FileCanRead         (0x1)
+#define Ext2FileCanWrite        (0x2)
+#define Ext2FileCanExecute      (0x4)
+
 
 /*
  * We need 8-bytes aligned for all the sturctures
@@ -679,6 +694,14 @@ typedef struct _EXT2_VCB {
     BOOLEAN                     bHidingSuffix;
     CHAR                        sHidingSuffix[HIDINGPAT_LEN];
 
+    /* User to impersanate */
+    uid_t                       uid;
+    gid_t                       gid;
+
+    /* User to act as */
+    uid_t                       euid;
+    gid_t                       egid;
+
     /* mountpoint: symlink to DesDevices */
     UCHAR                       DrvLetter;
 
@@ -702,6 +725,8 @@ typedef struct _EXT2_VCB {
 #define VCB_DISMOUNT_PENDING    0x00000008
 #define VCB_NEW_VPB             0x00000010
 #define VCB_BEING_CLOSED        0x00000020
+#define VCB_USER_IDS            0x00000040  /* uid/gid specified by user */
+#define VCB_USER_EIDS           0x00000080  /* euid/egid specified by user */
 
 #define VCB_FORCE_WRITING       0x00004000
 #define VCB_DEVICE_REMOVED      0x00008000
@@ -1081,6 +1106,14 @@ typedef struct _EXT2_FILLDIR_CONTEXT {
     FILE_INFORMATION_CLASS  efc_fi;
     BOOLEAN                 efc_single;
 } EXT2_FILLDIR_CONTEXT, *PEXT2_FILLDIR_CONTEXT;
+
+//
+// Access.c
+//
+
+
+int Ext2CheckInodeAccess(PEXT2_VCB Vcb, struct inode *in, int attempt);
+int Ext2CheckFileAccess (PEXT2_VCB Vcb, PEXT2_MCB Mcb, int attempt);
 
 //
 // Block.c
