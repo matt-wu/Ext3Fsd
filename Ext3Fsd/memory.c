@@ -2768,7 +2768,8 @@ Ext2DestroyVcb (IN PEXT2_VCB Vcb)
 
     if (IsFlagOn(Vcb->Flags, VCB_NEW_VPB)) {
         ASSERT(Vcb->Vpb2 != NULL);
-        Ext2FreePool(Vcb->Vpb2, TAG_VPB);
+        DEBUG(DL_DBG, ("Ext2DestroyVcb: Vpb2 to be freed: %p\n", Vcb->Vpb2));
+        ExFreePoolWithTag(Vcb->Vpb2, TAG_VPB);
         DEC_MEM_COUNT(PS_VPB, Vcb->Vpb2, sizeof(VPB));
         Vcb->Vpb2 = NULL;
     }

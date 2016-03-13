@@ -1966,11 +1966,12 @@ Ext2CheckDismount (
     BOOLEAN bDeleted = FALSE, bTearDown = FALSE;
     ULONG   UnCleanCount = 0;
 
-    NewVpb = Ext2AllocatePool(NonPagedPool, VPB_SIZE, TAG_VPB);
+    NewVpb = ExAllocatePoolWithTag(NonPagedPool, VPB_SIZE, TAG_VPB);
     if (NewVpb == NULL) {
         DEBUG(DL_ERR, ( "Ex2CheckDismount: failed to allocate NewVpb.\n"));
         return FALSE;
     }
+    DEBUG(DL_DBG, ("Ext2CheckDismount: NewVpb allocated: %p\n", NewVpb));
     INC_MEM_COUNT(PS_VPB, NewVpb, sizeof(VPB));
     memset(NewVpb, '_', VPB_SIZE);
     RtlZeroMemory(NewVpb, sizeof(VPB));
@@ -1983,15 +1984,16 @@ Ext2CheckDismount (
 
     if ((IrpContext->MajorFunction == IRP_MJ_CREATE) &&
             (IrpContext->RealDevice == Vcb->RealDevice)) {
-        UnCleanCount = 3;
-    } else {
         UnCleanCount = 2;
+    } else {
+        UnCleanCount = 1;
     }
 
     IoAcquireVpbSpinLock (&Irql);
 
     DEBUG(DL_DBG, ("Ext2CheckDismount: Vpb %p ioctl=%d Device %p\n",
                    Vpb, Vpb->ReferenceCount, Vpb->RealDevice));
+
     if (Vpb->ReferenceCount <= UnCleanCount) {
 
         if (!IsFlagOn(Vcb->Flags, VCB_DISMOUNT_PENDING)) {
@@ -2016,10 +2018,17 @@ Ext2CheckDismount (
             Vpb->DeviceObject = NULL;
         }
 
+        DEBUG(DL_DBG, ("Ext2CheckDismount: Vpb: %p bDeleted=%d bTearDown=%d\n",
+                        Vpb, bDeleted, bTearDown));
+
+
     } else if (bForce) {
 
-        DEBUG(DL_DBG, ( "Ext2CheckDismount: NewVpb %p Realdevice = %p\n",
-                        NewVpb, Vpb->RealDevice));
+        DEBUG(DL_DBG, ( "Ext2CheckDismount: New/Old Vpb %p/%p Realdevice = %p\n",
+                        NewVpb, Vcb->Vpb, Vpb->RealDevice));
+
+        /* keep vpb president and later we'll free it */
+        SetFlag(Vpb->Flags, VPB_PERSISTENT);
 
         Vcb->Vpb2 = Vcb->Vpb;
         NewVpb->Type = IO_TYPE_VPB;
@@ -2049,8 +2058,8 @@ Ext2CheckDismount (
     }
 
     if (NewVpb != NULL) {
-        DEBUG(DL_DBG, ( "Ext2CheckDismount: freeing Vpb %p\n", NewVpb));
-        Ext2FreePool(NewVpb, TAG_VPB);
+        DEBUG(DL_DBG, ( "Ext2CheckDismount: freeing new Vpb %p\n", NewVpb));
+        ExFreePoolWithTag(NewVpb, TAG_VPB);
         DEC_MEM_COUNT(PS_VPB, NewVpb, sizeof(VPB));
     }
 
