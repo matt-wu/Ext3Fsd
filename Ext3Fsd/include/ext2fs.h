@@ -1885,6 +1885,13 @@ Ext2NewInode(
 );
 
 NTSTATUS
+Ext2UpdateGroupDirStat(
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN ULONG                Group
+);
+
+NTSTATUS
 Ext2FreeInode(
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
@@ -1907,7 +1914,8 @@ Ext2SetFileType (
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
     IN PEXT2_FCB            Dcb,
-    IN PEXT2_MCB            Mcb
+    IN PEXT2_MCB            Mcb,
+    IN umode_t              mode
 );
 
 NTSTATUS
@@ -2913,6 +2921,7 @@ Ext2WriteInode (
     IN BOOLEAN              bDirectIo,
     OUT PULONG              dwReturn
 );
+
 
 VOID
 Ext2StartFloppyFlushDpc (

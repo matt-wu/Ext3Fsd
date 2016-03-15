@@ -1285,6 +1285,44 @@ errorout:
 }
 
 NTSTATUS
+Ext2UpdateGroupDirStat(
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN ULONG                group
+    )
+{
+    struct super_block     *sb = &Vcb->sb;
+    PEXT2_GROUP_DESC        gd;
+    struct buffer_head     *gb = NULL;
+    NTSTATUS                status;
+
+    ExAcquireResourceExclusiveLite(&Vcb->MetaLock, TRUE);
+
+    /* get group desc */
+    gd = ext4_get_group_desc(sb, group, &gb);
+    if (!gd) {
+        status = STATUS_INSUFFICIENT_RESOURCES;
+        goto errorout;
+    }
+
+    /* update group_desc and super_block */
+    ext4_used_dirs_set(sb, gd, ext4_used_dirs_count(sb, gd) - 1);
+    Ext2SaveGroup(IrpContext, Vcb, group);
+    Ext2UpdateVcbStat(IrpContext, Vcb);
+    status = STATUS_SUCCESS;
+
+errorout:
+
+    ExReleaseResourceLite(&Vcb->MetaLock);
+
+    if (gb)
+        fini_bh(&gb);
+
+    return status;
+}
+
+
+NTSTATUS
 Ext2FreeInode(
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
@@ -1474,7 +1512,8 @@ Ext2SetFileType (
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
     IN PEXT2_FCB            Dcb,
-    IN PEXT2_MCB            Mcb
+    IN PEXT2_MCB            Mcb,
+    IN umode_t              mode
     )
 {
     struct inode *dir = Dcb->Inode;
@@ -1507,14 +1546,20 @@ Ext2SetFileType (
         if (le32_to_cpu(de->inode) != inode->i_ino)
             __leave;
 
-        ext3_set_de_type(inode->i_sb, de, inode->i_mode);
+        ext3_set_de_type(inode->i_sb, de, mode);
         mark_buffer_dirty(bh);
-        
-        //if (!inode->i_nlink)
-        //    ext3_orphan_add(handle, inode);
 
+        if (S_ISDIR(inode->i_mode) == S_ISDIR(mode)) {
+        } else if (S_ISDIR(inode->i_mode)) {
+            ext3_dec_count(dir);
+        } else if (S_ISDIR(mode)) {
+            ext3_inc_count(dir);
+        }
         dir->i_ctime = dir->i_mtime = ext3_current_time(dir);
         ext3_mark_inode_dirty(IrpContext, dir);
+
+        inode->i_mode = mode;
+        ext3_mark_inode_dirty(IrpContext, inode);
 
         Status = STATUS_SUCCESS;
 

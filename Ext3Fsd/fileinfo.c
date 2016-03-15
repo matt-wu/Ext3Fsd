@@ -1289,8 +1289,9 @@ Ext2SetDispositionInfo(
         DEBUG(DL_INF, ( "Ext2SetDispositionInformation: Removing %wZ.\n",
                         &Mcb->FullName));
 
-        /* always allow deleting on symlinks */
-        if (Ccb->SymLink == NULL) {
+        if (Ccb->SymLink || IsInodeSymLink(&Mcb->Inode)) {
+            /* always allow deleting on symlinks */
+        } else {
             status = Ext2IsFileRemovable(IrpContext, Vcb, Fcb, Ccb);
         }
 
