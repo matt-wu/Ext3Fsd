@@ -503,11 +503,14 @@ typedef struct _EXT2_GLOBAL {
 
     /* User specified global codepage name */
     struct {
+        WCHAR                   PageName[CODEPAGE_MAXLEN];
         UCHAR                   AnsiName[CODEPAGE_MAXLEN];
         struct nls_table *      PageTable;
     } Codepage;
 
     /* global hiding patterns */
+    WCHAR                       wHidingPrefix[HIDINGPAT_LEN];
+    WCHAR                       wHidingSuffix[HIDINGPAT_LEN];
     BOOLEAN                     bHidingPrefix;
     CHAR                        sHidingPrefix[HIDINGPAT_LEN];
     BOOLEAN                     bHidingSuffix;
@@ -2385,8 +2388,10 @@ int ext3_is_dir_empty(struct ext2_icb *icb, struct inode *inode);
 // Init.c
 //
 
+NTSTATUS
+Ext2QueryGlobalParameters(IN PUNICODE_STRING RegistryPath);
 BOOLEAN
-Ext2QueryGlobalParameters (IN PUNICODE_STRING  RegistryPath);
+Ext2QueryRegistrySettings(IN PUNICODE_STRING  RegistryPath);
 
 VOID
 DriverUnload (IN PDRIVER_OBJECT DriverObject);

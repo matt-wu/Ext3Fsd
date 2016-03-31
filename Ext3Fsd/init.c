@@ -33,6 +33,7 @@ DriverEntry(
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(INIT, Ext2QueryGlobalParameters)
+#pragma alloc_text(INIT, Ext2QueryRegistrySettings)
 #pragma alloc_text(INIT, DriverEntry)
 #if EXT2_UNLOAD
 #pragma alloc_text(PAGE, DriverUnload)
@@ -99,36 +100,219 @@ DriverUnload (IN PDRIVER_OBJECT DriverObject)
 
 #endif
 
-BOOLEAN
-Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
+NTSTATUS
+Ext2RegistryQueryCallback(
+    IN PWSTR ValueName,
+    IN ULONG ValueType,
+    IN PVOID ValueData,
+    IN ULONG ValueLength,
+    IN PVOID Context,
+    IN PVOID EntryContext
+    )
 {
+    ULONG  i = 0;
+    BYTE   *s, *t;
+
+    if (ValueType == REG_DWORD && wcslen(ValueName) == wcslen(WRITING_SUPPORT) &&
+        _wcsnicmp(ValueName, WRITING_SUPPORT, wcslen(WRITING_SUPPORT)) == 0) {
+
+        if (ValueData && ValueLength == sizeof(DWORD)) {
+            if (*((PULONG)ValueData)) {
+                SetLongFlag(Ext2Global->Flags, EXT2_SUPPORT_WRITING);
+            } else {
+                ClearLongFlag(Ext2Global->Flags, EXT2_SUPPORT_WRITING);
+            }
+        }
+    } else if (ValueType == REG_DWORD && wcslen(ValueName) == wcslen(CHECKING_BITMAP) &&
+        _wcsnicmp(ValueName, CHECKING_BITMAP, wcslen(CHECKING_BITMAP)) == 0) {
+
+        if (ValueData && ValueLength == sizeof(DWORD)) {
+            if (*((PULONG)ValueData)) {
+                SetLongFlag(Ext2Global->Flags, EXT2_CHECKING_BITMAP);
+            } else {
+                ClearLongFlag(Ext2Global->Flags, EXT2_CHECKING_BITMAP);
+            }
+        }
+    } else if (ValueType == REG_DWORD && wcslen(ValueName) == wcslen(EXT3_FORCEWRITING) &&
+        _wcsnicmp(ValueName, EXT3_FORCEWRITING, wcslen(EXT3_FORCEWRITING)) == 0) {
+
+        if (ValueData && ValueLength == sizeof(DWORD)) {
+            if (*((PULONG)ValueData)) {
+                SetLongFlag(Ext2Global->Flags, EXT3_FORCE_WRITING);
+                SetLongFlag(Ext2Global->Flags, EXT2_SUPPORT_WRITING);
+            } else {
+                ClearLongFlag(Ext2Global->Flags, EXT3_FORCE_WRITING);
+            }
+        }
+    } else if (ValueType == REG_DWORD && wcslen(ValueName) == wcslen(AUTO_MOUNT) &&
+        _wcsnicmp(ValueName, AUTO_MOUNT, wcslen(AUTO_MOUNT)) == 0) {
+
+        if (ValueData && ValueLength == sizeof(DWORD)) {
+            if (*((PULONG)ValueData)) {
+                SetLongFlag(Ext2Global->Flags, EXT2_AUTO_MOUNT);
+            } else {
+                ClearLongFlag(Ext2Global->Flags, EXT2_AUTO_MOUNT);
+            }
+        }
+    } else if (ValueType == REG_SZ && wcslen(ValueName) == wcslen(CODEPAGE_NAME) &&
+        _wcsnicmp(ValueName, CODEPAGE_NAME, wcslen(CODEPAGE_NAME)) == 0) {
+
+        if (ValueData && ValueLength <= sizeof(WCHAR) * CODEPAGE_MAXLEN) {
+            RtlCopyMemory(&Ext2Global->Codepage.PageName[0],
+                          ValueData, ValueLength);
+        }
+    } else if (ValueType == REG_SZ && wcslen(ValueName) == wcslen(HIDING_PREFIX) &&
+        _wcsnicmp(ValueName, HIDING_PREFIX, wcslen(HIDING_PREFIX)) == 0) {
+
+        if (ValueData && ValueLength <= sizeof(WCHAR) * HIDINGPAT_LEN) {
+            RtlCopyMemory(&Ext2Global->wHidingPrefix[0],
+                          ValueData, ValueLength);
+        }
+    } else  if (ValueType == REG_SZ && wcslen(ValueName) == wcslen(HIDING_SUFFIX) &&
+        _wcsnicmp(ValueName, HIDING_SUFFIX, wcslen(HIDING_SUFFIX)) == 0) {
+
+        if (ValueData && ValueLength <= sizeof(WCHAR) * HIDINGPAT_LEN) {
+            RtlCopyMemory(&Ext2Global->wHidingSuffix[0],
+                          ValueData, ValueLength);
+        }
+    }
+
+
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS
+Ext2QueryGlobalParameters(IN PUNICODE_STRING RegistryPath)
+{
+    RTL_QUERY_REGISTRY_TABLE    QueryTable[8];
+    int                         i = 0;
     NTSTATUS                    Status;
+
+    RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 8);
+
+    /*
+     * 1 writing support
+     */
+    QueryTable[i].Flags = 0;
+    QueryTable[0].Name = WRITING_SUPPORT;
+    QueryTable[i].DefaultType = REG_DWORD;
+    QueryTable[i].DefaultLength = 0;
+    QueryTable[i].DefaultData = NULL;
+    QueryTable[i].EntryContext = NULL;
+    QueryTable[i].QueryRoutine = Ext2RegistryQueryCallback;
+    i++;
+
+    /*
+     * 2 checking bitmap
+     */
+    QueryTable[i].Flags = 0;
+    QueryTable[i].Name = CHECKING_BITMAP;
+    QueryTable[i].DefaultType = REG_DWORD;
+    QueryTable[i].DefaultLength = 0;
+    QueryTable[i].DefaultData = NULL;
+    QueryTable[i].EntryContext = NULL;
+    QueryTable[i].QueryRoutine = Ext2RegistryQueryCallback;
+    i++;
+
+    /*
+     * 3 force writing
+     */
+    QueryTable[i].Flags = 0;
+    QueryTable[i].Name = EXT3_FORCEWRITING;
+    QueryTable[i].DefaultType = REG_DWORD;
+    QueryTable[i].DefaultLength = 0;
+    QueryTable[i].DefaultData = NULL;
+    QueryTable[i].EntryContext = NULL;
+    QueryTable[i].QueryRoutine = Ext2RegistryQueryCallback;
+    i++;
+
+    /*
+     * 4 automount
+     */
+    QueryTable[i].Flags = 0;
+    QueryTable[i].Name = AUTO_MOUNT;
+    QueryTable[i].DefaultType = REG_DWORD;
+    QueryTable[i].DefaultLength = 0;
+    QueryTable[i].DefaultData = NULL;
+    QueryTable[i].EntryContext = NULL;
+    QueryTable[i].QueryRoutine = Ext2RegistryQueryCallback;
+    i++;
+
+    /*
+     * 5 codepage
+     */
+    QueryTable[i].Flags = 0;
+    QueryTable[i].Name = CODEPAGE_NAME;
+    QueryTable[i].DefaultType = REG_SZ;
+    QueryTable[i].DefaultLength = 0;
+    QueryTable[i].DefaultData = NULL;
+    QueryTable[i].EntryContext = NULL;
+    QueryTable[i].QueryRoutine = Ext2RegistryQueryCallback;
+    i++;
+
+    /*
+     * 6 hidden prefix
+     */
+    QueryTable[i].Flags = 0;
+    QueryTable[i].Name = HIDING_PREFIX;
+    QueryTable[i].DefaultType = REG_SZ;
+    QueryTable[i].DefaultLength = 0;
+    QueryTable[i].DefaultData = NULL;
+    QueryTable[i].EntryContext = NULL;
+    QueryTable[i].QueryRoutine = Ext2RegistryQueryCallback;
+    i++;
+
+
+    /*
+     * 7 hidden suffix
+     */
+    QueryTable[i].Flags = 0;
+    QueryTable[i].Name = HIDING_SUFFIX;
+    QueryTable[i].DefaultType = REG_SZ;
+    QueryTable[i].DefaultLength = 0;
+    QueryTable[i].DefaultData = NULL;
+    QueryTable[i].EntryContext = NULL;
+    QueryTable[i].QueryRoutine = Ext2RegistryQueryCallback;
+    i++;
+
+    Status = RtlQueryRegistryValues(
+                 RTL_REGISTRY_ABSOLUTE,
+                 RegistryPath->Buffer,
+                 &QueryTable[0],
+                 NULL,
+                 NULL
+            );
+
+    return NT_SUCCESS(Status);
+}
+
+
+BOOLEAN
+Ext2QueryRegistrySettings(IN PUNICODE_STRING  RegistryPath)
+{
     UNICODE_STRING              ParameterPath;
-    RTL_QUERY_REGISTRY_TABLE    QueryTable[2];
+    UNICODE_STRING              UniName;
+    ANSI_STRING                 AnsiName;
 
     ULONG                       WritingSupport = 0;
     ULONG                       CheckingBitmap = 0;
     ULONG                       Ext3ForceWriting = 0;
     ULONG                       AutoMount = 0;
 
-    UNICODE_STRING              UniName;
-    ANSI_STRING                 AnsiName;
-
     WCHAR                       UniBuffer[CODEPAGE_MAXLEN];
     USHORT                      Buffer[HIDINGPAT_LEN];
 
-    ParameterPath.Length = 0;
+    NTSTATUS                    Status;
 
+    ParameterPath.Length = 0;
     ParameterPath.MaximumLength =
         RegistryPath->Length + sizeof(PARAMETERS_KEY) + sizeof(WCHAR);
-
     ParameterPath.Buffer =
         (PWSTR) Ext2AllocatePool(
             PagedPool,
             ParameterPath.MaximumLength,
             'LG2E'
         );
-
     if (!ParameterPath.Buffer) {
         DbgBreak();
         DEBUG(DL_ERR, ( "Ex2QueryParameters: failed to allocate Parameters...\n"));
@@ -138,101 +322,24 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
     RtlCopyUnicodeString(&ParameterPath, RegistryPath);
     RtlAppendUnicodeToString(&ParameterPath, PARAMETERS_KEY);
 
-    /* querying value of WritingSupport */
-    RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
-
-    QueryTable[0].Flags = RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_REQUIRED;
-    QueryTable[0].Name = WRITING_SUPPORT;
-    QueryTable[0].EntryContext = &WritingSupport;
-
-    Status = RtlQueryRegistryValues(
-                 RTL_REGISTRY_ABSOLUTE,
-                 ParameterPath.Buffer,
-                 &QueryTable[0],
-                 NULL,
-                 NULL        );
-
-    DEBUG(DL_ERR, ( "Ext2QueryParameters: WritingSupport=%xh\n", WritingSupport));
-
-    /* querying value of CheckingBitmap */
-    RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
-    QueryTable[0].Flags = RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_REQUIRED;
-    QueryTable[0].Name = CHECKING_BITMAP;
-    QueryTable[0].EntryContext = &CheckingBitmap;
-
-    Status = RtlQueryRegistryValues(
-                 RTL_REGISTRY_ABSOLUTE,
-                 ParameterPath.Buffer,
-                 &QueryTable[0],
-                 NULL,
-                 NULL        );
-
-    DEBUG(DL_ERR, ( "Ext2QueryParameters: CheckingBitmap=%xh\n", CheckingBitmap));
-
-    /* querying value of Ext3ForceWriting */
-    RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
-    QueryTable[0].Flags = RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_REQUIRED;
-    QueryTable[0].Name = EXT3_FORCEWRITING;
-    QueryTable[0].EntryContext = &Ext3ForceWriting;
-
-    Status = RtlQueryRegistryValues(
-                 RTL_REGISTRY_ABSOLUTE,
-                 ParameterPath.Buffer,
-                 &QueryTable[0],
-                 NULL,
-                 NULL        );
-
-    DEBUG(DL_ERR, ( "Ext2QueryParameters: Ext3ForceWriting=%xh\n", Ext3ForceWriting));
-
-
-    /* querying value of AutoMount */
-    RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
-
-    QueryTable[0].Flags = RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_REQUIRED;
-    QueryTable[0].Name = AUTO_MOUNT;
-    QueryTable[0].EntryContext = &AutoMount;
-
-    Status = RtlQueryRegistryValues(
-                 RTL_REGISTRY_ABSOLUTE,
-                 ParameterPath.Buffer,
-                 &QueryTable[0],
-                 NULL,
-                 NULL        );
-
+    /* enable automount of ext2/3/4 volumes */
     SetLongFlag(Ext2Global->Flags, EXT2_AUTO_MOUNT);
-    if (NT_SUCCESS(Status) && AutoMount == 0) {
-        ClearLongFlag(Ext2Global->Flags, EXT2_AUTO_MOUNT);
-    }
 
-    DEBUG(DL_ERR, ( "Ext2QueryParameters: AutoMount=%xh\n", AutoMount));
+    /* query parameter settings from registry */
+    Ext2QueryGlobalParameters(&ParameterPath);
 
-    /* querying codepage */
-    RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
-    QueryTable[0].Flags = RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_REQUIRED;
-    QueryTable[0].Name = CODEPAGE_NAME;
-    QueryTable[0].EntryContext = &(UniName);
-    UniName.MaximumLength = CODEPAGE_MAXLEN * sizeof(WCHAR);
-    UniName.Length = 0;
-    UniName.Buffer = (PWSTR)UniBuffer;
-
-    Status = RtlQueryRegistryValues(
-                 RTL_REGISTRY_ABSOLUTE,
-                 ParameterPath.Buffer,
-                 &QueryTable[0],
-                 NULL,
-                 NULL        );
-
-    if (NT_SUCCESS(Status)) {
-        DEBUG(DL_ERR, ( "Ext2QueryParameters: Ext2CodePage=%wZ\n", &UniName));
+    /* set global codepage settings */
+    if (wcslen(&Ext2Global->Codepage.PageName[0])) {
+        UniName.Length = sizeof(WCHAR) * wcslen(&Ext2Global->Codepage.PageName[0]);
+        UniName.MaximumLength = CODEPAGE_MAXLEN * sizeof(WCHAR);
+        UniName.Buffer = &Ext2Global->Codepage.PageName[0];
         AnsiName.MaximumLength = CODEPAGE_MAXLEN;
         AnsiName.Length = 0;
-        AnsiName.Buffer = &(Ext2Global->Codepage.AnsiName[0]);
-
+        AnsiName.Buffer = &Ext2Global->Codepage.AnsiName[0];
         Status = RtlUnicodeStringToAnsiString(
                      &AnsiName,
                      &UniName,
                      FALSE);
-
         if (!NT_SUCCESS(Status)) {
             DEBUG(DL_ERR, ( "Ext2QueryParameters: Wrong CodePage %wZ ...\n", &UniName));
             RtlCopyMemory(&(Ext2Global->Codepage.AnsiName[0]),"default\0", 8);
@@ -243,25 +350,13 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
     }
     Ext2Global->Codepage.AnsiName[CODEPAGE_MAXLEN - 1] = 0;
 
-    /* querying name hiding patterns: prefix*/
-    RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
-    QueryTable[0].Flags = RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_REQUIRED;
-    QueryTable[0].Name = HIDING_PREFIX;
-    QueryTable[0].EntryContext = &(UniName);
-    UniName.MaximumLength = HIDINGPAT_LEN * sizeof(WCHAR);
-    UniName.Length = 0;
-    UniName.Buffer = Buffer;
 
-    Status = RtlQueryRegistryValues(
-                 RTL_REGISTRY_ABSOLUTE,
-                 ParameterPath.Buffer,
-                 &QueryTable[0],
-                 NULL,
-                 NULL        );
-
-    if (NT_SUCCESS(Status)) {
-        DEBUG(DL_ERR, ( "Ext2QueryParameters: HidingPrefix=%wZ\n", &UniName));
-        AnsiName.MaximumLength =HIDINGPAT_LEN;
+    /* set global hidden prefix pattern */
+    if (wcslen(&Ext2Global->wHidingPrefix[0])) {
+        UniName.Length = sizeof(WCHAR) * wcslen(&Ext2Global->wHidingPrefix[0]);
+        UniName.MaximumLength = HIDINGPAT_LEN * sizeof(WCHAR);
+        UniName.Buffer = &Ext2Global->wHidingPrefix[0];
+        AnsiName.MaximumLength = HIDINGPAT_LEN;
         AnsiName.Length = 0;
         AnsiName.Buffer = &(Ext2Global->sHidingPrefix[0]);
 
@@ -279,26 +374,12 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
     }
     Ext2Global->sHidingPrefix[HIDINGPAT_LEN - 1] = 0;
 
-    /* querying name hiding patterns: suffix */
-    RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
-    QueryTable[0].Flags = RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_REQUIRED;
-    QueryTable[0].Name = HIDING_SUFFIX;
-    QueryTable[0].EntryContext = &(UniName);
-    UniName.MaximumLength = HIDINGPAT_LEN * sizeof(WCHAR);
-    UniName.Length = 0;
-    UniName.Buffer = Buffer;
 
-    Status = RtlQueryRegistryValues(
-                 RTL_REGISTRY_ABSOLUTE,
-                 ParameterPath.Buffer,
-                 &QueryTable[0],
-                 NULL,
-                 NULL
-             );
-
-    if (NT_SUCCESS(Status)) {
-
-        DEBUG(DL_ERR, ( "Ext2QueryParameters: HidingSuffix=%wZ\n", &UniName));
+    /* set global hidden suffix pattern */
+    if (wcslen(&Ext2Global->wHidingSuffix[0])) {
+        UniName.Length = sizeof(WCHAR) * wcslen(&Ext2Global->wHidingSuffix[0]);
+        UniName.MaximumLength = HIDINGPAT_LEN * sizeof(WCHAR);
+        UniName.Buffer = &Ext2Global->wHidingSuffix[0];
         AnsiName.MaximumLength = HIDINGPAT_LEN;
         AnsiName.Length = 0;
         AnsiName.Buffer = &(Ext2Global->sHidingSuffix[0]);
@@ -316,29 +397,6 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
         DEBUG(DL_ERR, ( "Ext2QueryParameters: HidingSuffix not specified.\n"));
     }
     Ext2Global->sHidingPrefix[HIDINGPAT_LEN - 1] = 0;
-
-    {
-        if (WritingSupport) {
-            SetLongFlag(Ext2Global->Flags, EXT2_SUPPORT_WRITING);
-        } else {
-            ClearLongFlag(Ext2Global->Flags, EXT2_SUPPORT_WRITING);
-        }
-
-        if (CheckingBitmap) {
-            SetLongFlag(Ext2Global->Flags, EXT2_CHECKING_BITMAP);
-        } else {
-            ClearLongFlag(Ext2Global->Flags, EXT2_CHECKING_BITMAP);
-        }
-
-        if (Ext3ForceWriting) {
-            DbgPrint("Ext2Fsd -- Warning: Ext3ForceWriting enabled !!!\n");
-
-            SetLongFlag(Ext2Global->Flags, EXT3_FORCE_WRITING);
-            SetLongFlag(Ext2Global->Flags, EXT2_SUPPORT_WRITING);
-        } else {
-            ClearLongFlag(Ext2Global->Flags, EXT3_FORCE_WRITING);
-        }
-    }
 
     Ext2Global->RegistryPath.Buffer = ParameterPath.Buffer;
     Ext2Global->RegistryPath.Length = 0;
@@ -457,7 +515,7 @@ DriverEntry (
                       SynchronizationEvent, FALSE);
 
     /* query registry settings */
-    Ext2QueryGlobalParameters(RegistryPath);
+    Ext2QueryRegistrySettings(RegistryPath);
 
     /* create Ext2Fsd cdrom fs deivce */
     RtlInitUnicodeString(&DeviceName, CDROM_NAME);
