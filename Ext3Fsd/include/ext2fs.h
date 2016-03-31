@@ -1234,43 +1234,6 @@ Ext2NoOpAcquire (
 VOID
 Ext2NoOpRelease (IN PVOID Fcb);
 
-VOID
-Ext2AcquireForCreateSection (
-    IN PFILE_OBJECT FileObject
-);
-
-VOID
-Ext2ReleaseForCreateSection (
-    IN PFILE_OBJECT FileObject
-);
-
-NTSTATUS
-Ext2AcquireFileForModWrite (
-    IN PFILE_OBJECT FileObject,
-    IN PLARGE_INTEGER EndingOffset,
-    OUT PERESOURCE *ResourceToRelease,
-    IN PDEVICE_OBJECT DeviceObject
-);
-
-NTSTATUS
-Ext2ReleaseFileForModWrite (
-    IN PFILE_OBJECT FileObject,
-    IN PERESOURCE ResourceToRelease,
-    IN PDEVICE_OBJECT DeviceObject
-);
-
-NTSTATUS
-Ext2AcquireFileForCcFlush (
-    IN PFILE_OBJECT FileObject,
-    IN PDEVICE_OBJECT DeviceObject
-);
-
-NTSTATUS
-Ext2ReleaseFileForCcFlush (
-    IN PFILE_OBJECT FileObject,
-    IN PDEVICE_OBJECT DeviceObject
-);
-
 
 //
 // Create.c
@@ -2087,6 +2050,49 @@ Ext2FastIoQueryNetworkOpenInfo (
     OUT PIO_STATUS_BLOCK                IoStatus,
     IN PDEVICE_OBJECT                   DeviceObject);
 
+VOID
+Ext2AcquireForCreateSection (
+    IN PFILE_OBJECT FileObject
+);
+
+VOID
+Ext2ReleaseForCreateSection (
+    IN PFILE_OBJECT FileObject
+);
+
+NTSTATUS
+Ext2AcquireFileForModWrite (
+    IN PFILE_OBJECT FileObject,
+    IN PLARGE_INTEGER EndingOffset,
+    OUT PERESOURCE *ResourceToRelease,
+    IN PDEVICE_OBJECT DeviceObject
+);
+
+NTSTATUS
+Ext2ReleaseFileForModWrite (
+    IN PFILE_OBJECT FileObject,
+    IN PERESOURCE ResourceToRelease,
+    IN PDEVICE_OBJECT DeviceObject
+);
+
+NTSTATUS
+Ext2AcquireFileForCcFlush (
+    IN PFILE_OBJECT FileObject,
+    IN PDEVICE_OBJECT DeviceObject
+);
+
+NTSTATUS
+Ext2ReleaseFileForCcFlush (
+    IN PFILE_OBJECT FileObject,
+    IN PDEVICE_OBJECT DeviceObject
+);
+
+
+NTSTATUS
+Ext2PreAcquireForCreateSection(
+    IN PFS_FILTER_CALLBACK_DATA cd,
+    OUT PVOID *cc
+    );
 
 //
 // FileInfo.c
