@@ -562,12 +562,16 @@ DriverEntry (
     FastIoDispatch->FastIoUnlockAll               = Ext2FastIoUnlockAll;
     FastIoDispatch->FastIoUnlockAllByKey          = Ext2FastIoUnlockAllByKey;
     FastIoDispatch->FastIoQueryNetworkOpenInfo    = Ext2FastIoQueryNetworkOpenInfo;
+
+    FastIoDispatch->AcquireForModWrite            = Ext2AcquireFileForModWrite;
+    FastIoDispatch->ReleaseForModWrite            = Ext2ReleaseFileForModWrite;
     FastIoDispatch->AcquireForModWrite            = Ext2AcquireFileForModWrite;
     FastIoDispatch->ReleaseForModWrite            = Ext2ReleaseFileForModWrite;
     FastIoDispatch->AcquireForCcFlush             = Ext2AcquireFileForCcFlush;
     FastIoDispatch->ReleaseForCcFlush             = Ext2ReleaseFileForCcFlush;
     FastIoDispatch->AcquireFileForNtCreateSection = Ext2AcquireForCreateSection;
     FastIoDispatch->ReleaseFileForNtCreateSection = Ext2ReleaseForCreateSection;
+
     DriverObject->FastIoDispatch = FastIoDispatch;
 
     //
@@ -630,6 +634,17 @@ DriverEntry (
     Ext2Global->CacheManagerNoOpCallbacks.ReleaseFromLazyWrite = Ext2NoOpRelease;
     Ext2Global->CacheManagerNoOpCallbacks.AcquireForReadAhead  = Ext2NoOpAcquire;
     Ext2Global->CacheManagerNoOpCallbacks.ReleaseFromReadAhead = Ext2NoOpRelease;
+
+
+    //
+    // Initialize FS Filter callbacks
+    //
+
+    RtlZeroMemory(&Ext2Global->FilterCallbacks,  sizeof(FS_FILTER_CALLBACKS));
+    Ext2Global->FilterCallbacks.SizeOfFsFilterCallbacks = sizeof(FS_FILTER_CALLBACKS);
+    Ext2Global->FilterCallbacks.PreAcquireForSectionSynchronization = Ext2PreAcquireForCreateSection;
+    FsRtlRegisterFileSystemFilterCallbacks(DriverObject,  &Ext2Global->FilterCallbacks );
+
 
     //
     // Initialize the global data
