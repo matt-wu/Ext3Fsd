@@ -28,6 +28,21 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
  Revision history
 ======================
 
+49, V0.64    2016-04-04
+
+Modifications from V0.62:
+
+Features:
+    1, Drive letter assignment mechanism refined
+    2, Mount as specified user (uid/gid) supported
+
+Bugs fixed:
+    1, Symlink creation breaks metedata statistics for inodes
+    2, Unexpected drive letter removal for virtual devices
+    3, Resource lock rules refined to consolidate consistency
+    4, Kernel codes improved to make Ext3Fsd more secure
+
+
 48, V0.63:   2016-03-12
 
 Modifications from V0.62:

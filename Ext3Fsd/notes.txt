@@ -1,25 +1,21 @@
 
 ==================================
-Release Notes for Ext2Fsd V0.63
+Release Notes for Ext2Fsd V0.64
 ==================================
 
-Features implemented or bugfix since V0.62:
+Features implemented or bugfix since V0.63:
 
   Features:
-    1, Symlink (ReparsePoint) support implemented by ngkaho1234. See his
-       repository for more details: http://github.com/ngkaho1234/Ext3Fsd.git
-    2, Hard links support implemented
-    3, Win10 TH2 drive letter assignment supported
-    4, Case-insensitive-search supported (caused by dentry hash)
-    5, Peformance improvements for metadata operations
+    1, Drive letter assignment mechanism refined
+    2, Mount as specified user (uid/gid) supported
 
   Bugs fixed:
-    1, BSOD when trying to format or dismount EXT4 volumes
-    2, invalid extent content for newly created inodes
-    3, Possible data corruption (zero data) under high pressure (WDK building)
-    4, Splash screen of Ext2Mgr removed
+    1, Symlink creation breaks metedata statistics for inodes
+    2, Unexpected drive letter removal for virtual devices
+    3, Resource lock rules refined to consolidate consistency
+    4, Kernel codes improved to make Ext3Fsd more secure
 
-Supported Ext3/4 features by 0.63:
+Supported Ext3/4 features by 0.64:
 
     1, flexible inode size: > 128 bytes, up to block size
     2, dir_index:    htree directory index
@@ -38,8 +34,7 @@ Unsupported Ext3/4 features:
     2, EA (extended attributes), ACL support
 
 Features to be implemented in next release:
-
-    1, mounted as given user: privilege checking with given uid & gid
+    1, Extents management improvement
     2, EA and ACL security checking
 
 WARNINGS:
