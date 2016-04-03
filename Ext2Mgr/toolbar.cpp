@@ -32,56 +32,56 @@ CStandardBar::CStandardBar() : m_pTBButtons(NULL)
 
 CStandardBar::~CStandardBar()
 {
-    if (m_pTBButtons)
-        delete []m_pTBButtons;
+	if (m_pTBButtons)
+		delete []m_pTBButtons;
 
 }
 
 
 BEGIN_MESSAGE_MAP(CStandardBar, CToolBarCtrl)
-    //{{AFX_MSG_MAP(CStandardBar)
-    //}}AFX_MSG_MAP
+	//{{AFX_MSG_MAP(CStandardBar)
+	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
 
 BOOL CStandardBar::Create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID, int count, PBUTTON_INFO pButton)
 {
-    BOOL bRet = CToolBarCtrl::Create(dwStyle, rect, pParentWnd, nID);
+	BOOL bRet = CToolBarCtrl::Create(dwStyle, rect, pParentWnd, nID);
 
-    AddBitmap(count, IDR_STANDARDBAR);
+	AddBitmap(count, IDR_STANDARDBAR);
 
-    m_pTBButtons = new TBBUTTON[count];
+	m_pTBButtons = new TBBUTTON[count];
     memset(m_pTBButtons, 0, sizeof(TBBUTTON) * count);
 
     m_nButtonCount = count;
 
-    TBBUTTON sepButton;
-    sepButton.idCommand = 0;
-    sepButton.fsStyle = TBSTYLE_SEP;
-    sepButton.fsState = TBSTATE_ENABLED;
-    sepButton.iString = 0;
-    sepButton.iBitmap = 0;
-    sepButton.dwData = 0;
+	TBBUTTON sepButton;
+	sepButton.idCommand = 0;
+	sepButton.fsStyle = TBSTYLE_SEP;
+	sepButton.fsState = TBSTATE_ENABLED;
+	sepButton.iString = 0;
+	sepButton.iBitmap = 0;
+	sepButton.dwData = 0;
 
-    for (int nIndex = 0; nIndex < count; nIndex++) {
-        CString string;
-        string.LoadString(pButton[nIndex].ID);
+	for (int nIndex = 0; nIndex < count; nIndex++) {
+		CString string;
+		string.LoadString(pButton[nIndex].ID);
 
-        // Add second '\0'
-        int nStringLength = string.GetLength() + 1;
-        TCHAR * pString = string.GetBufferSetLength(nStringLength);
-        pString[nStringLength] = 0;
+		// Add second '\0'
+		int nStringLength = string.GetLength() + 1;
+		TCHAR * pString = string.GetBufferSetLength(nStringLength);
+		pString[nStringLength] = 0;
 
-        m_pTBButtons[nIndex].iString = AddStrings(pString);
+		m_pTBButtons[nIndex].iString = AddStrings(pString);
 
-        string.ReleaseBuffer();
+		string.ReleaseBuffer();
 
 
-        m_pTBButtons[nIndex].fsState = TBSTATE_ENABLED;
-        m_pTBButtons[nIndex].fsStyle = TBSTYLE_BUTTON;
-        m_pTBButtons[nIndex].dwData = 0;
-        m_pTBButtons[nIndex].iBitmap = nIndex;
-        m_pTBButtons[nIndex].idCommand = pButton[nIndex].ID;
+		m_pTBButtons[nIndex].fsState = TBSTATE_ENABLED;
+		m_pTBButtons[nIndex].fsStyle = TBSTYLE_BUTTON;
+		m_pTBButtons[nIndex].dwData = 0;
+		m_pTBButtons[nIndex].iBitmap = nIndex;
+		m_pTBButtons[nIndex].idCommand = pButton[nIndex].ID;
 
         if (pButton[nIndex].bSep) {
             AddButtons(1,&sepButton);
@@ -89,9 +89,9 @@ BOOL CStandardBar::Create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UIN
         }
 
         AddButtons(1, &m_pTBButtons[nIndex]);
-    }
+	}
 
-    return bRet;
+	return bRet;
 }
 
 
@@ -106,133 +106,133 @@ BOOL CStandardBar::Create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UIN
 
 BOOL CStandardBar::OnChildNotify(UINT message, WPARAM wParam, LPARAM lParam, LRESULT* pLResult)
 {
-    return CToolBarCtrl::OnChildNotify(message, wParam, lParam, pLResult);
+	return CToolBarCtrl::OnChildNotify(message, wParam, lParam, pLResult);
 }
 
 BOOL CStandardBar::BeginAdjust(WPARAM wParam, LPARAM lParam, LRESULT* pLResult)
 {
-    TRACE(_T("TBN_BEGINADJUST\n"));
-    // the customize dialog box is about to be displayed
+	TRACE(_T("TBN_BEGINADJUST\n"));
+	// the customize dialog box is about to be displayed
 
 
-    return TRUE;
+	return TRUE;
 }
 
 BOOL CStandardBar::BeginDrag(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult)
 {
-    TRACE(_T("TBN_BEGINDRAG\n"));
+	TRACE(_T("TBN_BEGINDRAG\n"));
 
-    // we are not implementing custon drag and drop
-    * pLResult = FALSE;
-    return FALSE;
+	// we are not implementing custon drag and drop
+	* pLResult = FALSE;
+	return FALSE;
 }
 
 BOOL CStandardBar::CustomizeHelp(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult)
 {
-    TRACE(_T("TBN_CUSTHELP\n"));
+	TRACE(_T("TBN_CUSTHELP\n"));
 
-    return TRUE;
+	return TRUE;
 }
 
 BOOL CStandardBar::EndAdjust(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult)
 {
-    TRACE(_T("TBN_ENDADJUST\n"));
+	TRACE(_T("TBN_ENDADJUST\n"));
 
-    // the customize dialog box has been closed
+	// the customize dialog box has been closed
 
-    return TRUE;
+	return TRUE;
 }
 
 BOOL CStandardBar::EndDrag(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult)
 {
-    TRACE(_T("TBN_ENDDRAG\n"));
+	TRACE(_T("TBN_ENDDRAG\n"));
 
-    // Code to handle custom drag and drop. This message indicates that
-    // the item is being dropped
-    * pLResult = FALSE;
-    return TRUE;
+	// Code to handle custom drag and drop. This message indicates that
+	// the item is being dropped
+	* pLResult = FALSE;
+	return TRUE;
 }
 
 BOOL CStandardBar::GetButtonInfo(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult)
 {
-    // This notification message has to be handled correctly if
-    // all operations in the custom dialogbox has to function correctly
-    // We have to supply information for the button specified by pTBN->tbButton
-    //
-    // This notification is sent in the following cases
-    //
-    // After TBN_BEGINADJUST the control sends these notifications until
-    // * pLResult is TRUE. We have to supply valid values when this value is
-    // set to TRUE. Here the control is collecting information for all
-    // the buttons that have to be displayed in the dialog box
-    //
-    // The control sends this notification to get information about
-    // a button if the user is trying to add it to the toolbar or
-    // rearranging the buttons on the toolbar from within the dialog
+	// This notification message has to be handled correctly if
+	// all operations in the custom dialogbox has to function correctly
+	// We have to supply information for the button specified by pTBN->tbButton
+	//
+	// This notification is sent in the following cases
+	//
+	// After TBN_BEGINADJUST the control sends these notifications until
+	// * pLResult is TRUE. We have to supply valid values when this value is
+	// set to TRUE. Here the control is collecting information for all
+	// the buttons that have to be displayed in the dialog box
+	//
+	// The control sends this notification to get information about
+	// a button if the user is trying to add it to the toolbar or
+	// rearranging the buttons on the toolbar from within the dialog
 
-    TRACE(_T("TBN_GETBUTTONINFO\n"));
+	TRACE(_T("TBN_GETBUTTONINFO\n"));
 
-    TBNOTIFY *pTBN = (TBNOTIFY *) lParam;
+	TBNOTIFY *pTBN = (TBNOTIFY *) lParam;
 
-    if (pTBN->iItem >= m_nButtonCount)
-    {
-        * pLResult = FALSE;
-    }
-    else
-    {
-        CString buffer;
-        buffer.LoadString(pTBN->iItem + ID_NEW);
+	if (pTBN->iItem >= m_nButtonCount)
+	{
+		* pLResult = FALSE;
+	}
+	else
+	{
+		CString buffer;
+		buffer.LoadString(pTBN->iItem + ID_NEW);
 
-        // set the string for the button
-        // truncate the string if its length is greater than the buffer
-        // supplied by the toolbar
-        _tcsncpy(pTBN->pszText, buffer, pTBN->cchText - 1);
-        pTBN->pszText[pTBN->cchText - 1] = '\0';
+		// set the string for the button
+		// truncate the string if its length is greater than the buffer
+		// supplied by the toolbar
+		_tcsncpy(pTBN->pszText, buffer, pTBN->cchText - 1);
+		pTBN->pszText[pTBN->cchText - 1] = '\0';
 
-        // set the button info
-        pTBN->tbButton = m_pTBButtons[pTBN->iItem];
+		// set the button info
+		pTBN->tbButton = m_pTBButtons[pTBN->iItem];
 
-        // valid values are structure
-        *pLResult = TRUE;
-    }
+		// valid values are structure
+		*pLResult = TRUE;
+	}
 
-    return TRUE;
+	return TRUE;
 }
 
 BOOL CStandardBar::QueryDelete(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult)
 {
-    TRACE(_T("TBN_QUERYDELETE\n"));
+	TRACE(_T("TBN_QUERYDELETE\n"));
 
-    // in this sample any button can be deleted
-    // if a particular button cannot be deleted set *pResult to FALSE for that item
-    *pLResult = FALSE;
-    return TRUE;
+	// in this sample any button can be deleted
+	// if a particular button cannot be deleted set *pResult to FALSE for that item
+	*pLResult = FALSE;
+	return TRUE;
 }
 
 BOOL CStandardBar::QueryInsert(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult)
 {
-    TRACE(_T("TBN_QUERYINSERT\n"));
+	TRACE(_T("TBN_QUERYINSERT\n"));
 
-    // in this sample buttons can be inserted at any location on the
-    // toolbar
-    *pLResult = FALSE;
-    return TRUE;
+	// in this sample buttons can be inserted at any location on the
+	// toolbar
+	*pLResult = FALSE;
+	return TRUE;
 }
 
 BOOL CStandardBar::Reset(WPARAM wParam, LPARAM lParam, LRESULT* pLResult)
 {
-    TRACE(_T("TBN_RESET\n"));
+	TRACE(_T("TBN_RESET\n"));
 
-    *pLResult = TRUE;
-    return TRUE;
+	*pLResult = TRUE;
+	return TRUE;
 }
 
 BOOL CStandardBar::ToolBarChange(WPARAM wParam, LPARAM lParam,LRESULT* pLResult)
 {
-    TRACE(_T("TBN_TOOLBARCHANGE\n"));
+	TRACE(_T("TBN_TOOLBARCHANGE\n"));
 
-    // the toolbar has changed
-    return TRUE;
+	// the toolbar has changed
+	return TRUE;
 }
 
 
@@ -240,41 +240,41 @@ BOOL CStandardBar::ToolBarChange(WPARAM wParam, LPARAM lParam,LRESULT* pLResult)
 
 CString CStandardBar::NeedText( UINT nID, NMHDR * pNotifyStruct, LRESULT * lResult )
 {
-    LPTOOLTIPTEXT lpTTT = (LPTOOLTIPTEXT)pNotifyStruct ;
-    ASSERT(nID == lpTTT->hdr.idFrom);
+	LPTOOLTIPTEXT lpTTT = (LPTOOLTIPTEXT)pNotifyStruct ;
+	ASSERT(nID == lpTTT->hdr.idFrom);
 
-    CString toolTipText;
-    toolTipText.LoadString(nID);
+	CString toolTipText;
+	toolTipText.LoadString(nID);
 
-    // szText length is 80
-    int nLength = (toolTipText.GetLength() > 79) ? 79 : toolTipText.GetLength();
+	// szText length is 80
+	int nLength = (toolTipText.GetLength() > 79) ? 79 : toolTipText.GetLength();
 
-    toolTipText = toolTipText.Left(nLength);
+	toolTipText = toolTipText.Left(nLength);
 
-    return toolTipText;
+	return toolTipText;
 }
 
 
 void CStandardBar::OnNeedTextW( UINT nID, NMHDR * pNotifyStruct, LRESULT * lResult )
 {
-    CString toolTipText = NeedText(nID, pNotifyStruct, lResult);
+	CString toolTipText = NeedText(nID, pNotifyStruct, lResult);
 
-    LPTOOLTIPTEXTW lpTTT = (LPTOOLTIPTEXTW)pNotifyStruct;
+	LPTOOLTIPTEXTW lpTTT = (LPTOOLTIPTEXTW)pNotifyStruct;
 
 #ifndef _UNICODE
-    mbstowcs(lpTTT->szText,(LPCSTR)toolTipText, toolTipText.GetLength() + 1);
+	mbstowcs(lpTTT->szText,(LPCSTR)toolTipText, toolTipText.GetLength() + 1);
 #else
-    _tcsncpy(lpTTT->szText, toolTipText, toolTipText.GetLength() + 1);
+	_tcsncpy(lpTTT->szText, toolTipText, toolTipText.GetLength() + 1);
 #endif
 }
 
 void CStandardBar::OnNeedTextA( UINT nID, NMHDR * pNotifyStruct, LRESULT * lResult )
 {
-    CString toolTipText = NeedText(nID, pNotifyStruct, lResult);
+	CString toolTipText = NeedText(nID, pNotifyStruct, lResult);
 
-    LPTOOLTIPTEXT lpTTT = (LPTOOLTIPTEXT)pNotifyStruct;
+	LPTOOLTIPTEXT lpTTT = (LPTOOLTIPTEXT)pNotifyStruct;
 
-    _tcscpy(lpTTT->szText,(LPCTSTR)toolTipText);
+	_tcscpy(lpTTT->szText,(LPCTSTR)toolTipText);
 }
 
 
@@ -285,47 +285,47 @@ void CStandardBar::OnNeedTextA( UINT nID, NMHDR * pNotifyStruct, LRESULT * lResu
 
 BOOL CStandardBar::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult)
 {
-    ASSERT(pResult != NULL);
-    NMHDR* pNMHDR = (NMHDR*)lParam;
-    HWND hWndCtrl = pNMHDR->hwndFrom;
+	ASSERT(pResult != NULL);
+	NMHDR* pNMHDR = (NMHDR*)lParam;
+	HWND hWndCtrl = pNMHDR->hwndFrom;
 
-    // get the child ID from the window itself
-    // UINT nID = _AfxGetDlgCtrlID(hWndCtrl);
+	// get the child ID from the window itself
+	// UINT nID = _AfxGetDlgCtrlID(hWndCtrl);
 
-    //////////////////////////////////////////////////////////////////
-    // If TTN_NEEDTEXT we cannot get the ID from the tooltip window //
-    //////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////
+	// If TTN_NEEDTEXT we cannot get the ID from the tooltip window //
+	//////////////////////////////////////////////////////////////////
 
-    int nCode = pNMHDR->code;
+	int nCode = pNMHDR->code;
 
-    //
-    // if it is the following notification message
-    // nID has to obtained from wParam
-    //
+	//
+	// if it is the following notification message
+	// nID has to obtained from wParam
+	//
 
-    if (nCode == TTN_NEEDTEXTA || nCode == TTN_NEEDTEXTW)
-    {
-        UINT nID;   // = _AfxGetDlgCtrlID(hWndCtrl);
-        nID = (UINT)wParam;
+	if (nCode == TTN_NEEDTEXTA || nCode == TTN_NEEDTEXTW)
+	{
+		UINT nID;   // = _AfxGetDlgCtrlID(hWndCtrl);
+		nID = (UINT)wParam;
 
 
-        ASSERT((UINT)pNMHDR->idFrom == (UINT)wParam);
-        UNUSED(wParam);  // not used in release build
-        ASSERT(hWndCtrl != NULL);
-        ASSERT(::IsWindow(hWndCtrl));
+		ASSERT((UINT)pNMHDR->idFrom == (UINT)wParam);
+		UNUSED(wParam);  // not used in release build
+		ASSERT(hWndCtrl != NULL);
+		ASSERT(::IsWindow(hWndCtrl));
 
-        if (AfxGetThreadState()->m_hLockoutNotifyWindow == m_hWnd)
-            return TRUE;        // locked out - ignore control notification
+		if (AfxGetThreadState()->m_hLockoutNotifyWindow == m_hWnd)
+			return TRUE;        // locked out - ignore control notification
 
-        // reflect notification to child window control
-        if (ReflectLastMsg(hWndCtrl, pResult))
-            return TRUE;        // eaten by child
+	// reflect notification to child window control
+		if (ReflectLastMsg(hWndCtrl, pResult))
+			return TRUE;        // eaten by child
 
-        AFX_NOTIFY notify;
-        notify.pResult = pResult;
-        notify.pNMHDR = pNMHDR;
-        return OnCmdMsg(nID, MAKELONG(nCode, WM_NOTIFY), &notify, NULL);
-    }
+		AFX_NOTIFY notify;
+		notify.pResult = pResult;
+		notify.pNMHDR = pNMHDR;
+		return OnCmdMsg(nID, MAKELONG(nCode, WM_NOTIFY), &notify, NULL);
+	}
 
-    return CToolBarCtrl::OnNotify(wParam, lParam, pResult);
+	return CToolBarCtrl::OnNotify(wParam, lParam, pResult);
 }

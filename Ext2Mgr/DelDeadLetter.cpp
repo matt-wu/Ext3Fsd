@@ -16,39 +16,39 @@ static char THIS_FILE[] = __FILE__;
 
 
 CDelDeadLetter::CDelDeadLetter(CWnd* pParent /*=NULL*/)
-        : CDialog(CDelDeadLetter::IDD, pParent)
+	: CDialog(CDelDeadLetter::IDD, pParent)
 {
-    //{{AFX_DATA_INIT(CDelDeadLetter)
-    m_sDrvLetter = _T("");
-    m_bAutoRemoval = g_bAutoRemoveDeadLetters;
-    m_bKeepIt = TRUE;
-    //}}AFX_DATA_INIT
+	//{{AFX_DATA_INIT(CDelDeadLetter)
+	m_sDrvLetter = _T("");
+	m_bAutoRemoval = g_bAutoRemoveDeadLetters;
+	m_bKeepIt = TRUE;
+	//}}AFX_DATA_INIT
 }
 
 
 void CDelDeadLetter::DoDataExchange(CDataExchange* pDX)
 {
-    CDialog::DoDataExchange(pDX);
-    //{{AFX_DATA_MAP(CDelDeadLetter)
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CDelDeadLetter)
     DDX_CBString(pDX, IDC_DEAD_LETTER_LIST, m_sDrvLetter);
-    DDX_Check(pDX, IDC_AUTO_REMOVAL, m_bAutoRemoval);
-    DDX_Check(pDX, IDC_REMOVAL_CURRENT, m_bKeepIt);
-    //}}AFX_DATA_MAP
+	DDX_Check(pDX, IDC_AUTO_REMOVAL, m_bAutoRemoval);
+	DDX_Check(pDX, IDC_REMOVAL_CURRENT, m_bKeepIt);
+	//}}AFX_DATA_MAP
 }
 
 
 BEGIN_MESSAGE_MAP(CDelDeadLetter, CDialog)
-    //{{AFX_MSG_MAP(CDelDeadLetter)
-    ON_BN_CLICKED(ID_RELOAD_DL, OnReloadDl)
-    ON_BN_CLICKED(IDC_AUTO_REMOVAL, OnAutoRemoval)
-    ON_BN_CLICKED(IDC_AUTOREMOVALTEXT, OnAutoremovaltext)
-    //}}AFX_MSG_MAP
+	//{{AFX_MSG_MAP(CDelDeadLetter)
+	ON_BN_CLICKED(ID_RELOAD_DL, OnReloadDl)
+	ON_BN_CLICKED(IDC_AUTO_REMOVAL, OnAutoRemoval)
+	ON_BN_CLICKED(IDC_AUTOREMOVALTEXT, OnAutoremovaltext)
+	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
 // CDelDeadLetter message handlers
 
-void CDelDeadLetter::OnOK()
+void CDelDeadLetter::OnOK() 
 {
     CHAR            drvChar;
     PEXT2_LETTER    drvLetter = NULL;
@@ -75,14 +75,14 @@ void CDelDeadLetter::OnOK()
     }
 }
 
-BOOL CDelDeadLetter::OnInitDialog()
+BOOL CDelDeadLetter::OnInitDialog() 
 {
-    CDialog::OnInitDialog();
+	CDialog::OnInitDialog();
 
     UpdateDeadLetterList();
 
-    return TRUE;  // return TRUE unless you set the focus to a control
-    // EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;  // return TRUE unless you set the focus to a control
+	              // EXCEPTION: OCX Property Pages should return FALSE
 }
 
 VOID
@@ -112,7 +112,7 @@ CDelDeadLetter::UpdateDeadLetterList()
         for (j=0; j < disk->NumParts; j++) {
             part = &disk->DataParts[j];
             if (part) {
-                LetterMask &= ~(part->DrvLetters);
+                 LetterMask &= ~(part->DrvLetters);
             }
         }
     }
@@ -124,7 +124,7 @@ CDelDeadLetter::UpdateDeadLetterList()
 
     for (i=0; i < 10; i++) {
         if (drvDigits[i].bUsed && (drvDigits[i].Extent == NULL) &&
-                (LetterMask & (((ULONGLONG) 1) << (i + 32)) ) ) {
+            (LetterMask & (((ULONGLONG) 1) << (i + 32)) ) ) {
             str.Format("%c: ", drvDigits[i].Letter);
             str += drvDigits[i].SymLink;
             cbList->AddString(str);
@@ -133,7 +133,7 @@ CDelDeadLetter::UpdateDeadLetterList()
 
     for (i=0; i <26; i++) {
         if (drvLetters[i].bUsed && (drvLetters[i].Extent == NULL) &&
-                (LetterMask & (((ULONGLONG) 1) << i)) ) {
+            (LetterMask & (((ULONGLONG) 1) << i)) ) {
             str.Format("%c: ", drvLetters[i].Letter);
             str += drvLetters[i].SymLink;
             cbList->AddString(str);
@@ -150,19 +150,19 @@ CDelDeadLetter::UpdateDeadLetterList()
     cbList->SetCurSel(0);
 }
 
-void CDelDeadLetter::OnReloadDl()
+void CDelDeadLetter::OnReloadDl() 
 {
-    // TODO: Add your control notification handler code here
-    UpdateDeadLetterList();
+	// TODO: Add your control notification handler code here
+	UpdateDeadLetterList();
 }
 
-void CDelDeadLetter::OnAutoRemoval()
+void CDelDeadLetter::OnAutoRemoval() 
 {
-    // TODO: Add your control notification handler code here
-    UpdateData(TRUE);
-    g_bAutoRemoveDeadLetters = m_bAutoRemoval;
+	// TODO: Add your control notification handler code here
+	UpdateData(TRUE);
+    g_bAutoRemoveDeadLetters = m_bAutoRemoval;	
 }
 
-void CDelDeadLetter::OnAutoremovaltext()
+void CDelDeadLetter::OnAutoremovaltext() 
 {
 }

@@ -112,34 +112,41 @@ BEGIN
                     135,12
 END
 
-IDD_EXT2_ATTR DIALOG DISCARDABLE  0, 0, 251, 208
+IDD_EXT2_ATTR DIALOG DISCARDABLE  0, 0, 251, 236
 STYLE DS_MODALFRAME | DS_3DLOOK | WS_POPUP
 FONT 8, "MS Sans Serif"
 BEGIN
-    DEFPUSHBUTTON   "保存并退出",IDOK,159,187,61,17
+    DEFPUSHBUTTON   "保存并退出",IDOK,159,215,61,17
     CONTROL         "设置为只读，不可写",IDC_READ_ONLY,"Button",
                     BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,27,39,134,10
     COMBOBOX        IDC_COMBO_CODEPAGE,184,37,49,106,CBS_DROPDOWNLIST | 
                     CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "自动加载盘符：主要针对可移动设备",IDC_AUTOMOUNT,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,27,79,147,10
+    COMBOBOX        IDC_COMBO_AUTOMP,196,76,36,96,CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
+    CONTROL         "固定盘符：对固定磁盘建议采用此种方式",IDC_FIXMOUNT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,27,102,165,10
     COMBOBOX        IDC_COMBO_DRVLETTER,196,100,36,107,CBS_DROPDOWNLIST | 
                     WS_VSCROLL | WS_TABSTOP
     EDITTEXT        IDC_EXT2_PREFIX,109,138,108,14
     EDITTEXT        IDC_EXT2_SUFFIX,109,157,108,14
-    PUSHBUTTON      "取消所有改动",IDCANCEL,25,187,60,17
-    GROUPBOX        "Ext2文件系统卷设置：",IDC_STATIC,7,7,237,176
+    EDITTEXT        IDC_EDIT_UID,53,192,25,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_GID,105,192,25,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_EUID,189,192,25,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "取消所有改动",IDCANCEL,25,215,60,17
+    GROUPBOX        "Ext2文件系统卷设置：",IDC_STATIC,7,7,237,205
     GROUPBOX        "卷属性",IDC_STATIC,15,22,149,37,WS_GROUP
     GROUPBOX        "语种编码",IDC_STATIC,173,22,64,37,WS_GROUP
     LTEXT           "文件名以此为开头：",IDC_STATIC,29,140,75,13
     LTEXT           "文件名以此为结束：",IDC_STATIC,29,159,74,13
     GROUPBOX        "隐藏指定文件",IDC_STATIC,13,123,224,52
     GROUPBOX        "盘符设置",IDC_STATIC,14,64,223,55,WS_GROUP
-    CONTROL         "自动加载盘符：主要针对可移动设备",IDC_AUTOMOUNT,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,27,79,147,10
-    CONTROL         "固定盘符：对固定磁盘建议采用此种方式",IDC_FIXMOUNT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,27,102,165,10
-    COMBOBOX        IDC_COMBO_AUTOMP,196,76,36,96,CBS_DROPDOWNLIST | 
-                    WS_VSCROLL | WS_TABSTOP
     GROUPBOX        "",IDC_STATIC,14,90,223,29
+    GROUPBOX        "指定加载帐号",IDC_STATIC,13,177,224,30
+    LTEXT           "UID:",IDC_STATIC,31,193,17,9
+    LTEXT           "GID:",IDC_STATIC,84,193,17,9
+    LTEXT           "EUID:",IDC_STATIC,164,193,21,9
 END
 
 IDD_EXT2MGR_DIALOG DIALOGEX 0, 0, 407, 277
@@ -244,8 +251,8 @@ BEGIN
     LTEXT           "盘符:",IDC_STATIC,14,139,54,8
     EDITTEXT        IDC_MOUNT_POINTS,70,138,83,12,ES_AUTOHSCROLL | 
                     ES_READONLY
-    PUSHBUTTON      "更改盘符/装配点",IDC_SDEV_CHANGE_MP,155,136,66,14,
-                    BS_LEFT,WS_EX_STATICEDGE
+    PUSHBUTTON      "更改盘符",IDC_SDEV_CHANGE_MP,183,134,38,14,BS_LEFT,
+                    WS_EX_STATICEDGE
     LTEXT           "文件系统:",IDC_STATIC,14,155,51,8
     EDITTEXT        IDC_FILE_SYSTEM,69,152,83,12,ES_AUTOHSCROLL | 
                     ES_READONLY
@@ -257,6 +264,8 @@ BEGIN
     LTEXT           "可用空间:",IDC_STATIC,14,187,49,8
     EDITTEXT        IDC_SDEV_FREE_SIZE,69,186,84,12,ES_RIGHT | 
                     ES_AUTOHSCROLL | ES_READONLY | ES_NUMBER
+    PUSHBUTTON      "挂载",IDC_SDEV_QUICK_MOUNT,156,134,24,15,BS_LEFT,
+                    WS_EX_STATICEDGE
 END
 
 IDD_REMOVE_DEADLETTER DIALOG DISCARDABLE  0, 0, 208, 122
@@ -280,11 +289,11 @@ BEGIN
                     BS_LEFTTEXT | WS_TABSTOP,19,43,174,12
 END
 
-IDD_SERVICE_MANAGE DIALOG DISCARDABLE  0, 0, 238, 236
+IDD_SERVICE_MANAGE DIALOG DISCARDABLE  0, 0, 238, 235
 STYLE DS_MODALFRAME | DS_3DLOOK | WS_POPUP
 FONT 8, "MS Sans Serif"
 BEGIN
-    DEFPUSHBUTTON   "更改并退出",IDOK,170,215,47,17
+    DEFPUSHBUTTON   "更改并退出",IDOK,170,214,47,17
     GROUPBOX        "Ext2Fsd 驱动设置",IDC_STATIC,7,7,224,203
     GROUPBOX        "当前状态",IDC_STATIC,19,21,201,36,WS_GROUP
     EDITTEXT        IDC_SERVICE_STATUS,26,35,145,14,ES_READONLY
@@ -302,7 +311,7 @@ BEGIN
     CONTROL         "支持Ext3的写操作(忽略日志及目录索引)",IDC_EXT3_WRITABLE,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,32,136,
                     170,10
-    PUSHBUTTON      "取消",IDCANCEL,29,215,38,17
+    PUSHBUTTON      "取消",IDCANCEL,29,214,38,17
     EDITTEXT        IDC_GLOBAL_PREFIX,100,167,107,14
     EDITTEXT        IDC_GLOBAL_SUFFIX,99,187,108,14
     LTEXT           "文件名隐藏前缀:",IDC_STATIC,32,169,67,13
@@ -348,7 +357,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 244
         TOPMARGIN, 7
-        BOTTOMMARGIN, 204
+        BOTTOMMARGIN, 232
     END
 
     IDD_EXT2MGR_DIALOG, DIALOG
@@ -402,7 +411,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 231
         TOPMARGIN, 7
-        BOTTOMMARGIN, 232
+        BOTTOMMARGIN, 231
     END
 END
 #endif    // APSTUDIO_INVOKED
@@ -415,8 +424,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,5,2,1
- PRODUCTVERSION 2,5,2,1
+ FILEVERSION 2,7,4,04
+ PRODUCTVERSION 2,7,4,04
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -434,14 +443,14 @@ BEGIN
             VALUE "Comments", "\0"
             VALUE "CompanyName", "Ext2Fsd Group (www.ext2fsd.com)\0"
             VALUE "FileDescription", "Ext2 Volume Manager for Windows\0"
-            VALUE "FileVersion", "2, 5, 2, 1\0"
+            VALUE "FileVersion", "2,7,4,04\0"
             VALUE "InternalName", "Ext2Mgr\0"
-            VALUE "LegalCopyright", "Copyright (C) 2010 Ext2Fsd Group\0"
+            VALUE "LegalCopyright", "Copyright (C) 2016 Ext2Fsd Group\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "Ext2Mgr.exe\0"
             VALUE "PrivateBuild", "\0"
             VALUE "ProductName", "Ext2 Volume Manager for Windows\0"
-            VALUE "ProductVersion", "2, 5, 2, 1\0"
+            VALUE "ProductVersion", "2,7,4,04\0"
             VALUE "SpecialBuild", "\0"
         END
     END
@@ -466,14 +475,11 @@ BEGIN
         MENUITEM "设置为自动启动(&E)",          ID_ENABLE_AUTOSTART
         MENUITEM "取消自动启动(&D)",            ID_DISABLE_AUTOSTART
         MENUITEM SEPARATOR
-        MENUITEM "以系统服务方式自动启动(&I)",  ID_INSTALL_SERVICE
-        MENUITEM "卸载系统服务取消自动启动(&R)", ID_REMOVE_SERVICE
-        MENUITEM SEPARATOR
         MENUITEM "退出本程序(&x)",              ID_EXIT
     END
     POPUP "编辑(&E)"
     BEGIN
-        MENUITEM "复制所有信息至剪贴板(&C)\tF10", ID_COPYALL
+        MENUITEM "复制所有信息至剪贴板(&C)",    ID_COPYALL
     END
     POPUP "工具与设置(&T)"
     BEGIN
@@ -483,13 +489,13 @@ BEGIN
         MENUITEM "性能及内存分配统计(&T)\tF8",  ID_PERFSTAT
         MENUITEM SEPARATOR
         MENUITEM "配置Ext2卷属性(&E)\tF3",      ID_CHANGE
-        MENUITEM "盘符管理及设置(&M)\tF4",      ID_DRV_LETTER
-        MENUITEM "删除无效盘符(&D)\tF9",        ID_REMOVE_DEAD_LETTER
+        MENUITEM "盘符管理及设置(&M)\tF10",     ID_DRV_LETTER
+        MENUITEM "删除无效盘符(&D)\tF7",        ID_REMOVE_DEAD_LETTER
         MENUITEM SEPARATOR
-        MENUITEM "强制保存系统缓冲(&F)\tF11",   ID_FLUSH_BUFFER
-        MENUITEM "更改分区类型ID(&C)\tF12",     ID_CHANGE_PARTTYPE
+        MENUITEM "强制保存系统缓冲(&F)\tF9",    ID_FLUSH_BUFFER
+        MENUITEM "更改分区类型ID(&C)\tF11",     ID_CHANGE_PARTTYPE
         MENUITEM SEPARATOR
-        MENUITEM "显示磁盘或分区属性(&P)\tF6",  ID_PROPERTY
+        MENUITEM "显示磁盘或分区属性(&P)\tF12", ID_PROPERTY
     END
     POPUP "帮助(&H)"
     BEGIN
@@ -515,6 +521,21 @@ BEGIN
         MENUITEM "退出本程序 ...",              ID_EXIT
     END
 END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// 24
+//
+
+MANIFEST_RESOURCE_ID    24      MOVEABLE PURE   "Ext2Mgr.exe.manifest"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Ext2Srv binary
+//
+
+IDR_RCDAT_SRV      RCDATA       "..\\Ext2Srv\\Release\\X86\\Ext2Srv.exe"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -545,6 +566,21 @@ END
 
 STRINGTABLE DISCARDABLE 
 BEGIN
+    ID_INSTALL_SERVICE      "Install Ext2Mgr as a service (with autostart enabled)"
+    ID_REMOVE_SERVICE       "Remove Ext2Mgr service (disable service autostart)"
+    ID_ENABLE_AUTOSTART     "Let Ext2Mgr automatically start when system boots"
+    ID_DISABLE_AUTOSTART    "Don't want Ext2Mgr automatically start when system boots"
+    ID_PERFSTAT             "Statistics of memory allocations and Irp processing"
+    ID_COPYALL              "Copy all disks/partitions/cdrom/volumes information to clipboard"
+    ID_FLUSH_BUFFER         "Sync all dirty cache to disk"
+    ID_CHANGE_PARTTYPE      "Change the partition type/id"
+    ID_REMOVE_DEAD_LETTER   "Remove the dead driver letter"
+    ID_DRV_QUICK_MOUNT      "Assign a driver letter to selected volume or disk"
+    ID_DRV_QUICK_REMOVE     "Remove 1st driver letter of selected volume or disk"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
     ID_HELP                 "Help"
     IDS_LISTITEM_FILESYSTEM "文件系统"
     IDS_LISTITEM_VOLUME     "卷"
@@ -559,24 +595,11 @@ END
 
 STRINGTABLE DISCARDABLE 
 BEGIN
-    ID_INSTALL_SERVICE      "Install Ext2Mgr as a service (with autostart enabled)"
-    ID_REMOVE_SERVICE       "Remove Ext2Mgr service (disable service autostart)"
-    ID_ENABLE_AUTOSTART     "Let Ext2Mgr automatically start when system boots"
-    ID_DISABLE_AUTOSTART    "Don't want Ext2Mgr automatically start when system boots"
-    ID_PERFSTAT             "Statistics of memory allocations and Irp processing"
-    ID_COPYALL              "Copy all disks/partitions/cdrom/volumes information to clipboard"
-    ID_FLUSH_BUFFER         "Sync all dirty cache to disk"
-    ID_CHANGE_PARTTYPE      "Change the partition type/id"
-    ID_REMOVE_DEAD_LETTER   "Remove the dead driver letter"
-END
-
-STRINGTABLE DISCARDABLE 
-BEGIN
     IDS_DISK_TYPE_DYN       "动态"
     IDS_DONATE_DECLARE      "\r\n世界需要热心肠，一家人也不说两家话：\r\n\r\n有钱出钱，有力出力！：-）\r\n\r\n其实，将使用过程中发现的问题或者好的建议直接发给我就已是对Ext2Fsd最好的支持了。简言之，多用多反馈多宣传！\r\n\r\nMatt Wu"
     IDS_SHOW_PROPERTY       "磁盘及分区属性\tF6"
     IDS_COPY_ITEM_TO_CLIP   "复制当前内容(&C)"
-    IDS_CHANGE_DRVLETTER    "更改装配点盘符\tF4"
+    IDS_CHANGE_DRVLETTER    "更改装配点盘符\tF10"
     IDS_EXT2_MANAGEMENT     "配置Ext2卷属性\tF3"
     IDS_FLUSH_BUFFER        "保存系统缓冲\tF11"
     IDS_CHANGE_PARTID       "更改分区类型\tF12"
@@ -595,6 +618,7 @@ BEGIN
     IDS_PERFSTAT_TOTAL      "历史积累分配次数"
     IDS_PERFSTAT_PROCESSING "正在处理"
     IDS_PERFSTAT_PROCESSED  "已完成的请求"
+    IDS_DRV_QUICK_MOUNT     "加载装配点盘符\tF4"
 END
 
 #endif    // Chinese (P.R.C.) resources
@@ -667,7 +691,7 @@ IDD_SERVICE_MANAGE DIALOG DISCARDABLE  0, 0, 238, 233
 STYLE DS_MODALFRAME | DS_3DLOOK | WS_POPUP
 FONT 8, "MS Sans Serif"
 BEGIN
-    DEFPUSHBUTTON   "Apply",IDOK,170,212,37,17
+    DEFPUSHBUTTON   "Apply",IDOK,170,213,37,17
     GROUPBOX        "Ext2Fsd Service Management",IDC_STATIC,7,7,224,203
     GROUPBOX        "Service status",IDC_STATIC,19,21,201,36,WS_GROUP
     EDITTEXT        IDC_SERVICE_STATUS,26,35,145,14,ES_READONLY
@@ -678,7 +702,7 @@ BEGIN
     GROUPBOX        "Global Codepage",IDC_STATIC,153,63,66,38
     COMBOBOX        IDC_COMBO_CODEPAGE,160,81,54,111,CBS_DROPDOWN | CBS_SORT | 
                     WS_VSCROLL | WS_TABSTOP
-    GROUPBOX        "Global Volume Settings",IDC_STATIC,18,104,201,103,
+    GROUPBOX        "Global Volume Settings",IDC_STATIC,18,104,201,100,
                     WS_GROUP
     CONTROL         "Mount all volumes in read-only mode",IDC_READ_ONLY,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,32,120,
@@ -686,7 +710,7 @@ BEGIN
     CONTROL         "Enable writing support for ext3 volumes",
                     IDC_EXT3_WRITABLE,"Button",BS_AUTOCHECKBOX | WS_GROUP | 
                     WS_TABSTOP,32,136,170,10
-    PUSHBUTTON      "Cancel",IDCANCEL,29,212,38,17
+    PUSHBUTTON      "Cancel",IDCANCEL,29,213,38,17
     EDITTEXT        IDC_GLOBAL_PREFIX,137,166,70,14
     EDITTEXT        IDC_GLOBAL_SUFFIX,137,186,70,14
     LTEXT           "Hiding files with prefix:",IDC_STATIC,32,168,102,13
@@ -723,21 +747,30 @@ BEGIN
                     BS_AUTOCHECKBOX | WS_TABSTOP,32,125,112,10
 END
 
-IDD_EXT2_ATTR DIALOG DISCARDABLE  0, 0, 251, 208
+IDD_EXT2_ATTR DIALOG DISCARDABLE  0, 0, 251, 233
 STYLE DS_MODALFRAME | DS_3DLOOK | WS_POPUP
 FONT 8, "MS Sans Serif"
 BEGIN
-    DEFPUSHBUTTON   "Apply",IDOK,176,187,39,17
+    DEFPUSHBUTTON   "Apply",IDOK,176,216,39,17
     CONTROL         "Mount volume in readonly mode",IDC_READ_ONLY,"Button",
                     BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,27,39,134,10
     COMBOBOX        IDC_COMBO_CODEPAGE,184,37,49,106,CBS_DROPDOWNLIST | 
                     CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Automatically mount via Ext2Mgr",IDC_AUTOMOUNT,"Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP,27,79,148,10
+    COMBOBOX        IDC_COMBO_AUTOMP,196,76,36,96,CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Mountpoint for fixed disk, need reboot",IDC_FIXMOUNT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,27,102,165,10
     COMBOBOX        IDC_COMBO_DRVLETTER,196,100,36,107,CBS_DROPDOWNLIST | 
                     WS_VSCROLL | WS_TABSTOP
     EDITTEXT        IDC_EXT2_PREFIX,147,138,70,14
     EDITTEXT        IDC_EXT2_SUFFIX,147,157,70,14
-    PUSHBUTTON      "Cancel",IDCANCEL,17,187,42,17
-    GROUPBOX        "Ext2/3 Volume Settings",IDC_STATIC,7,7,237,176
+    EDITTEXT        IDC_EDIT_UID,53,193,25,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_GID,105,193,25,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_EUID,189,193,25,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "Cancel",IDCANCEL,17,216,42,17
+    GROUPBOX        "Ext2/3 Volume Settings",IDC_STATIC,7,7,237,206
     GROUPBOX        "Volume attribute",IDC_STATIC,15,22,149,37,WS_GROUP
     GROUPBOX        "Codepage",IDC_STATIC,173,22,64,37,WS_GROUP
     LTEXT           "Hiding files with prefix:",IDC_STATIC,29,140,102,13
@@ -745,13 +778,11 @@ BEGIN
     GROUPBOX        "Hiding filter patterns",IDC_STATIC,13,123,224,52
     GROUPBOX        "Mount point && driver letter",IDC_STATIC,14,64,223,55,
                     WS_GROUP
-    CONTROL         "Automatically mount via Ext2Mgr",IDC_AUTOMOUNT,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,27,79,148,10
-    CONTROL         "Mountpoint for fixed disk, need reboot",IDC_FIXMOUNT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,27,102,165,10
-    COMBOBOX        IDC_COMBO_AUTOMP,196,76,36,96,CBS_DROPDOWNLIST | 
-                    WS_VSCROLL | WS_TABSTOP
     GROUPBOX        "",IDC_STATIC,14,90,223,29
+    GROUPBOX        "Mounting as User",IDC_STATIC,13,179,224,30
+    LTEXT           "UID:",IDC_STATIC,31,195,17,9
+    LTEXT           "GID:",IDC_STATIC,84,195,17,9
+    LTEXT           "EUID:",IDC_STATIC,164,195,21,9
 END
 
 IDD_CHANGE_MOUNTPINT DIALOG DISCARDABLE  0, 0, 206, 129
@@ -823,7 +854,7 @@ BEGIN
     LTEXT           "Mount points:",IDC_STATIC,14,139,53,8
     EDITTEXT        IDC_MOUNT_POINTS,70,138,84,12,ES_AUTOHSCROLL | 
                     ES_READONLY
-    PUSHBUTTON      "Mount Points",IDC_SDEV_CHANGE_MP,155,136,65,14,BS_LEFT,
+    PUSHBUTTON      "Change",IDC_SDEV_CHANGE_MP,188,135,32,14,BS_LEFT,
                     WS_EX_STATICEDGE
     LTEXT           "File system:",IDC_STATIC,14,155,51,8
     EDITTEXT        IDC_FILE_SYSTEM,69,152,85,12,ES_AUTOHSCROLL | 
@@ -836,6 +867,8 @@ BEGIN
     LTEXT           "Free space:",IDC_STATIC,14,187,49,8
     EDITTEXT        IDC_SDEV_FREE_SIZE,69,186,85,12,ES_RIGHT | 
                     ES_AUTOHSCROLL | ES_READONLY | ES_NUMBER
+    PUSHBUTTON      "Mount",IDC_SDEV_QUICK_MOUNT,155,135,26,14,BS_LEFT,
+                    WS_EX_STATICEDGE
 END
 
 IDD_PERFSTAT_DIALOG DIALOGEX 0, 0, 286, 248
@@ -930,7 +963,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 231
         TOPMARGIN, 7
-        BOTTOMMARGIN, 229
+        BOTTOMMARGIN, 230
     END
 
     IDD_FORMAT, DIALOG
@@ -946,7 +979,6 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 244
         TOPMARGIN, 7
-        BOTTOMMARGIN, 204
     END
 
     IDD_CHANGE_MOUNTPINT, DIALOG
@@ -1004,8 +1036,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,5,2,1
- PRODUCTVERSION 2,5,2,1
+ FILEVERSION 2,7,4,04
+ PRODUCTVERSION 2,7,4,04
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -1023,14 +1055,14 @@ BEGIN
             VALUE "Comments", "\0"
             VALUE "CompanyName", "Ext2Fsd Group (www.ext2fsd.com)\0"
             VALUE "FileDescription", "Ext2 Volume Manager for Windows\0"
-            VALUE "FileVersion", "2, 5, 2, 1\0"
+            VALUE "FileVersion", "2,7,4,04\0"
             VALUE "InternalName", "Ext2Mgr\0"
-            VALUE "LegalCopyright", "Copyright (C) 2010 Ext2Fsd Group\0"
+            VALUE "LegalCopyright", "Copyright (C) 2016 Ext2Fsd Group\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "Ext2Mgr.exe\0"
             VALUE "PrivateBuild", "\0"
             VALUE "ProductName", "Ext2 Volume Manager for Windows\0"
-            VALUE "ProductVersion", "2, 5, 2, 1\0"
+            VALUE "ProductVersion", "2,7,4,04\0"
             VALUE "SpecialBuild", "\0"
         END
     END
@@ -1070,14 +1102,11 @@ BEGIN
         MENUITEM "&Enable Ext2Mgr autostart ",  ID_ENABLE_AUTOSTART
         MENUITEM "&Disable Ext2Mgr autostart",  ID_DISABLE_AUTOSTART
         MENUITEM SEPARATOR
-        MENUITEM "&Install Ext2Mgr as service", ID_INSTALL_SERVICE
-        MENUITEM "&Remove Ext2Mgr service",     ID_REMOVE_SERVICE
-        MENUITEM SEPARATOR
         MENUITEM "E&xit",                       ID_EXIT
     END
     POPUP "&Edit"
     BEGIN
-        MENUITEM "&Copy Everything to Clipboard\tF10", ID_COPYALL
+        MENUITEM "&Copy Everything to Clipboard", ID_COPYALL
     END
     POPUP "&Tools"
     BEGIN
@@ -1089,7 +1118,7 @@ BEGIN
         MENUITEM "Remove &Dead Letters\tF9",    ID_REMOVE_DEAD_LETTER
         MENUITEM SEPARATOR
         MENUITEM "&Ext2 Volume Management\tF3", ID_CHANGE
-        MENUITEM "&Mountpoint Management\tF4",  ID_DRV_LETTER
+        MENUITEM "&Mountpoint Management\tF10", ID_DRV_LETTER
         MENUITEM SEPARATOR
         MENUITEM "&Flush Cache to Disk\tF11",   ID_FLUSH_BUFFER
         MENUITEM "&Change Partition Type\tF12", ID_CHANGE_PARTTYPE
@@ -1141,12 +1170,12 @@ IDB_BIG_PENGUIN         BITMAP  DISCARDABLE     "res\\images\\penguin.bmp"
 IDR_AKEY_EXT2MGR ACCELERATORS DISCARDABLE 
 BEGIN
     VK_F1,          ID_HELP,                VIRTKEY, NOINVERT
-    VK_F10,         ID_COPYALL,             VIRTKEY, NOINVERT
+    VK_F10,         ID_DRV_LETTER,          VIRTKEY, NOINVERT
     VK_F11,         ID_FLUSH_BUFFER,        VIRTKEY, NOINVERT
     VK_F12,         ID_CHANGE_PARTTYPE,     VIRTKEY, NOINVERT
     VK_F2,          ID_ABOUT,               VIRTKEY, NOINVERT
     VK_F3,          ID_CHANGE,              VIRTKEY, NOINVERT
-    VK_F4,          ID_DRV_LETTER,          VIRTKEY, NOINVERT
+    VK_F4,          ID_DRV_QUICK_MOUNT,     VIRTKEY, NOINVERT
     VK_F5,          ID_REFRESH,             VIRTKEY, NOINVERT
     VK_F6,          ID_PROPERTY,            VIRTKEY, NOINVERT
     VK_F7,          ID_SERVICE,             VIRTKEY, NOINVERT
@@ -1154,13 +1183,6 @@ BEGIN
     VK_F9,          ID_REMOVE_DEAD_LETTER,  VIRTKEY, NOINVERT
 END
 
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// 24
-//
-
-MANIFEST_RESOURCE_ID    24      MOVEABLE PURE   "Ext2Mgr.exe.manifest"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -1190,6 +1212,20 @@ END
 
 STRINGTABLE DISCARDABLE 
 BEGIN
+    ID_INSTALL_SERVICE      "Install Ext2Mgr as a service (with autostart enabled)"
+    ID_REMOVE_SERVICE       "Remove Ext2Mgr service (disable service autostart)"
+    ID_ENABLE_AUTOSTART     "Let Ext2Mgr automatically start when system boots"
+    ID_DISABLE_AUTOSTART    "Don't want Ext2Mgr automatically start when system boots"
+    ID_PERFSTAT             "Statistics of memory allocations and Irp processing"
+    ID_COPYALL              "Copy all disks/partitions/cdrom/volumes information to clipboard"
+    ID_FLUSH_BUFFER         "Sync all dirty cache to disk"
+    ID_CHANGE_PARTTYPE      "Change the partition type/id"
+    ID_REMOVE_DEAD_LETTER   "Remove the dead driver letter"
+    ID_DRV_QUICK_MOUNT      "Assign a driver letter to selected volume or disk"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
     ID_HELP                 "Help"
     IDS_LISTITEM_FILESYSTEM "File system"
     IDS_LISTITEM_VOLUME     "Volume"
@@ -1204,24 +1240,11 @@ END
 
 STRINGTABLE DISCARDABLE 
 BEGIN
-    ID_INSTALL_SERVICE      "Install Ext2Mgr as a service (with autostart enabled)"
-    ID_REMOVE_SERVICE       "Remove Ext2Mgr service (disable service autostart)"
-    ID_ENABLE_AUTOSTART     "Let Ext2Mgr automatically start when system boots"
-    ID_DISABLE_AUTOSTART    "Don't want Ext2Mgr automatically start when system boots"
-    ID_PERFSTAT             "Statistics of memory allocations and Irp processing"
-    ID_COPYALL              "Copy all disks/partitions/cdrom/volumes information to clipboard"
-    ID_FLUSH_BUFFER         "Sync all dirty cache to disk"
-    ID_CHANGE_PARTTYPE      "Change the partition type/id"
-    ID_REMOVE_DEAD_LETTER   "Remove the dead driver letter"
-END
-
-STRINGTABLE DISCARDABLE 
-BEGIN
     IDS_DISK_TYPE_DYN       "Dynamic"
     IDS_DONATE_DECLARE      "\r\nExt2Fsd is an open source software. It acts as a bridge between Windows and Linux, making life easier to access Linux partitions under Windows systems.\r\n\r\nCurrently there are still lots of jobs left to make a fully functional file system driver, such as complete ext3 support, Linux LVM, Windows Vista, Longhorn. Especially Vista and Longhorn will need driver signing.\r\n\r\nNow I'm the only part-time developer. It needs about two full time developers to implement that job and also it needs some hardwares such SMP system, SCSI array for debugging and testing.\r\n\r\nI'll try my best to make it out. I'm dreaming of that day.\r\n\r\nAny help will be highly appreciated. Thanks and best wishes.\r\n\r\n\r\nYours sincerely,\r\nMatt"
     IDS_SHOW_PROPERTY       "Show Properties\tF6"
     IDS_COPY_ITEM_TO_CLIP   "&Copy to Clipboard"
-    IDS_CHANGE_DRVLETTER    "Change Drive Letter\tF4"
+    IDS_CHANGE_DRVLETTER    "Change Drive Letter\tF10"
     IDS_EXT2_MANAGEMENT     "Ext2 Management\tF3"
     IDS_FLUSH_BUFFER        "Flush Cache to Disk\tF11"
     IDS_CHANGE_PARTID       "Change Partition Type\tF12"
@@ -1240,6 +1263,7 @@ BEGIN
     IDS_PERFSTAT_TOTAL      "Total allocations"
     IDS_PERFSTAT_PROCESSING "Being processed"
     IDS_PERSTAT_PROCESSED   "Ever processed"
+    IDS_DRV_QUICK_MOUNT     "Assign Drive Letter\tF4"
 END
 
 #endif    // English (U.S.) resources

@@ -8,7 +8,7 @@
 #include "windowsx.h"
 
 //  ===========================================================================
-//  The following is used for layering support which is used in the
+//  The following is used for layering support which is used in the 
 //  splash screen for transparency. In VC 6 these are not defined in the headers
 //  for user32.dll and hence we use mechanisms so that it can work in VC 6.
 //  We define the flags here and write code so that we can load the function
@@ -16,28 +16,28 @@
 //  to work.
 //  ===========================================================================
 typedef BOOL (WINAPI *lpfnSetLayeredWindowAttributes)
-(HWND hWnd, COLORREF cr, BYTE bAlpha, DWORD dwFlags);
+        (HWND hWnd, COLORREF cr, BYTE bAlpha, DWORD dwFlags);
 
 lpfnSetLayeredWindowAttributes g_pSetLayeredWindowAttributes;
 
-#define WS_EX_LAYERED 0x00080000
+#define WS_EX_LAYERED 0x00080000 
 
 //  ===========================================================================
 //  Func    ExtWndProc
-//  Desc    The windows procedure that is used to forward messages to the
+//  Desc    The windows procedure that is used to forward messages to the 
 //          CSplash class. CSplash sends the "this" pointer through the
-//          CreateWindowEx call and the pointer reaches here in the
-//          WM_CREATE message. We store it here and use it for message
+//          CreateWindowEx call and the pointer reaches here in the 
+//          WM_CREATE message. We store it here and use it for message 
 //          forwarding.
 //  ===========================================================================
 static LRESULT CALLBACK ExtWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     static CSplash * spl = NULL;
-    if (uMsg == WM_CREATE)
+    if(uMsg == WM_CREATE)
     {
         spl = (CSplash*)((LPCREATESTRUCT)lParam)->lpCreateParams;
     }
-    if (spl)
+    if(spl)
         return spl->WindowProc(hwnd, uMsg, wParam, lParam);
     else
         return DefWindowProc (hwnd, uMsg, wParam, lParam);
@@ -46,15 +46,15 @@ static LRESULT CALLBACK ExtWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 LRESULT CALLBACK CSplash::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     //  We need to handle on the WM_PAINT message
-    switch (uMsg)
+    switch(uMsg)
     {
         HANDLE_MSG(hwnd, WM_PAINT, OnPaint);
 #if 0
-        // Stop flicker when splash screen appears
-    case WM_ERASEBKGND:
-        // stop the default processing of this message
-        // by returning 1
-        return (LRESULT)1; // say we handled it
+       // Stop flicker when splash screen appears
+        case WM_ERASEBKGND:
+           // stop the default processing of this message
+           // by returning 1
+           return (LRESULT)1; // say we handled it
 #endif
     }
 
@@ -74,16 +74,16 @@ void CSplash:: OnPaint(HWND hwnd)
 
     RECT   rect;
     ::GetClientRect(m_hwnd, &rect);
-
+    
     HDC hMemDC      = ::CreateCompatibleDC(hDC);
     HBITMAP hOldBmp = (HBITMAP)::SelectObject(hMemDC, m_hBitmap);
-
+    
     BitBlt(hDC, 0, 0, m_dwWidth, m_dwHeight, hMemDC, 0, 0, SRCCOPY);
 
     ::SelectObject(hMemDC, hOldBmp);
 
     ::DeleteDC(hMemDC);
-
+    
     EndPaint (hwnd, &ps) ;
 }
 
@@ -103,7 +103,7 @@ void CSplash::Init()
     HMODULE hUser32 = GetModuleHandle(TEXT("USER32.DLL"));
 
     g_pSetLayeredWindowAttributes = (lpfnSetLayeredWindowAttributes)
-                                    GetProcAddress(hUser32, "SetLayeredWindowAttributes");
+                        GetProcAddress(hUser32, "SetLayeredWindowAttributes");
 }
 
 CSplash::CSplash()
@@ -143,7 +143,7 @@ HWND CSplash::RegAndCreateWindow()
     wndclass.lpszClassName  = m_lpszClassName;
     wndclass.hIconSm        = NULL;
 
-    if (!RegisterClassEx (&wndclass))
+    if(!RegisterClassEx (&wndclass))
         return NULL;
 
     //  =======================================================================
@@ -155,14 +155,14 @@ HWND CSplash::RegAndCreateWindow()
 
     int x = (nScrWidth  - m_dwWidth) / 2;
     int y = (nScrHeight - m_dwHeight) / 2;
-    m_hwnd = ::CreateWindowEx(WS_EX_TOPMOST|WS_EX_TOOLWINDOW, m_lpszClassName,
-                              TEXT("Ext2 Volume Manager"), WS_POPUP, x, y,
+    m_hwnd = ::CreateWindowEx(WS_EX_TOPMOST|WS_EX_TOOLWINDOW, m_lpszClassName, 
+                              TEXT("Ext2 Volume Manager"), WS_POPUP, x, y, 
                               m_dwWidth, m_dwHeight, NULL, NULL, NULL, this);
 
     //  =======================================================================
     //  Display the window
     //  =======================================================================
-    if (m_hwnd)
+    if(m_hwnd)
     {
         MakeTransparent();
         ShowWindow   (m_hwnd, SW_SHOW) ;
@@ -176,7 +176,7 @@ int CSplash::DoLoop()
     //  =======================================================================
     //  Show the window
     //  =======================================================================
-    if (!m_hwnd)
+    if(!m_hwnd)
         ShowSplash();
 
     //  =======================================================================
@@ -207,7 +207,7 @@ DWORD CSplash::SetBitmap(UINT id)
     //  =======================================================================
     HBITMAP    hBitmap       = NULL;
     hBitmap = (HBITMAP)::LoadImage(GetModuleHandle(NULL), MAKEINTRESOURCE(id),
-                                   IMAGE_BITMAP, 0, 0, 0);
+                                  IMAGE_BITMAP, 0, 0, 0);
     return SetBitmap(hBitmap);
 }
 
@@ -215,16 +215,16 @@ DWORD CSplash::SetBitmap(HBITMAP hBitmap)
 {
     int nRetValue;
     BITMAP  csBitmapSize;
-
+    
     //  =======================================================================
     //  Free loaded resource
     //  =======================================================================
     FreeResources();
-
+    
     if (hBitmap)
     {
         m_hBitmap = hBitmap;
-
+        
         //  ===================================================================
         //  Get bitmap size
         //  ===================================================================
@@ -237,7 +237,7 @@ DWORD CSplash::SetBitmap(HBITMAP hBitmap)
         m_dwWidth = (DWORD)csBitmapSize.bmWidth;
         m_dwHeight = (DWORD)csBitmapSize.bmHeight;
     }
-
+       
     return 1;
 }
 
@@ -250,8 +250,8 @@ void CSplash::FreeResources()
 
 int CSplash::CloseSplash()
 {
-
-    if (m_hwnd)
+    
+    if(m_hwnd)
     {
         DestroyWindow(m_hwnd);
         m_hwnd = 0;
@@ -273,12 +273,12 @@ bool CSplash::MakeTransparent()
     //  =======================================================================
     //  Set the layered window style and make the required color transparent
     //  =======================================================================
-    if (m_hwnd && g_pSetLayeredWindowAttributes && m_colTrans )
+    if(m_hwnd && g_pSetLayeredWindowAttributes && m_colTrans )
     {
         //  set layered style for the window
         SetWindowLong(m_hwnd, GWL_EXSTYLE, GetWindowLong(m_hwnd, GWL_EXSTYLE) | WS_EX_LAYERED);
         //  call it with 0 alpha for the given color
         g_pSetLayeredWindowAttributes(m_hwnd, m_colTrans, 0, LWA_COLORKEY);
-    }
+    }    
     return TRUE;
 }

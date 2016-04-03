@@ -17,25 +17,25 @@ class CProperties : public CDialog
 {
 // Construction
 public:
-    CProperties(CWnd* pParent = NULL);   // standard constructor
+	CProperties(CWnd* pParent = NULL);   // standard constructor
 
     BOOLEAN m_bdisk;
     ULONG   m_type;
     PVOID   m_sdev;
 
 // Dialog Data
-    //{{AFX_DATA(CProperties)
-    enum { IDD = IDD_PROPERTY_DIALOG };
-    // NOTE: the ClassWizard will add data members here
-    //}}AFX_DATA
+	//{{AFX_DATA(CProperties)
+	enum { IDD = IDD_PROPERTY_DIALOG };
+		// NOTE: the ClassWizard will add data members here
+	//}}AFX_DATA
 
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CProperties)
-protected:
-    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CProperties)
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	//}}AFX_VIRTUAL
 
 // Implementation
 protected:
@@ -51,14 +51,15 @@ protected:
     CComboBox *cbDiskBox;
     CComboBox *cbPartBox;
 
-    // Generated message map functions
-    //{{AFX_MSG(CProperties)
-    afx_msg void OnSdevChangeMp();
-    afx_msg void OnSdevExt2Info();
-    virtual BOOL OnInitDialog();
+	// Generated message map functions
+	//{{AFX_MSG(CProperties)
+	afx_msg void OnSdevChangeMp();
+	afx_msg void OnSdevQuickMount();
+	afx_msg void OnSdevExt2Info();
+	virtual BOOL OnInitDialog();
     LRESULT OnGroupBoxUpdated(WPARAM wParam,LPARAM lParam);
-    //}}AFX_MSG
-    DECLARE_MESSAGE_MAP()
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
 
     void ResetDiskGroup();
     void ResetPartGroup();

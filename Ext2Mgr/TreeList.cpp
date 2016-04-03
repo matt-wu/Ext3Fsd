@@ -19,7 +19,7 @@ CTreeList::CTreeList()
     m_SelectionRect = CRect(0,0,0,0);
     m_SelectionFlag = FALSE;
     m_Point = CPoint(0, 0);
-    m_PrevItem = -1;
+	m_PrevItem = -1;
     m_Rows = 0;
     m_Columns = 1;
     m_hBitmap = NULL;
@@ -30,7 +30,7 @@ CTreeList::CTreeList()
 
 CTreeList::~CTreeList()
 {
-    if (m_hBitmap) {
+	if (m_hBitmap) {
 
         if (m_hMemDC) {
             ::SelectObject(m_hMemDC, m_hOldBmp);
@@ -44,12 +44,12 @@ CTreeList::~CTreeList()
 
 
 BEGIN_MESSAGE_MAP(CTreeList, CListCtrl)
-    //{{AFX_MSG_MAP(CTreeList)
-    ON_WM_LBUTTONDOWN()
-    ON_WM_RBUTTONDOWN()
-    ON_NOTIFY_REFLECT(NM_KILLFOCUS, OnKillfocus)
-    ON_NOTIFY_REFLECT(NM_SETFOCUS, OnSetfocus)
-    //}}AFX_MSG_MAP
+	//{{AFX_MSG_MAP(CTreeList)
+	ON_WM_LBUTTONDOWN()
+	ON_WM_RBUTTONDOWN()
+	ON_NOTIFY_REFLECT(NM_KILLFOCUS, OnKillfocus)
+	ON_NOTIFY_REFLECT(NM_SETFOCUS, OnSetfocus)
+	//}}AFX_MSG_MAP
     ON_MESSAGE(WM_SETFONT, OnSetFont)
     ON_WM_MEASUREITEM_REFLECT()
 END_MESSAGE_MAP()
@@ -57,22 +57,22 @@ END_MESSAGE_MAP()
 /////////////////////////////////////////////////////////////////////////////
 // CTreeList message handlers
 
-void CTreeList::OnLButtonDown(UINT nFlags, CPoint point)
+void CTreeList::OnLButtonDown(UINT nFlags, CPoint point) 
 {
-    // TODO: Add your message handler code here and/or call default
-    m_Point = point;
-    m_SelectionFlag = FALSE;
+	// TODO: Add your message handler code here and/or call default
+	m_Point = point;
+	m_SelectionFlag = FALSE;
 
-    Invalidate();
-
-    CListCtrl::OnLButtonDown(nFlags, point);
+	Invalidate();
+	
+	CListCtrl::OnLButtonDown(nFlags, point);
 }
 
-BOOL CTreeList::PreCreateWindow(CREATESTRUCT& cs)
+BOOL CTreeList::PreCreateWindow(CREATESTRUCT& cs) 
 {
-    // TODO: Add your specialized code here and/or call the base class
-    cs.style |= LVS_REPORT | LVS_OWNERDRAWFIXED| WS_BORDER;
-    return CListCtrl::PreCreateWindow(cs);
+	// TODO: Add your specialized code here and/or call the base class
+	cs.style |= LVS_REPORT | LVS_OWNERDRAWFIXED| WS_BORDER;
+	return CListCtrl::PreCreateWindow(cs);
 }
 
 LRESULT CTreeList::OnSetFont(WPARAM wParam, LPARAM)
@@ -97,7 +97,7 @@ void CTreeList::MeasureItem( LPMEASUREITEMSTRUCT lpMeasureItemStruct )
     lpMeasureItemStruct->itemHeight = 16;
 }
 
-void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
+void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct) 
 {
     PULONG  pMagic = (PULONG) lpDrawItemStruct->itemData;
 
@@ -107,7 +107,7 @@ void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
     memset(lpBuffer, 0, 256);
     lvi.mask = LVIF_TEXT | LVIF_PARAM ;
-    lvi.iItem = lpDrawItemStruct->itemID ;
+    lvi.iItem = lpDrawItemStruct->itemID ;  
     lvi.iSubItem = 0;
     lvi.pszText = lpBuffer ;
     lvi.cchTextMax = sizeof(lpBuffer);
@@ -134,7 +134,7 @@ void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
     if (*pMagic == EXT2_CDROM_DEVICE_MAGIC || *pMagic == EXT2_DISK_MAGIC) {
 
-        if (IsVista()) {
+        if (IsVistaOrAbove()) {
             lstrcpy(lf.lfFaceName, "MS Sans Serif"); /*Courier New*/
             lf.lfHeight = -MulDiv(8, cyPixels, 72);
             lf.lfWeight = TRUE;
@@ -153,9 +153,9 @@ void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
     /* loading bitmap */
     if (m_hBitmap == NULL) {
-        m_hBitmap = (HBITMAP)::LoadImage(GetModuleHandle(NULL),
-                                         MAKEINTRESOURCE(IDB_LINE_SEP),
-                                         IMAGE_BITMAP, 0, 0, 0);
+        m_hBitmap = (HBITMAP)::LoadImage(GetModuleHandle(NULL), 
+                             MAKEINTRESOURCE(IDB_LINE_SEP),
+                             IMAGE_BITMAP, 0, 0, 0);
 
         if (m_hBitmap) {
             m_hMemDC  = ::CreateCompatibleDC(this->GetDC()->m_hDC);
@@ -168,11 +168,11 @@ void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
         if (!m_SelectionFlag) {
             for (nCol=0; GetColumn(nCol, &lvc); nCol++) {
                 if (nCol > 0) {
-                    GetSubItemRect(lpDrawItemStruct->itemID,
-                                   nCol,LVIR_BOUNDS, m_SelectionRect);
+                    GetSubItemRect(lpDrawItemStruct->itemID, 
+                        nCol,LVIR_BOUNDS, m_SelectionRect);
                 } else {
-                    GetItemRect(lpDrawItemStruct->itemID,
-                                m_SelectionRect,LVIR_BOUNDS);
+                    GetItemRect(lpDrawItemStruct->itemID, 
+                             m_SelectionRect,LVIR_BOUNDS);
                     m_SelectionRect.right = GetColumnWidth(0);
                     m_SelectionRect.left = 0;
                 }
@@ -183,26 +183,23 @@ void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
                 } else {
                     m_SelectionFlag = FALSE;
                 }
-            }
+            } 
         }
-
+ 
         if ((lpDrawItemStruct->itemState & ODS_SELECTED) && m_SelectionFlag ) {
 
             CRect rc = lpDrawItemStruct->rcItem;
-            rc.left  += 4;
-            rc.right -= 4;
-            rc.top   += 1;
-            rc.bottom -= 0;
+            rc.left  += 4; rc.right -= 4;
+            rc.top   += 1; rc.bottom -= 0;
             if (*pMagic == EXT2_CDROM_DEVICE_MAGIC || *pMagic == EXT2_DISK_MAGIC) {
-                rc.bottom -= 3;
-                rc.top -= 1;
+                rc.bottom -= 3; rc.top -= 1;
                 rc.right = (rc.Width() * 7 / 8) + rc.left;
             }
             pDC->FillSolidRect(&rc, GetSysColor(m_bFocus ? COLOR_HIGHLIGHT : COLOR_INACTIVEBORDER));
         } else {
             CRect rc = lpDrawItemStruct->rcItem;
             pDC->FillSolidRect(&rc, GetSysColor(COLOR_WINDOW)) ;
-            pDC->SetTextColor(GetSysColor(COLOR_WINDOWTEXT)) ;
+            pDC->SetTextColor(GetSysColor(COLOR_WINDOWTEXT)) ; 
         }
     }
 
@@ -217,8 +214,8 @@ void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
             rcText.bottom += 1;
             rcText.top = rcText.bottom - 6 + lf.lfHeight;
 
-            ::DrawText(lpDrawItemStruct->hDC, lpBuffer, strlen(lpBuffer),
-                       &rcText, DT_LEFT) ;
+            ::DrawText(lpDrawItemStruct->hDC, lpBuffer, strlen(lpBuffer), 
+                              &rcText, DT_LEFT) ;
 
             CRect rect = lpDrawItemStruct->rcItem;
             int rc = 0;
@@ -239,10 +236,10 @@ void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
         } else {
 
             if (nCol > 0) {
-                GetColumn(nCol, &lvcprev) ;
-                rcText.left = rcText.right;
-                rcText.right += lvcprev.cx;
-                rcText.left += 4;
+               GetColumn(nCol, &lvcprev) ;
+               rcText.left = rcText.right;
+               rcText.right += lvcprev.cx;
+               rcText.left += 4;
 
                 if (nCol == 3 || nCol == 4) {
                     uFormat = DT_RIGHT;
@@ -256,7 +253,7 @@ void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
                 rcText.left += 20;
             }
 
-            // Get and draw the text
+            // Get and draw the text 
             memset(lpBuffer, 0, 256);
             ::ZeroMemory(&lvi, sizeof(lvi));
             lvi.iItem = lpDrawItemStruct->itemID;
@@ -265,9 +262,9 @@ void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
             lvi.pszText = lpBuffer;
             lvi.cchTextMax = sizeof(lpBuffer);
             GetItem(&lvi);
-
-            ::DrawText(lpDrawItemStruct->hDC, lpBuffer, strlen(lpBuffer),
-                       &rcText, uFormat) ;
+   
+            ::DrawText(lpDrawItemStruct->hDC, lpBuffer, strlen(lpBuffer), 
+                              &rcText, uFormat) ;
 
             if (nCol == 0) {
                 rcText.left -= 20;
@@ -285,32 +282,32 @@ void CTreeList::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
     return;
 }
 
-void CTreeList::OnRButtonDown(UINT nFlags, CPoint point)
+void CTreeList::OnRButtonDown(UINT nFlags, CPoint point) 
 {
-    // TODO: Add your message handler code here and/or call default
-    m_Point = point;
-    m_SelectionFlag = FALSE;
+	// TODO: Add your message handler code here and/or call default
+	m_Point = point;
+	m_SelectionFlag = FALSE;
 
-    Invalidate();
-
-    CListCtrl::OnRButtonDown(nFlags, point);
+	Invalidate();
+	
+	CListCtrl::OnRButtonDown(nFlags, point);
 }
 
-void CTreeList::OnKillfocus(NMHDR* pNMHDR, LRESULT* pResult)
+void CTreeList::OnKillfocus(NMHDR* pNMHDR, LRESULT* pResult) 
 {
-    // TODO: Add your control notification handler code here
+	// TODO: Add your control notification handler code here
     m_bFocus = FALSE;
     Invalidate();
-    *pResult = 0;
+	*pResult = 0;
 }
 
-void CTreeList::OnSetfocus(NMHDR* pNMHDR, LRESULT* pResult)
+void CTreeList::OnSetfocus(NMHDR* pNMHDR, LRESULT* pResult) 
 {
-    // TODO: Add your control notification handler code here
+	// TODO: Add your control notification handler code here
     m_bFocus = TRUE;
     Invalidate();
 
-    *pResult = 0;
+	*pResult = 0;
 }
 
 int CTreeList::QuerySubItemText(int item, CHAR *Data, int length)

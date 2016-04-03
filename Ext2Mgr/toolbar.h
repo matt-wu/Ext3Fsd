@@ -24,12 +24,12 @@ typedef struct _BUTTON_INFO {
 class CStandardBar : public CToolBarCtrl
 {
 private:
-    int         m_nButtonCount;
-    TBBUTTON    *m_pTBButtons;
+	int         m_nButtonCount;
+	TBBUTTON    *m_pTBButtons;
 
 // Construction
 public:
-    CStandardBar();
+	CStandardBar();
 
 // Attributes
 public:
@@ -39,47 +39,47 @@ public:
 
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CStandardBar)
-public:
-    virtual BOOL OnChildNotify(UINT message, WPARAM wParam, LPARAM lParam, LRESULT* pLResult);
-    virtual BOOL Create( DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID, int count, PBUTTON_INFO);
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CStandardBar)
+	public:
+	virtual BOOL OnChildNotify(UINT message, WPARAM wParam, LPARAM lParam, LRESULT* pLResult);
+	virtual BOOL Create( DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID, int count, PBUTTON_INFO);
+	//}}AFX_VIRTUAL
 
 
 // Implementation
 public:
-    virtual ~CStandardBar();
+	virtual ~CStandardBar();
 
 protected:
-    BOOL BeginAdjust(WPARAM wParam, LPARAM lParam, LRESULT* pLResult);
-    BOOL BeginDrag(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
-    BOOL CustomizeHelp(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
-    BOOL EndAdjust(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
-    BOOL EndDrag(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
-    BOOL GetButtonInfo(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
-    BOOL QueryDelete(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
-    BOOL QueryInsert(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
-    BOOL Reset(WPARAM wParam, LPARAM lParam, LRESULT* pLResult);
-    BOOL ToolBarChange(WPARAM wParam, LPARAM lParam,LRESULT* pLResult);
+	BOOL BeginAdjust(WPARAM wParam, LPARAM lParam, LRESULT* pLResult);
+	BOOL BeginDrag(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
+	BOOL CustomizeHelp(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
+	BOOL EndAdjust(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
+	BOOL EndDrag(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
+	BOOL GetButtonInfo(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
+	BOOL QueryDelete(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
+	BOOL QueryInsert(WPARAM wParam, LPARAM  lParam, LRESULT* pLResult);
+	BOOL Reset(WPARAM wParam, LPARAM lParam, LRESULT* pLResult);
+	BOOL ToolBarChange(WPARAM wParam, LPARAM lParam,LRESULT* pLResult);
 
-    CString NeedText(UINT nID, NMHDR * pNotifyStruct, LRESULT * lResult);
+	CString NeedText(UINT nID, NMHDR * pNotifyStruct, LRESULT * lResult);
 
 ///////////////////////////////////////////////////////////////////////////////
 // Following function has to be removed when OnNotify is fixed
 //
-    virtual BOOL OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult);
+	virtual BOOL OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult);
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-    // Generated message map functions
+	// Generated message map functions
 protected:
-    //{{AFX_MSG(CStandardBar)
-    afx_msg void OnNeedTextW( UINT nID, NMHDR * pNotifyStruct, LRESULT * lResult );
-    afx_msg void OnNeedTextA( UINT nID, NMHDR * pNotifyStruct, LRESULT * lResult );
-    //}}AFX_MSG
+	//{{AFX_MSG(CStandardBar)
+	afx_msg void OnNeedTextW( UINT nID, NMHDR * pNotifyStruct, LRESULT * lResult );
+	afx_msg void OnNeedTextA( UINT nID, NMHDR * pNotifyStruct, LRESULT * lResult );
+	//}}AFX_MSG
 
-    DECLARE_MESSAGE_MAP()
+	DECLARE_MESSAGE_MAP()
 };
 
 /////////////////////////////////////////////////////////////////////////////

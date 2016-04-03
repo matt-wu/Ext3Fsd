@@ -16,18 +16,18 @@ class CMountPoints : public CDialog
 {
 // Construction
 public:
-    CMountPoints(CWnd* pParent = NULL);   // standard constructor
+	CMountPoints(CWnd* pParent = NULL);   // standard constructor
 
 // Dialog Data
-    //{{AFX_DATA(CMountPoints)
-    enum { IDD = IDD_CHANGE_MOUNTPINT };
-    CListCtrl	m_drvList;
-    //}}AFX_DATA
+	//{{AFX_DATA(CMountPoints)
+	enum { IDD = IDD_CHANGE_MOUNTPINT };
+	CListCtrl	m_drvList;
+	//}}AFX_DATA
 
     void InitializeList(ULONGLONG letters);
 
 // Attributes
-public:
+public: 
 
     PEXT2_CDROM     m_Cdrom;
     PEXT2_VOLUME    m_Volume;
@@ -38,35 +38,35 @@ public:
 
     CWnd *          m_MainDlg;
 
-    BOOLEAN
-    RemoveMountPoint(CHAR drvChar);
+BOOLEAN
+RemoveMountPoint(CHAR drvChar);
 
-    BOOLEAN
-    AddMountPoint(CHAR drvChar, BOOLEAN bRegistry, BOOLEAN bMountMgr);
+BOOLEAN
+AddMountPoint(CHAR drvChar, BOOLEAN bRegistry, BOOLEAN bMountMgr);
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CMountPoints)
-public:
-    virtual BOOL PreTranslateMessage(MSG* pMsg);
-protected:
-    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CMountPoints)
+	public:
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	//}}AFX_VIRTUAL
 
 // Implementation
 protected:
 
-    // Generated message map functions
-    //{{AFX_MSG(CMountPoints)
-    afx_msg void OnClickDrvLetterList(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnAddMountpoint();
-    afx_msg void OnChangeMountpoint();
-    afx_msg void OnRemoveMountpoint();
-    virtual void OnOK();
-    virtual void OnCancel();
-    virtual BOOL OnInitDialog();
-    //}}AFX_MSG
-    DECLARE_MESSAGE_MAP()
+	// Generated message map functions
+	//{{AFX_MSG(CMountPoints)
+	afx_msg void OnClickDrvLetterList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnAddMountpoint();
+	afx_msg void OnChangeMountpoint();
+	afx_msg void OnRemoveMountpoint();
+	virtual void OnOK();
+	virtual void OnCancel();
+	virtual BOOL OnInitDialog();
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
 };
 
 //{{AFX_INSERT_LOCATION}}

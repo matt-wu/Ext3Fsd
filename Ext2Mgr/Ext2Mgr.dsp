@@ -125,6 +125,10 @@ SOURCE=.\Ext2MgrDlg.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\Ext2Pipe.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\HyperLink.cpp
 # End Source File
 # Begin Source File

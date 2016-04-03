@@ -38,6 +38,7 @@
 #define IDD_PARTITION_TYPE              187
 #define IDD_REMOVE_DEADLETTER           188
 #define IDR_AKEY_EXT2MGR                190
+#define IDR_RCDAT_SRV                   191
 #define IDC_VOLUME_LIST                 1001
 #define IDC_AUTHOR                      1002
 #define IDC_ABOUT_SHOW                  1003
@@ -103,6 +104,10 @@
 #define IDC_AUTOREMOVALTEXT             1065
 #define IDC_REMOVAL_CURRENT             1066
 #define IDC_DRIVER                      1067
+#define IDC_SDEV_QUICK_MOUNT            1068
+#define IDC_EDIT_UID                    1070
+#define IDC_EDIT_GID                    1071
+#define IDC_EDIT_EUID                   1072
 #define ID_ABOUT                        32771
 #define ID_NEW                          32772
 #define ID_CHANGE                       32773
@@ -129,6 +134,8 @@
 #define ID_FLUSH_BUFFER                 32794
 #define ID_CHANGE_PARTTYPE              32795
 #define ID_REMOVE_DEAD_LETTER           32796
+#define ID_DRV_QUICK_MOUNT              32797
+#define ID_DRV_QUICK_REMOVE             32798
 #define IDS_LISTITEM_FILESYSTEM         57671
 #define IDS_LISTITEM_VOLUME             57672
 #define IDS_LISTITEM_TYPE               57673
@@ -158,14 +165,15 @@
 #define IDS_PERFSTAT_PROCESSING         57697
 #define IDS_PERSTAT_PROCESSED           57698
 #define IDS_PERFSTAT_PROCESSED          57698
+#define IDS_DRV_QUICK_MOUNT             57699
 
 // Next default values for new objects
-//
+// 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        192
-#define _APS_NEXT_COMMAND_VALUE         32797
-#define _APS_NEXT_CONTROL_VALUE         1068
+#define _APS_NEXT_COMMAND_VALUE         32799
+#define _APS_NEXT_CONTROL_VALUE         1071
 #define _APS_NEXT_SYMED_VALUE           105
 #endif
 #endif

@@ -16,49 +16,49 @@ static char THIS_FILE[] = __FILE__;
 
 
 CSelectDrvLetter::CSelectDrvLetter(CWnd* pParent /*=NULL*/)
-        : CDialog(CSelectDrvLetter::IDD, pParent)
+	: CDialog(CSelectDrvLetter::IDD, pParent)
 {
-    //{{AFX_DATA_INIT(CSelectDrvLetter)
-    m_DrvLetter = _T("");
-    //}}AFX_DATA_INIT
+	//{{AFX_DATA_INIT(CSelectDrvLetter)
+	m_DrvLetter = _T("");
+	//}}AFX_DATA_INIT
 
-    m_bMountMgr = TRUE;
-    m_bRegistry = FALSE;
-    m_bDosDev = FALSE;
+	m_bMountMgr = TRUE;
+	m_bRegistry = FALSE;
+	m_bDosDev = FALSE;
 }
 
 
 void CSelectDrvLetter::DoDataExchange(CDataExchange* pDX)
 {
-    CDialog::DoDataExchange(pDX);
-    //{{AFX_DATA_MAP(CSelectDrvLetter)
-    DDX_CBString(pDX, IDC_DRVLETTERS_LIST, m_DrvLetter);
-    //}}AFX_DATA_MAP
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CSelectDrvLetter)
+	DDX_CBString(pDX, IDC_DRVLETTERS_LIST, m_DrvLetter);
+	//}}AFX_DATA_MAP
 }
 
 
 BEGIN_MESSAGE_MAP(CSelectDrvLetter, CDialog)
-    //{{AFX_MSG_MAP(CSelectDrvLetter)
-    ON_BN_CLICKED(IDC_DOSDEV_MP, OnDosdevMount)
-    ON_BN_CLICKED(IDC_PERMANENT_MP, OnMMgrMount)
-    ON_BN_CLICKED(IDC_REGISTRY_MP, OnRegistryMount)
-    //}}AFX_MSG_MAP
+	//{{AFX_MSG_MAP(CSelectDrvLetter)
+	ON_BN_CLICKED(IDC_DOSDEV_MP, OnDosdevMount)
+	ON_BN_CLICKED(IDC_PERMANENT_MP, OnMMgrMount)
+	ON_BN_CLICKED(IDC_REGISTRY_MP, OnRegistryMount)
+	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
 // CSelectDrvLetter message handlers
 
-void CSelectDrvLetter::OnOK()
+void CSelectDrvLetter::OnOK() 
 {
-    // TODO: Add extra validation here
-    UpdateData(TRUE);
+	// TODO: Add extra validation here
+	UpdateData(TRUE);
 
     if (m_DrvLetter.IsEmpty()) {
         AfxMessageBox("You must select a drive letter.", MB_OK|MB_ICONWARNING);
         return;
     }
 
-    CComboBox   *cbDrvLetter = (CComboBox *)GetDlgItem(IDC_DRVLETTERS_LIST);
+	CComboBox   *cbDrvLetter = (CComboBox *)GetDlgItem(IDC_DRVLETTERS_LIST);
     if (cbDrvLetter) {
         int rc = cbDrvLetter->FindStringExact(-1, m_DrvLetter);
         if (rc == CB_ERR) {
@@ -66,23 +66,23 @@ void CSelectDrvLetter::OnOK()
             return;
         }
     }
-    CDialog::OnOK();
+	CDialog::OnOK();
 }
 
-void CSelectDrvLetter::OnCancel()
+void CSelectDrvLetter::OnCancel() 
 {
-    // TODO: Add extra cleanup here
-    m_DrvLetter.Empty();
-    CDialog::OnCancel();
+	// TODO: Add extra cleanup here
+	m_DrvLetter.Empty();
+	CDialog::OnCancel();
 }
 
-BOOL CSelectDrvLetter::OnInitDialog()
+BOOL CSelectDrvLetter::OnInitDialog() 
 {
-    CDialog::OnInitDialog();
+	CDialog::OnInitDialog();
+	
+	// TODO: Add extra initialization here
 
-    // TODO: Add extra initialization here
-
-    CComboBox   *cbDrvLetter = (CComboBox *)GetDlgItem(IDC_DRVLETTERS_LIST);
+	CComboBox   *cbDrvLetter = (CComboBox *)GetDlgItem(IDC_DRVLETTERS_LIST);
     if (cbDrvLetter) {
         int i;
         CHAR drvPath[]="A:\0";
@@ -93,28 +93,31 @@ BOOL CSelectDrvLetter::OnInitDialog()
                 cbDrvLetter->AddString(drvPath);
             }
         }
+/*
         for (i=0; i < 10; i++) {
             if (!drvDigits[i].bUsed) {
                 drvPath[0] = drvDigits[i].Letter;
                 cbDrvLetter->AddString(drvPath);
             }
         }
+*/
         cbDrvLetter->SetCurSel(0);
     }
     UpdateData(FALSE);
 
     SET_CHECK(IDC_DOSDEV_MP,    m_bDosDev);
-    SET_CHECK(IDC_PERMANENT_MP, m_bMountMgr);
+    SET_WIN(IDC_PERMANENT_MP, FALSE);
+    SET_CHECK(IDC_PERMANENT_MP, 0);
     SET_CHECK(IDC_REGISTRY_MP,  m_bRegistry);
 
-    return TRUE;  // return TRUE unless you set the focus to a control
-    // EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;  // return TRUE unless you set the focus to a control
+	              // EXCEPTION: OCX Property Pages should return FALSE
 }
 
-void CSelectDrvLetter::OnDosdevMount()
+void CSelectDrvLetter::OnDosdevMount() 
 {
     if (!m_bDosDev) {
-        m_bDosDev = !m_bDosDev;
+	    m_bDosDev = !m_bDosDev;
         if (m_bDosDev) {
             m_bMountMgr = FALSE;
             m_bRegistry = FALSE;
@@ -124,12 +127,14 @@ void CSelectDrvLetter::OnDosdevMount()
     SET_CHECK(IDC_DOSDEV_MP,    m_bDosDev);
     SET_CHECK(IDC_PERMANENT_MP, m_bMountMgr);
     SET_CHECK(IDC_REGISTRY_MP,  m_bRegistry);
+
+    OnOK();
 }
 
-void CSelectDrvLetter::OnMMgrMount()
+void CSelectDrvLetter::OnMMgrMount() 
 {
     if (!m_bMountMgr) {
-        m_bMountMgr = !m_bMountMgr;
+	    m_bMountMgr = !m_bMountMgr;
         if (m_bMountMgr) {
             m_bDosDev = FALSE;
             m_bRegistry = FALSE;
@@ -139,12 +144,14 @@ void CSelectDrvLetter::OnMMgrMount()
     SET_CHECK(IDC_DOSDEV_MP,    m_bDosDev);
     SET_CHECK(IDC_PERMANENT_MP, m_bMountMgr);
     SET_CHECK(IDC_REGISTRY_MP,  m_bRegistry);
+
+    OnOK();
 }
 
-void CSelectDrvLetter::OnRegistryMount()
+void CSelectDrvLetter::OnRegistryMount() 
 {
     if (!m_bRegistry) {
-        m_bRegistry = !m_bRegistry;
+	    m_bRegistry = !m_bRegistry;
         if (m_bRegistry) {
             m_bDosDev = FALSE;
             m_bMountMgr = FALSE;
@@ -154,4 +161,6 @@ void CSelectDrvLetter::OnRegistryMount()
     SET_CHECK(IDC_DOSDEV_MP,    m_bDosDev);
     SET_CHECK(IDC_PERMANENT_MP, m_bMountMgr);
     SET_CHECK(IDC_REGISTRY_MP,  m_bRegistry);
+
+    OnOK();
 }

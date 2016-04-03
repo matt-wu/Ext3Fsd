@@ -15,7 +15,7 @@ ULONG g_nVols     = 0;
 EXT2_LETTER drvLetters[26];
 EXT2_LETTER drvDigits[10];
 
-ULONGLONG Ext2DrvLetters[2];
+ULONGLONG Ext2DrvLetters[2] = {-1, -1};
 
 PEXT2_DISK      gDisks  = NULL;
 PEXT2_CDROM     gCdroms = NULL;
@@ -24,23 +24,23 @@ PEXT2_VOLUME    gVols = NULL;
 /* information string array */
 
 typedef struct {
-    int PartitionType;
-    char *type;
+  int PartitionType;
+  char *type;
 } PARTITION_LIST;
 
 typedef struct {
-    UINT DriveType;
-    char *type;
+  UINT DriveType;
+  char *type;
 } DRIVE_LIST;
 
 typedef struct {
-    DEVICE_TYPE DeviceType;
-    char *type;
+  DEVICE_TYPE DeviceType;
+  char *type;
 } DEVICE_LIST;
 
 typedef struct {
-    STORAGE_BUS_TYPE BusType;
-    char *type;
+  STORAGE_BUS_TYPE BusType;
+  char *type;
 } BUSTYPE_LIST;
 
 CHAR *
@@ -77,27 +77,27 @@ IrpMjStrings[] = {
 
 CHAR *
 PerfStatStrings[] = {
-    "IRP_CONTEXT",
-    "VCB",
-    "FCB",
-    "CCB",
-    "MCB",
-    "EXTENT",
-    "RW_CONTEXT",
-    "VPB",
-    "FCB_NAME",
-    "MCB_NAME",
-    "FILE_NAME",
-    "DIR_ENTRY",
-    "DIR_PATTERN",
-    "DISK_EVENT",
-    "DISK_BUFFER",
-    "BLOCK_DATA",
-    "inode",
-    "dentry",
-    "buffer head",
-    NULL
-};
+        "IRP_CONTEXT",
+        "VCB",
+        "FCB",
+        "CCB",
+        "MCB",
+        "EXTENT",
+        "RW_CONTEXT",
+        "VPB",
+        "FCB_NAME",
+        "MCB_NAME",
+        "FILE_NAME",
+        "DIR_ENTRY",
+        "DIR_PATTERN",
+        "DISK_EVENT",
+        "DISK_BUFFER",
+        "BLOCK_DATA",
+        "inode",
+        "dentry",
+        "buffer head",
+        NULL
+    };
 
 PARTITION_LIST PartitionList[] = {
     {PARTITION_ENTRY_UNUSED ,   "Empty"},
@@ -294,7 +294,7 @@ char *BusTypeString(STORAGE_BUS_TYPE BusType)
 /* Ext2Fsd supported codepages */
 
 CHAR * gCodepages[] =
-{
+  {
     "default",
     "cp936",
     "gb2312",
@@ -343,25 +343,76 @@ CHAR * gCodepages[] =
     "cp1250",
     "acsii",
     NULL
-};
+  };
 
 /* routines */
 
-BOOLEAN IsVista()
+BOOL g_isWow64 = FALSE;
+BOOL g_isX64 = FALSE;
+
+#define PROCESSOR_ARCHITECTURE_AMD64            9
+
+typedef BOOL (WINAPI *LPFN_ISWOW64PROCESS) (HANDLE, PBOOL);
+LPFN_ISWOW64PROCESS fnIsWow64Process = NULL;
+
+typedef void (WINAPI *LPFN_GETNATIVESYSINFO)(
+                  LPSYSTEM_INFO lpSystemInfo);
+
+LPFN_GETNATIVESYSINFO fnGetNativeSystemInfo = NULL;
+BOOL Ext2IsWow64()
+{
+    if (NULL != fnIsWow64Process) {
+        if (!fnIsWow64Process(GetCurrentProcess(), &g_isWow64)) {
+        }
+    }
+    return g_isWow64;
+}
+
+
+BOOL Ext2IsX64System()
+{
+    SYSTEM_INFO sysInfo;
+    fnIsWow64Process = (LPFN_ISWOW64PROCESS)GetProcAddress(
+        GetModuleHandle("kernel32"), "IsWow64Process");
+
+    fnGetNativeSystemInfo = (LPFN_GETNATIVESYSINFO)GetProcAddress(
+        GetModuleHandle("kernel32"), "GetNativeSystemInfo");
+
+    if (fnGetNativeSystemInfo) {
+        fnGetNativeSystemInfo(&sysInfo);
+
+        if (sysInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 &&
+            Ext2IsWow64()) {
+            g_isWow64 = TRUE;
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+BOOLEAN IsVistaOrAbove()
 {
     OSVERSIONINFO   OsVerInfo;
 
     OsVerInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-
+ 
     if (GetVersionEx(&OsVerInfo)) {
 
-        if (OsVerInfo.dwPlatformId == VER_PLATFORM_WIN32_NT)
-            if (OsVerInfo.dwMajorVersion == 6)
-                if (OsVerInfo.dwBuildNumber > 3790)
-                    return TRUE;
+       if (OsVerInfo.dwMajorVersion == 6 && OsVerInfo.dwBuildNumber > 3790)
+           return TRUE;
+
+       if (OsVerInfo.dwMajorVersion > 6)
+            return TRUE;
     }
 
     return FALSE;
+}
+
+BOOLEAN IsWin10TH2OrAbove()
+{
+    return TRUE;
+    // return IsWindows10OrGreater();
 }
 
 BOOLEAN
@@ -373,8 +424,8 @@ IsWindows2000()
 
     if (GetVersionEx(&OsVer)) {
         if (OsVer.dwPlatformId == VER_PLATFORM_WIN32_NT &&
-                OsVer.dwMajorVersion <= 5 &&
-                OsVer.dwMinorVersion == 0) {
+            OsVer.dwMajorVersion <= 5 && 
+            OsVer.dwMinorVersion == 0) {
             return TRUE;
         }
     } else {
@@ -384,6 +435,33 @@ IsWindows2000()
     return FALSE;
 }
 
+BOOL Ext2DismountVolume(CHAR *voldev)
+{
+
+	HANDLE	device;
+	ULONG	bytes;
+    BOOL    rc = FALSE;
+
+	device = CreateFile(voldev, GENERIC_READ | GENERIC_WRITE,
+                        FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+		                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (device == INVALID_HANDLE_VALUE) {
+		goto errorout;
+	}
+
+	if (!DeviceIoControl(device, FSCTL_LOCK_VOLUME, NULL, 0, NULL, 0,
+                          &bytes, NULL)) {
+	}
+
+    rc = DeviceIoControl(device, FSCTL_DISMOUNT_VOLUME,	NULL, 0, NULL, 0,
+                         &bytes, NULL);
+	CloseHandle(device);
+
+errorout:
+
+	return rc;
+}
 
 /*
  * Ext2LockVolume
@@ -392,10 +470,10 @@ IsWindows2000()
  * ARGUMENTS:
  *     VolumeHandle:    Volume handle.
  *
- * RETURNS:
+ * RETURNS: 
  *     Success or Fail
  *
- * NOTES:
+ * NOTES: 
  *     N/A
  */
 
@@ -407,8 +485,8 @@ Ext2LockVolume(HANDLE Handle)
     NT::IO_STATUS_BLOCK ioSb;
 
     status = NT::ZwFsControlFile(
-                 Handle, NULL, NULL, NULL, &ioSb,
-                 FSCTL_LOCK_VOLUME, NULL, 0, NULL, 0);
+                    Handle, NULL, NULL, NULL, &ioSb,
+                    FSCTL_LOCK_VOLUME, NULL, 0, NULL, 0);
     return status;
 }
 
@@ -420,8 +498,8 @@ Ext2UnLockVolume(HANDLE Handle)
     NT::IO_STATUS_BLOCK ioSb;
 
     status = NT::ZwFsControlFile(
-                 Handle, NULL, NULL, NULL, &ioSb,
-                 FSCTL_UNLOCK_VOLUME, NULL, 0, NULL, 0);
+                    Handle, NULL, NULL, NULL, &ioSb,
+                    FSCTL_UNLOCK_VOLUME, NULL, 0, NULL, 0);
     return status;
 }
 
@@ -433,8 +511,8 @@ Ext2DisMountVolume(HANDLE Handle)
     NT::IO_STATUS_BLOCK ioSb;
 
     status = NT::ZwFsControlFile(
-                 Handle, NULL, NULL, NULL, &ioSb,
-                 FSCTL_DISMOUNT_VOLUME, NULL, 0, NULL, 0);
+                    Handle, NULL, NULL, NULL, &ioSb,
+                    FSCTL_DISMOUNT_VOLUME, NULL, 0, NULL, 0);
 
     return status;
 }
@@ -443,7 +521,7 @@ PDRIVE_LAYOUT_INFORMATION_EXT
 Ext2QueryDriveLayout(
     HANDLE Handle,
     PUCHAR NumOfParts
-)
+    )
 {
     NT::IO_STATUS_BLOCK       ioSb;
     NT::NTSTATUS              status = STATUS_SUCCESS;
@@ -455,24 +533,24 @@ Ext2QueryDriveLayout(
 QueryDrive:
 
     driveLayout = (PDRIVE_LAYOUT_INFORMATION_EXT) malloc(dataSize);
-    if (!driveLayout) {
+    if(!driveLayout) {
         goto errorout;
     }
     memset(driveLayout, 0, dataSize);
 
     if (IsWindows2000()) {
 
-        PDRIVE_LAYOUT_INFORMATION oldLayout =
-            (PDRIVE_LAYOUT_INFORMATION ) malloc(dataSize);
+        PDRIVE_LAYOUT_INFORMATION oldLayout = 
+              (PDRIVE_LAYOUT_INFORMATION ) malloc(dataSize);
         if (!oldLayout) {
             goto errorout;
         }
-
+        
         status = NT::ZwDeviceIoControlFile(
-                     Handle, NULL, NULL, NULL, &ioSb,
-                     IOCTL_DISK_GET_DRIVE_LAYOUT,
-                     NULL, 0, (PVOID)oldLayout, dataSize
-                 );
+                    Handle, NULL, NULL, NULL, &ioSb,
+                    IOCTL_DISK_GET_DRIVE_LAYOUT,
+                    NULL, 0, (PVOID)oldLayout, dataSize
+                    );
 
         if (NT_SUCCESS(status)) {
 
@@ -488,22 +566,22 @@ QueryDrive:
                 for (DWORD i=0; i < oldLayout->PartitionCount; i++) {
                     driveLayout->PartitionEntry[i].PartitionStyle = PARTITION_STYLE_MBR;
 
-                    driveLayout->PartitionEntry[i].StartingOffset =
-                        oldLayout->PartitionEntry[i].StartingOffset;
+                    driveLayout->PartitionEntry[i].StartingOffset = 
+                            oldLayout->PartitionEntry[i].StartingOffset;
                     driveLayout->PartitionEntry[i].PartitionLength =
-                        oldLayout->PartitionEntry[i].PartitionLength;
+                            oldLayout->PartitionEntry[i].PartitionLength;
                     driveLayout->PartitionEntry[i].PartitionNumber =
-                        oldLayout->PartitionEntry[i].PartitionNumber;
+                            oldLayout->PartitionEntry[i].PartitionNumber;
                     driveLayout->PartitionEntry[i].RewritePartition =
-                        oldLayout->PartitionEntry[i].RewritePartition;
+                            oldLayout->PartitionEntry[i].RewritePartition;
                     driveLayout->PartitionEntry[i].Mbr.PartitionType =
-                        oldLayout->PartitionEntry[i].PartitionType;
+                            oldLayout->PartitionEntry[i].PartitionType;
                     driveLayout->PartitionEntry[i].Mbr.BootIndicator =
-                        oldLayout->PartitionEntry[i].BootIndicator;
+                            oldLayout->PartitionEntry[i].BootIndicator;
                     driveLayout->PartitionEntry[i].Mbr.RecognizedPartition =
-                        oldLayout->PartitionEntry[i].RecognizedPartition;
-                    driveLayout->PartitionEntry[i].Mbr.HiddenSectors =
-                        oldLayout->PartitionEntry[i].HiddenSectors;
+                            oldLayout->PartitionEntry[i].RecognizedPartition;
+                    driveLayout->PartitionEntry[i].Mbr.HiddenSectors = 
+                            oldLayout->PartitionEntry[i].HiddenSectors;
                 }
 
             } else {
@@ -517,22 +595,20 @@ QueryDrive:
     } else {
 
         status = NT::ZwDeviceIoControlFile(
-                     Handle, NULL, NULL, NULL, &ioSb,
-                     IOCTL_DISK_GET_DRIVE_LAYOUT_EXT,
-                     NULL, 0, (PVOID)driveLayout, dataSize
-                 );
+                    Handle, NULL, NULL, NULL, &ioSb,
+                    IOCTL_DISK_GET_DRIVE_LAYOUT_EXT,
+                    NULL, 0, (PVOID)driveLayout, dataSize
+                    );
     }
 
     if (status == STATUS_BUFFER_TOO_SMALL) {
-        free(driveLayout);
-        driveLayout = NULL;
+        free(driveLayout); driveLayout = NULL;
         dataSize += 128;
         goto QueryDrive;
     }
 
     if (!NT_SUCCESS(status)) {
-        free(driveLayout);
-        driveLayout = NULL;
+        free(driveLayout); driveLayout = NULL;
         goto errorout;
     }
 
@@ -548,9 +624,9 @@ QueryDrive:
         /* Now walk the Drive_Layout to count the partitions */
         while (i < (UCHAR)driveLayout->PartitionCount) {
             Part = &driveLayout->PartitionEntry[i++];
-            if (Part->Mbr.PartitionType != PARTITION_ENTRY_UNUSED &&
-                    Part->Mbr.PartitionType != PARTITION_EXTENDED &&
-                    Part->Mbr.PartitionType != PARTITION_XINT13_EXTENDED) {
+            if (Part->Mbr.PartitionType != PARTITION_ENTRY_UNUSED && 
+                Part->Mbr.PartitionType != PARTITION_EXTENDED && 
+                Part->Mbr.PartitionType != PARTITION_XINT13_EXTENDED) {
                 cnt++;
             }
         }
@@ -559,13 +635,11 @@ QueryDrive:
         *NumOfParts = (UCHAR)driveLayout->PartitionCount;
     } else {
         *NumOfParts = 0;
-        free(driveLayout);
-        driveLayout = NULL;
+         free(driveLayout); driveLayout = NULL;
     }
 
     if (*NumOfParts == 0) {
-        free(driveLayout);
-        driveLayout = NULL;
+         free(driveLayout); driveLayout = NULL;
     }
 
 
@@ -578,7 +652,7 @@ NTSTATUS
 Ext2SetDriveLayout(
     HANDLE  Handle,
     PDRIVE_LAYOUT_INFORMATION_EXT Layout
-)
+    )
 {
     NT::IO_STATUS_BLOCK       ioSb;
     NT::NTSTATUS              status = STATUS_SUCCESS;
@@ -596,51 +670,51 @@ Ext2SetDriveLayout(
         ULONG newLayoutSize = FIELD_OFFSET(DRIVE_LAYOUT_INFORMATION, PartitionEntry);
         newLayoutSize += sizeof(PARTITION_INFORMATION) * Layout->PartitionCount;
 
-        PDRIVE_LAYOUT_INFORMATION oldLayout =
-            (PDRIVE_LAYOUT_INFORMATION ) malloc(newLayoutSize);
+        PDRIVE_LAYOUT_INFORMATION oldLayout = 
+              (PDRIVE_LAYOUT_INFORMATION ) malloc(newLayoutSize);
         if (!oldLayout) {
             goto errorout;
         }
-
+        
         oldLayout->PartitionCount = Layout->PartitionCount;
         oldLayout->Signature = Layout->Mbr.Signature;
 
         for (DWORD i=0; i < oldLayout->PartitionCount; i++) {
 
-            oldLayout->PartitionEntry[i].StartingOffset =
-                Layout->PartitionEntry[i].StartingOffset;
+            oldLayout->PartitionEntry[i].StartingOffset = 
+                    Layout->PartitionEntry[i].StartingOffset;
             oldLayout->PartitionEntry[i].PartitionLength =
-                Layout->PartitionEntry[i].PartitionLength;
+                    Layout->PartitionEntry[i].PartitionLength;
             oldLayout->PartitionEntry[i].PartitionNumber =
-                Layout->PartitionEntry[i].PartitionNumber;
+                    Layout->PartitionEntry[i].PartitionNumber;
             oldLayout->PartitionEntry[i].RewritePartition =
-                Layout->PartitionEntry[i].RewritePartition;
+                    Layout->PartitionEntry[i].RewritePartition;
             oldLayout->PartitionEntry[i].PartitionType =
-                Layout->PartitionEntry[i].Mbr.PartitionType;
+                    Layout->PartitionEntry[i].Mbr.PartitionType;
             oldLayout->PartitionEntry[i].BootIndicator =
-                Layout->PartitionEntry[i].Mbr.BootIndicator;
+                    Layout->PartitionEntry[i].Mbr.BootIndicator;
             oldLayout->PartitionEntry[i].RecognizedPartition =
-                Layout->PartitionEntry[i].Mbr.RecognizedPartition;
+                    Layout->PartitionEntry[i].Mbr.RecognizedPartition;
             oldLayout->PartitionEntry[i].HiddenSectors =
-                Layout->PartitionEntry[i].Mbr.HiddenSectors;
+                    Layout->PartitionEntry[i].Mbr.HiddenSectors;
         }
 
         status = NT::ZwDeviceIoControlFile(
-                     Handle, NULL, NULL, NULL, &ioSb,
-                     IOCTL_DISK_SET_DRIVE_LAYOUT,
-                     (PVOID)oldLayout, newLayoutSize,
-                     NULL, 0
-                 );
+                    Handle, NULL, NULL, NULL, &ioSb,
+                    IOCTL_DISK_SET_DRIVE_LAYOUT,
+                    (PVOID)oldLayout, newLayoutSize,
+                    NULL, 0
+                    );
 
         free(oldLayout);
 
     } else {
 
         status = NT::ZwDeviceIoControlFile(
-                     Handle, NULL, NULL, NULL, &ioSb,
-                     IOCTL_DISK_SET_DRIVE_LAYOUT_EXT,
-                     (PVOID)Layout, dataSize,NULL, 0
-                 );
+                    Handle, NULL, NULL, NULL, &ioSb,
+                    IOCTL_DISK_SET_DRIVE_LAYOUT_EXT,
+                    (PVOID)Layout, dataSize,NULL, 0
+                    );
     }
 
     return status;
@@ -651,10 +725,32 @@ errorout:
 }
 
 BOOLEAN
+Ext2IsDeviceValid(CHAR *Device)
+{
+    HANDLE  handle = NULL;
+    NT::NTSTATUS status;
+    NT::IO_STATUS_BLOCK iosb;
+
+    status = Ext2Open(Device, &handle, EXT2_DESIRED_ACCESS);
+    if (!NT_SUCCESS(status)) {
+        goto errorout;
+    }
+
+errorout:
+
+    if (handle) {
+        Ext2Close(&handle);
+    }
+
+    return NT_SUCCESS(status);
+}
+
+
+BOOLEAN
 Ext2SetPartitionType(
     PEXT2_PARTITION Part,
     BYTE            Type
-)
+    )
 {
     BOOLEAN rc = FALSE;
     HANDLE  Handle = NULL;
@@ -683,12 +779,12 @@ Ext2SetPartitionType(
 
     for (i=0; i < Layout->PartitionCount; i++) {
 
-        if ((Layout->PartitionEntry[i].StartingOffset.QuadPart ==
-                Part->Entry->StartingOffset.QuadPart) &&
-                (Layout->PartitionEntry[i].PartitionLength.QuadPart ==
-                 Part->Entry->PartitionLength.QuadPart) &&
-                (Layout->PartitionEntry[i].PartitionNumber ==
-                 Part->Entry->PartitionNumber) ) {
+        if ((Layout->PartitionEntry[i].StartingOffset.QuadPart == 
+             Part->Entry->StartingOffset.QuadPart) &&
+            (Layout->PartitionEntry[i].PartitionLength.QuadPart ==
+             Part->Entry->PartitionLength.QuadPart) &&
+            (Layout->PartitionEntry[i].PartitionNumber ==
+             Part->Entry->PartitionNumber) ) {
 
             Layout->PartitionEntry[i].Mbr.PartitionType = Type;
             Layout->PartitionEntry[i].RewritePartition = TRUE;
@@ -739,7 +835,7 @@ errorout:
 PEXT2_PARTITION
 Ext2QueryVolumePartition(
     PEXT2_VOLUME    Volume
-)
+    )
 {
     PEXT2_PARTITION Part = NULL;
     DWORD i, j;
@@ -758,29 +854,29 @@ Ext2QueryVolumePartition(
 
 NT::NTSTATUS
 Ext2QueryProperty(
-    HANDLE                      Handle,
+    HANDLE                      Handle, 
     STORAGE_PROPERTY_ID         Id,
     PVOID                       DescBuf,
     ULONG                       DescSize
-)
+    )
 {
-    STORAGE_PROPERTY_QUERY	    SPQ;
+	STORAGE_PROPERTY_QUERY	    SPQ;
     NT::NTSTATUS                status;
     NT::IO_STATUS_BLOCK         ioSb;
 
-    SPQ.PropertyId = Id;
-    SPQ.QueryType  = PropertyStandardQuery;
+	SPQ.PropertyId = Id;
+	SPQ.QueryType  = PropertyStandardQuery;
 
     memset(DescBuf, 0, DescSize);
 
     status = NT::ZwDeviceIoControlFile(
-                 Handle, NULL, NULL, NULL, &ioSb,
-                 IOCTL_STORAGE_QUERY_PROPERTY,
-                 &SPQ, sizeof(STORAGE_PROPERTY_QUERY),
-                 DescBuf,  DescSize
-             );
+                Handle, NULL, NULL, NULL, &ioSb,
+                IOCTL_STORAGE_QUERY_PROPERTY,
+                &SPQ, sizeof(STORAGE_PROPERTY_QUERY),
+                DescBuf,  DescSize
+            );
 
-    return status;
+	return status;
 }
 
 /*
@@ -790,10 +886,10 @@ Ext2QueryProperty(
  * ARGUMENTS:
  *     VolumeHandle:    Volume handle.
  *
- * RETURNS:
+ * RETURNS: 
  *     Success or Fail
  *
- * NOTES:
+ * NOTES: 
  *     N/A
  */
 
@@ -801,16 +897,16 @@ NTSTATUS
 Ext2QueryDisk(
     HANDLE                  Handle,
     PDISK_GEOMETRY          DiskGeometry
-)
+    )
 {
     NT::NTSTATUS        status;
     NT::IO_STATUS_BLOCK ioSb;
 
     status = NT::ZwDeviceIoControlFile(
-                 Handle, NULL, NULL, NULL, &ioSb,
-                 IOCTL_DISK_GET_DRIVE_GEOMETRY,
-                 DiskGeometry, sizeof(DISK_GEOMETRY),
-                 DiskGeometry, sizeof(DISK_GEOMETRY));
+                Handle, NULL, NULL, NULL, &ioSb,
+                IOCTL_DISK_GET_DRIVE_GEOMETRY,
+                DiskGeometry, sizeof(DISK_GEOMETRY),
+                DiskGeometry, sizeof(DISK_GEOMETRY));
 
 
     if (!NT_SUCCESS(status)) {
@@ -825,8 +921,8 @@ errorout:
 PVOLUME_DISK_EXTENTS
 Ext2QueryVolumeExtents(HANDLE hVolume)
 {
-    ULONG	dataSize = 1024;
-    PVOLUME_DISK_EXTENTS dskExtents = NULL;
+	ULONG	dataSize = 1024;
+	PVOLUME_DISK_EXTENTS dskExtents = NULL;
 
     NT::NTSTATUS        status;
     NT::IO_STATUS_BLOCK ioSb;
@@ -839,20 +935,18 @@ QueryExtent:
     }
 
     status = NT::ZwDeviceIoControlFile(
-                 hVolume, NULL, NULL, NULL, &ioSb,
-                 IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,
-                 NULL, 0, dskExtents, dataSize );
+                hVolume, NULL, NULL, NULL, &ioSb,
+                IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,
+                NULL, 0, dskExtents, dataSize );
 
     if (status == STATUS_BUFFER_TOO_SMALL) {
-        free(dskExtents);
-        dskExtents = NULL;
+        free(dskExtents); dskExtents = NULL;
         dataSize += 1024;
         goto QueryExtent;
     }
 
     if (!NT_SUCCESS(status)) {
-        free(dskExtents);
-        dskExtents = NULL;
+        free(dskExtents); dskExtents = NULL;
         goto errorout;
     }
 
@@ -864,8 +958,8 @@ errorout:
 PSTORAGE_DEVICE_NUMBER
 Ext2QueryDeviceNumber(HANDLE hVolume)
 {
-    ULONG	            dataSize;
-    PSTORAGE_DEVICE_NUMBER SDN = NULL;
+	ULONG	            dataSize;
+	PSTORAGE_DEVICE_NUMBER SDN = NULL;
 
     NT::NTSTATUS        status;
     NT::IO_STATUS_BLOCK ioSb;
@@ -881,20 +975,18 @@ QuerySDN:
     memset(SDN, 0, dataSize);
 
     status = NT::ZwDeviceIoControlFile(
-                 hVolume, NULL, NULL, NULL, &ioSb,
-                 IOCTL_STORAGE_GET_DEVICE_NUMBER,
-                 NULL, 0, SDN, dataSize );
+                hVolume, NULL, NULL, NULL, &ioSb,
+                IOCTL_STORAGE_GET_DEVICE_NUMBER,
+                NULL, 0, SDN, dataSize );
 
     if (status == STATUS_BUFFER_TOO_SMALL) {
-        free(SDN);
-        SDN = NULL;
+        free(SDN); SDN = NULL;
         dataSize += sizeof(STORAGE_DEVICE_NUMBER);
         goto QuerySDN;
     }
 
     if (!NT_SUCCESS(status)) {
-        free(SDN);
-        SDN = NULL;
+        free(SDN); SDN = NULL;
         goto errorout;
     }
 
@@ -906,46 +998,43 @@ errorout:
 BOOLEAN
 Ext2QueryDrvLetter(
     PEXT2_LETTER    drvLetter
-)
+    )
 {
-    CHAR	        drvPath[MAX_PATH];
-    CHAR            devPath[] = "A:";
-    HANDLE	        hVolume;
+	HANDLE	        hVolume;
     NT::NTSTATUS    status = STATUS_SUCCESS;
-    DWORD           rc = 0;
+    DWORD           rc = 0; 
 
-    devPath[0] = drvLetter->Letter;
-    drvLetter->DrvType = GetDriveType(devPath);
+    drvLetter->DrvType = Ext2QueryDrive(drvLetter->Letter,
+                                        drvLetter->SymLink);
 
     if (drvLetter->DrvType == DRIVE_NO_ROOT_DIR) {
         drvLetter->bUsed = FALSE;
         goto errorout;
     } else {
         drvLetter->bUsed = TRUE;
-        QueryDosDevice(devPath, drvLetter->SymLink, MAX_PATH);
     }
 
-    if (drvLetter->Letter == 'A' ||
-            drvLetter->Letter == 'B' ) {
+    if (drvLetter->Letter == 'A' || 
+        drvLetter->Letter == 'B' ) {
         drvLetter->bUsed = TRUE;
         goto errorout;
     }
 
     if (drvLetter->DrvType == DRIVE_REMOVABLE ||
-            drvLetter->DrvType == DRIVE_FIXED) {
+        drvLetter->DrvType == DRIVE_FIXED) {
 
-        sprintf(drvPath, "\\DosDevices\\%c:", drvLetter->Letter);
-        status = Ext2Open(drvPath, &hVolume, EXT2_DESIRED_ACCESS);
-        if (!NT_SUCCESS(status)) {
+	    status = Ext2Open(drvLetter->SymLink, &hVolume, EXT2_DESIRED_ACCESS);
+	    if (!NT_SUCCESS(status)) {
+            drvLetter->bInvalid = TRUE;
             goto errorout;
-        }
+	    }
 
-        drvLetter->Extent = Ext2QueryVolumeExtents(hVolume);
+  	    drvLetter->Extent = Ext2QueryVolumeExtents(hVolume);
         if (drvLetter->DrvType == DRIVE_REMOVABLE) {
             drvLetter->SDN = Ext2QueryDeviceNumber(hVolume);
         }
 
-        Ext2Close(&hVolume);
+	    Ext2Close(&hVolume);
     }
 
 errorout:
@@ -953,11 +1042,85 @@ errorout:
     return NT_SUCCESS(status);
 }
 
+
+PEXT2_LETTER Ext2GetFirstUnusedDrvLetter()
+{
+    PEXT2_LETTER    drvLetter = NULL;
+    CHAR            devPath[] = "C:";
+    UINT            drvType;
+    int             i;
+
+    for (i = 5; i < 24; i++) {
+        drvLetter = &drvLetters[i];
+        if (drvLetter->DrvType == DRIVE_NO_ROOT_DIR) {
+            drvLetter->DrvType = Ext2QueryDrive(drvLetter->Letter,
+                                                drvLetter->SymLink);
+            if (drvLetter->DrvType == DRIVE_NO_ROOT_DIR) {
+                /* we got it */
+                break;
+            } else {
+                /* we need do a new refresh */
+            }
+        }
+        drvLetter = NULL;
+    }
+
+    return drvLetter;
+}
+
+
+CHAR Ext2MountVolume(CHAR *voldev)
+{
+    PEXT2_LETTER drvLetter;
+    CHAR         rc = 0;
+   
+    /* query drive letter to check whether it's mounted */
+    drvLetter = Ext2GetFirstUnusedDrvLetter();
+    if (!drvLetter) {
+        goto errorout;
+    }
+
+    if (Ext2AssignDrvLetter(drvLetter, voldev, FALSE)) {
+        rc = drvLetter->Letter;
+    }
+
+errorout:
+
+    return rc;
+}
+
+CHAR Ext2MountVolumeAs(CHAR *voldev, CHAR DrvLetter)
+{
+    PEXT2_LETTER drvLetter;
+    CHAR         rc = 0;
+   
+            
+    if (DrvLetter >= '0' && DrvLetter <= '9') {
+        drvLetter = &drvDigits[DrvLetter - '0'];
+    } else if (DrvLetter >= 'A' && DrvLetter <= 'Z') {
+        drvLetter = &drvLetters[DrvLetter - 'A'];
+    } else if (DrvLetter >= 'a' && DrvLetter <= 'z') {
+        drvLetter = &drvLetters[DrvLetter - 'a'];
+    }
+
+    if (!drvLetter || drvLetter->bUsed) {
+        goto errorout;
+    }
+
+    if (Ext2AssignDrvLetter(drvLetter, voldev, FALSE)) {
+        rc = drvLetter->Letter;
+    }
+
+errorout:
+
+    return rc;
+}
+
 NTSTATUS
 Ext2QueryMediaType(
     HANDLE                  Handle,
     PDWORD                  MediaType
-)
+    )
 {
     NT::NTSTATUS        status;
     NT::IO_STATUS_BLOCK ioSb;
@@ -965,9 +1128,9 @@ Ext2QueryMediaType(
     UCHAR               buffer[1024];
 
     status = NT::ZwDeviceIoControlFile(
-                 Handle, NULL, NULL, NULL, &ioSb,
-                 IOCTL_STORAGE_GET_MEDIA_TYPES_EX,
-                 NULL, 0, buffer, 1024 );
+                Handle, NULL, NULL, NULL, &ioSb,
+                IOCTL_STORAGE_GET_MEDIA_TYPES_EX,
+                NULL, 0, buffer, 1024 );
 
 
     if (!NT_SUCCESS(status)) {
@@ -992,14 +1155,14 @@ errorout:
  *     Length      : Data Length to be read
  *     Buffer      : ...
  *
- * RETURNS:
+ * RETURNS: 
  *     Success: STATUS_SUCCESS
  *     Fail:  ...
  *
- * NOTES:
+ * NOTES: 
  *     Both Length and Offset should be SECTOR_SIZE aligned.
  */
-NT::NTSTATUS
+NT::NTSTATUS 
 Ext2Read(
     IN  HANDLE          Handle,
     IN  BOOLEAN         IsFile,
@@ -1007,7 +1170,7 @@ Ext2Read(
     IN  ULONGLONG       Offset,
     IN  ULONG           Length,
     IN  PVOID           Buffer
-)
+    )
 {
     NT::NTSTATUS        status;
     NT::IO_STATUS_BLOCK ioSb;
@@ -1024,15 +1187,15 @@ Ext2Read(
 
         address.QuadPart = Offset;
         status = NT::ZwReadFile(
-                     Handle, 0, NULL, NULL, &ioSb,
-                     Buffer, Length, &address, NULL
-                 );
+                    Handle, 0, NULL, NULL, &ioSb,
+                    Buffer, Length, &address, NULL
+                    );
     } else {
 
         address.QuadPart = Offset & (~((ULONGLONG)SectorSize - 1));
         aLength  = (Length + SectorSize - 1)&(~(SectorSize - 1));
         aLength += ((ULONG)(Offset - address.QuadPart) + SectorSize - 1)
-                   & (~(SectorSize - 1));
+                    & (~(SectorSize - 1));
 
         aBuffer = malloc(aLength);
         if (!aBuffer) {
@@ -1041,18 +1204,18 @@ Ext2Read(
         }
 
         status = NT::ZwReadFile(
-                     Handle, 0, NULL, NULL, &ioSb,
-                     aBuffer, aLength, &address, NULL
-                 );
+                    Handle, 0, NULL, NULL, &ioSb,
+                    aBuffer, aLength, &address, NULL
+                    );
 
         if (!NT_SUCCESS(status)) {
             goto errorout;
         }
 
-        memmove( Buffer, (PUCHAR)aBuffer +
+        memmove( Buffer, (PUCHAR)aBuffer + 
                  (ULONG)(Offset - address.QuadPart), Length);
     }
-
+ 
 errorout:
 
     if (aBuffer)
@@ -1071,11 +1234,11 @@ errorout:
  *     Length      : Data Length to be written
  *     Buffer      : Data to be written ...
  *
- * RETURNS:
+ * RETURNS: 
  *     Success: STATUS_SUCCESS
  *     Fail:  ...
  *
- * NOTES:
+ * NOTES: 
  *     Both Length and Offset should be SECTOR_SIZE aligned.
  */
 
@@ -1087,7 +1250,7 @@ Ext2WriteDisk(
     ULONGLONG       Offset,
     ULONG           Length,
     PVOID           Buffer
-)
+    )
 {
     NT::LARGE_INTEGER       address;
     NT::NTSTATUS            status;
@@ -1105,15 +1268,15 @@ Ext2WriteDisk(
 
         address.QuadPart = Offset;
         status = NT::ZwWriteFile(
-                     Handle, 0, NULL, NULL, &ioSb,
-                     Buffer, Length, &address, NULL
-                 );
+                    Handle, 0, NULL, NULL, &ioSb,
+                    Buffer, Length, &address, NULL
+                    );
     } else  {
 
         address.QuadPart = Offset & (~((ULONGLONG)SectorSize - 1));
         aLength = (Length + SectorSize - 1)&(~(SectorSize - 1));
         aLength += ((ULONG)(Offset - address.QuadPart) + SectorSize - 1)
-                   & (~(SectorSize - 1));
+                         & (~(SectorSize - 1));
 
         aBuffer = malloc(aLength);
         if (!aBuffer) {
@@ -1121,12 +1284,12 @@ Ext2WriteDisk(
             goto errorout;
         }
 
-        if ( (aLength != Length) ||
-                (address.QuadPart != (LONGLONG)Offset)) {
+        if ( (aLength != Length) || 
+             (address.QuadPart != (LONGLONG)Offset)) {
             status = NT::ZwReadFile(
-                         Handle, 0, NULL, NULL, &ioSb,
-                         aBuffer, aLength, &address, NULL
-                     );
+                        Handle, 0, NULL, NULL, &ioSb,
+                        aBuffer, aLength, &address, NULL
+                        );
 
             if (!NT_SUCCESS(status)) {
                 goto errorout;
@@ -1136,9 +1299,9 @@ Ext2WriteDisk(
         memmove((PUCHAR)aBuffer + (ULONG)(Offset - address.QuadPart),
                 Buffer, Length);
         status = NT::ZwWriteFile(
-                     Handle, 0, NULL, NULL, &ioSb,
-                     aBuffer, aLength, &address, NULL
-                 );
+                    Handle, 0, NULL, NULL, &ioSb,
+                    aBuffer, aLength, &address, NULL
+                    );
     }
 
 errorout:
@@ -1154,7 +1317,7 @@ Ext2Open(
     PCHAR                   FileName,
     PHANDLE                 Handle,
     ULONG                   DesiredAccess
-)
+    )
 {
     NT::IO_STATUS_BLOCK     iosb;
     NT::NTSTATUS            status;
@@ -1206,19 +1369,19 @@ Ext2Open(
     // make our write requests syncrhonous for our convenience.
     //
     status = NT::ZwCreateFile(
-                 Handle,                           // returned file handle
-                 (DesiredAccess | SYNCHRONIZE),    // desired access
-                 &ObjectAttributes,                // ptr to object attributes
-                 &iosb,                            // ptr to I/O status block
-                 0,                                // allocation size
-                 FILE_ATTRIBUTE_NORMAL,            // file attributes
-                 FILE_SHARE_WRITE | FILE_SHARE_READ, // share access
-                 FILE_OPEN  /*FILE_SUPERSEDE*/,    // create disposition
-                 FILE_SYNCHRONOUS_IO_NONALERT |    // create options
-                 ((DesiredAccess & GENERIC_WRITE) ?
-                  FILE_NO_INTERMEDIATE_BUFFERING : 0),
-                 NULL,                             // ptr to extended attributes
-                 0);                               // length of ea buffer
+                Handle,                           // returned file handle
+                (DesiredAccess | SYNCHRONIZE),    // desired access
+                &ObjectAttributes,                // ptr to object attributes
+                &iosb,                            // ptr to I/O status block
+                0,                                // allocation size
+                FILE_ATTRIBUTE_NORMAL,            // file attributes
+                FILE_SHARE_WRITE | FILE_SHARE_READ, // share access
+                FILE_OPEN  /*FILE_SUPERSEDE*/,    // create disposition
+                FILE_SYNCHRONOUS_IO_NONALERT |    // create options
+                ((DesiredAccess & GENERIC_WRITE) ? 
+                 FILE_NO_INTERMEDIATE_BUFFERING : 0),
+                NULL,                             // ptr to extended attributes
+                0);                               // length of ea buffer
 
     //
     // Check the system service status
@@ -1242,7 +1405,7 @@ Ext2Close(HANDLE * Handle)
 {
     NT::NTSTATUS status = 0;
     if (Handle != NULL && *Handle != 0 && *Handle != INVALID_HANDLE_VALUE) {
-        status = NT::ZwClose(*Handle);
+        status = NT::ZwClose(*Handle); 
         if (NT_SUCCESS(status)) {
             *Handle = 0;
         } else {
@@ -1258,8 +1421,8 @@ Ext2QuerySysConfig()
     NT::_SYSTEM_CONFIGURATION_INFORMATION ConfigInfo;
 
     status = NT::ZwQuerySystemInformation(
-                 NT::SystemConfigurationInformation,
-                 &ConfigInfo, sizeof(ConfigInfo), 0);
+                    NT::SystemConfigurationInformation,
+					&ConfigInfo, sizeof(ConfigInfo), 0);
     if (NT_SUCCESS(status)) {
         g_nDisks  = ConfigInfo.DiskCount;
         g_nFlps   = ConfigInfo.FloppyCount;
@@ -1335,7 +1498,7 @@ Ext2LoadDisks()
 
         if (!gDisks[i].bEjected) {
             gDisks[i].Layout = Ext2QueryDriveLayout(
-                                   Handle, &gDisks[i].NumParts);
+                        Handle, &gDisks[i].NumParts);
         }
 
         gDisks[i].bLoaded = TRUE;
@@ -1359,7 +1522,7 @@ Ext2PartInformation(PEXT2_PARTITION part)
     s.Format("\r\n    Partition No: %d\r\n\r\n", part->Number);
     if (!part->Entry) {
         return ret;
-    }
+    } 
 
     s = "      Partition Type: ";
     if (part->Entry->PartitionStyle == PARTITION_STYLE_MBR) {
@@ -1413,7 +1576,7 @@ Ext2PartInformation(PEXT2_PARTITION part)
 
         s.Format("      Free: %I64u\r\n", freeSize);
         ret += s;
-    }
+    } 
 
     return ret;
 }
@@ -1456,13 +1619,13 @@ Ext2DiskInformation(PEXT2_DISK  disk)
         if (disk->Layout) {
             if (disk->Layout->PartitionStyle == PARTITION_STYLE_MBR) {
                 if (disk->Layout->PartitionEntry->Mbr.PartitionType
-                        == PARTITION_LDM) {
+                    == PARTITION_LDM) {
                     s.LoadString(IDS_DISK_TYPE_DYN);
                 } else {
                     s.LoadString(IDS_DISK_TYPE_BASIC);
                 }
             } else if (disk->Layout->PartitionStyle == PARTITION_STYLE_MBR) {
-                s = "GUID";
+                 s = "GUID";
             }
         }
         s   += "\r\n";
@@ -1484,39 +1647,22 @@ Ext2DiskInformation(PEXT2_DISK  disk)
         ret += s;
 
         switch (disk->DiskGeometry.MediaType) {
-        case FixedMedia:
-            s="Fixed";
-            break;
-        case RemovableMedia:
-            s="Removable";
-            break;
-        case CD_ROM:
-            s="CDROM";
-            break;
-        case CD_R:
-            s="CDR";
-            break;
-        case CD_RW:
-            s="CDRW";
-            break;
-        case DVD_ROM:
-            s="DVD";
-            break;
-        case DVD_R:
-            s="DVDR";
-            break;
-        case DVD_RW:
-            s="DVDRW";
-            break;
-        default:
-            s="Unkown";
+		        case FixedMedia: s="Fixed"; break;
+		        case RemovableMedia: s="Removable"; break;
+		        case CD_ROM: s="CDROM"; break;
+		        case CD_R: s="CDR"; break;
+		        case CD_RW: s="CDRW"; break;
+		        case DVD_ROM: s="DVD"; break;
+		        case DVD_R: s="DVDR"; break;
+		        case DVD_RW: s="DVDRW"; break;
+		        default: s="Unkown";
         }
 
         ret += "    MediaType: ";
         ret += s;
         ret += "\r\n";
     }
-
+ 
     ret += "\r\n";
     if (disk->Layout) {
         s.Format("    Partition Numbers: %d\r\n", disk->NumParts);
@@ -1586,7 +1732,7 @@ Ext2CdromInformation(PEXT2_CDROM cdrom)
 
     if (cdrom->bLoaded) {
         if (cdrom->bEjected) {
-            ret += "    Media ejected\r\n";
+	        ret += "    Media ejected\r\n";
         } else {
             ret += "    File system: ";
             if (cdrom->EVP.bExt2) {
@@ -1599,33 +1745,16 @@ Ext2CdromInformation(PEXT2_CDROM cdrom)
             ret += "\r\n";
 
             s = "    Online,";
-            switch (cdrom->DiskGeometry.MediaType) {
-            case FixedMedia:
-                s +="Fixed";
-                break;
-            case RemovableMedia:
-                s += "Media Removable";
-                break;
-            case CD_ROM:
-                s +=" CDROM";
-                break;
-            case CD_R:
-                s += "CDR";
-                break;
-            case CD_RW:
-                s += "CDRW";
-                break;
-            case DVD_ROM:
-                s += "DVD";
-                break;
-            case DVD_R:
-                s += "DVDR";
-                break;
-            case DVD_RW:
-                s += "DVDRW";
-                break;
-            default:
-                s += "Unkown";
+	        switch (cdrom->DiskGeometry.MediaType) {
+		        case FixedMedia: s +="Fixed"; break;
+		        case RemovableMedia: s += "Media Removable"; break;
+		        case CD_ROM: s +=" CDROM"; break;
+		        case CD_R: s += "CDR"; break;
+		        case CD_RW: s += "CDRW"; break;
+		        case DVD_ROM: s += "DVD"; break;
+		        case DVD_R: s += "DVDR"; break;
+		        case DVD_RW: s += "DVDRW"; break;
+		        default: s += "Unkown";
             }
             ret += s;
             ret += "\r\n";
@@ -1748,8 +1877,7 @@ Ext2CleanupDisks()
 
     g_nDisks = 0;
     if (gDisks) {
-        free(gDisks);
-        gDisks = NULL;
+        free(gDisks); gDisks = NULL;
     }
 }
 
@@ -1856,8 +1984,7 @@ Ext2CleanupCdroms()
 
     g_nCdroms = 0;
     if (gCdroms) {
-        free(gCdroms);
-        gCdroms = NULL;
+        free(gCdroms); gCdroms = NULL;
     }
 }
 
@@ -1865,7 +1992,7 @@ BOOLEAN
 Ext2CompareExtents(
     PVOLUME_DISK_EXTENTS ext1,
     PVOLUME_DISK_EXTENTS ext2
-)
+    )
 {
     DWORD nExt;
 
@@ -1875,8 +2002,8 @@ Ext2CompareExtents(
 
     for (nExt = 0; nExt < ext1->NumberOfDiskExtents; nExt++) {
         if ((ext1->Extents[nExt].DiskNumber != ext2->Extents[nExt].DiskNumber) ||
-                (ext1->Extents[nExt].StartingOffset.QuadPart != ext2->Extents[nExt].StartingOffset.QuadPart) ||
-                (ext1->Extents[nExt].ExtentLength.QuadPart != ext2->Extents[nExt].ExtentLength.QuadPart) ) {
+            (ext1->Extents[nExt].StartingOffset.QuadPart != ext2->Extents[nExt].StartingOffset.QuadPart) ||
+            (ext1->Extents[nExt].ExtentLength.QuadPart != ext2->Extents[nExt].ExtentLength.QuadPart) ) {
             return FALSE;
         }
     }
@@ -1886,7 +2013,7 @@ Ext2CompareExtents(
 ULONGLONG
 Ext2EjectedDiskLetters(
     PEXT2_DISK   Disk
-)
+    )
 {
     ULONGLONG letters = 0;
     int i;
@@ -1996,10 +2123,10 @@ BOOLEAN
 Ext2QueryVolumeFS(
     HANDLE          Handle,
     PEXT2_VOLUME    volume
-)
+    )
 {
     struct ext2_super_block *sb = NULL;
-    union swap_header*	swap = NULL;
+	union swap_header*	swap = NULL;
     PUCHAR  buffer = NULL;
 
 
@@ -2013,7 +2140,7 @@ Ext2QueryVolumeFS(
     swap = (union swap_header*)&buffer[SWAP_HEADER_OFFSET];
     sb = (struct ext2_super_block *)&buffer[SUPER_BLOCK_OFFSET];
 
-    status = Ext2Read( Handle, FALSE, volume->FssInfo.BytesPerSector,
+    status = Ext2Read( Handle, FALSE, volume->FssInfo.BytesPerSector, 
                        (ULONGLONG)0,PAGE_SIZE, (PUCHAR) buffer);
 
     if (!NT_SUCCESS(status)) {
@@ -2028,10 +2155,10 @@ Ext2QueryVolumeFS(
         volume->FsaInfo.FileSystemName[1] = (WCHAR)'X';
         volume->FsaInfo.FileSystemName[2] = (WCHAR)'T';
         volume->FsaInfo.FileSystemName[4] = 0;
-
+        
         if ((sb->s_feature_incompat & EXT3_FEATURE_INCOMPAT_JOURNAL_DEV) ||
-                (sb->s_feature_incompat & EXT3_FEATURE_INCOMPAT_RECOVER) ||
-                (sb->s_feature_compat & EXT3_FEATURE_COMPAT_HAS_JOURNAL) ) {
+            (sb->s_feature_incompat & EXT3_FEATURE_INCOMPAT_RECOVER) ||
+            (sb->s_feature_compat & EXT3_FEATURE_COMPAT_HAS_JOURNAL) ) {
             volume->FsaInfo.FileSystemName[3] = (WCHAR)'3';
             volume->EVP.bExt3 = TRUE;
         } else {
@@ -2043,7 +2170,7 @@ Ext2QueryVolumeFS(
     }
 
     if ((memcmp(swap->magic.magic, SWAP_HEADER_MAGIC_V1, 10) == 0) ||
-            (memcmp(swap->magic.magic, SWAP_HEADER_MAGIC_V2, 10) == 0)) {
+        (memcmp(swap->magic.magic, SWAP_HEADER_MAGIC_V2, 10) == 0)) {
         volume->FsaInfo.FileSystemNameLength = 8;
         volume->FsaInfo.FileSystemName[0] = (WCHAR)'S';
         volume->FsaInfo.FileSystemName[1] = (WCHAR)'W';
@@ -2061,8 +2188,8 @@ errorout:
 BOOLEAN
 Ext2QueryExt2Property (
     HANDLE                      Handle,
-    PEXT2_VOLUME_PROPERTY2      EVP
-)
+    PEXT2_VOLUME_PROPERTY3      EVP
+    )
 {
     NT::NTSTATUS                status;
     NT::IO_STATUS_BLOCK         iosb;
@@ -2082,14 +2209,14 @@ Ext2QueryExt2Property (
     EVP->bExt2 = bExt2;
     EVP->bExt3 = bExt3;
     EVP->Magic = EXT2_VOLUME_PROPERTY_MAGIC;
-    EVP->Command = APP_CMD_QUERY_PROPERTY2;
+    EVP->Command = APP_CMD_QUERY_PROPERTY3;
 
     status = NT::ZwDeviceIoControlFile(
-                 Handle, NULL, NULL, NULL, &iosb,
-                 IOCTL_APP_VOLUME_PROPERTY,
-                 EVP, sizeof(EXT2_VOLUME_PROPERTY2),
-                 EVP, sizeof(EXT2_VOLUME_PROPERTY2)
-             );
+                Handle, NULL, NULL, NULL, &iosb,
+                IOCTL_APP_VOLUME_PROPERTY,
+                EVP, sizeof(EXT2_VOLUME_PROPERTY3),
+                EVP, sizeof(EXT2_VOLUME_PROPERTY3)
+            );
 
     return NT_SUCCESS(status);
 }
@@ -2101,7 +2228,7 @@ Ext2QueryPerfStat (
     PEXT2_QUERY_PERFSTAT        Stat,
     PEXT2_PERF_STATISTICS_V1   *PerfV1,
     PEXT2_PERF_STATISTICS_V2   *PerfV2
-)
+    )
 {
     NT::NTSTATUS                status;
     NT::IO_STATUS_BLOCK         iosb;
@@ -2114,20 +2241,20 @@ Ext2QueryPerfStat (
     *PerfV2 = NULL;
 
     status = NT::ZwDeviceIoControlFile(
-                 Handle, NULL, NULL, NULL, &iosb,
-                 IOCTL_APP_QUERY_PERFSTAT,
-                 Stat, sizeof(EXT2_QUERY_PERFSTAT),
-                 Stat, sizeof(EXT2_QUERY_PERFSTAT)
-             );
+                Handle, NULL, NULL, NULL, &iosb,
+                IOCTL_APP_QUERY_PERFSTAT,
+                Stat, sizeof(EXT2_QUERY_PERFSTAT),
+                Stat, sizeof(EXT2_QUERY_PERFSTAT)
+            );
     if (!NT_SUCCESS(!status))
         return FALSE;
 
-    if (iosb.Information == EXT2_QUERY_PERFSTAT_SZV2 &&
-            (Stat->Flags & EXT2_QUERY_PERFSTAT_VER2) != 0) {
+    if (iosb.Information == EXT2_QUERY_PERFSTAT_SZV2 && 
+        (Stat->Flags & EXT2_QUERY_PERFSTAT_VER2) != 0) {
 
-        if (Stat->PerfStatV2.Magic == EXT2_PERF_STAT_MAGIC &&
-                Stat->PerfStatV2.Length == sizeof(EXT2_PERF_STATISTICS_V2) &&
-                Stat->PerfStatV2.Version == EXT2_PERF_STAT_VER2) {
+        if (Stat->PerfStatV2.Magic == EXT2_PERF_STAT_MAGIC && 
+            Stat->PerfStatV2.Length == sizeof(EXT2_PERF_STATISTICS_V2) &&
+            Stat->PerfStatV2.Version == EXT2_PERF_STAT_VER2) {
             *PerfV2 = &Stat->PerfStatV2;
         }
 
@@ -2143,9 +2270,9 @@ Ext2QueryPerfStat (
 }
 
 VOID
-Ext2StorePropertyinRegistry(PEXT2_VOLUME_PROPERTY2 EVP)
+Ext2StorePropertyinRegistry(PEXT2_VOLUME_PROPERTY3 EVP)
 {
-    CHAR    UUID[50];
+    CHAR    UUID[50], ID[16];
     HKEY    hKey;
     CHAR    keyPath[MAX_PATH];
     LONG    status;
@@ -2171,14 +2298,14 @@ Ext2StorePropertyinRegistry(PEXT2_VOLUME_PROPERTY2 EVP)
     /* Create or open ext2fsd volumes key */
     strcpy (keyPath, "SYSTEM\\CurrentControlSet\\Services\\Ext2Fsd\\Volumes") ;
     status = ::RegCreateKeyEx (HKEY_LOCAL_MACHINE,
-                               keyPath,
-                               0,
-                               0,
-                               REG_OPTION_NON_VOLATILE,
-                               KEY_ALL_ACCESS,
-                               NULL,
-                               &hKey,
-                               NULL);
+                            keyPath,
+                            0,
+                            0,
+                            REG_OPTION_NON_VOLATILE,
+                            KEY_ALL_ACCESS,
+                            NULL,
+                            &hKey,
+                            NULL);
     if (status != ERROR_SUCCESS) {
         return;
     }
@@ -2190,6 +2317,11 @@ Ext2StorePropertyinRegistry(PEXT2_VOLUME_PROPERTY2 EVP)
 #define HIDING_PREFIX       "HidingPrefix"
 #define HIDING_SUFFIX       "HidingSuffix"
 #define MOUNT_POINT         "MountPoint"
+#define UID                 "uid"
+#define GID                 "gid"
+#define EUID                "euid"
+#define EGID                "egid"
+
 
     if (EVP->bReadonly) {
         data += READING_ONLY";";
@@ -2225,6 +2357,25 @@ Ext2StorePropertyinRegistry(PEXT2_VOLUME_PROPERTY2 EVP)
         data += ";";
     }
 
+    if (EVP->Flags2 & EXT2_VPROP3_USERIDS) {
+        sprintf(ID, "%u", EVP->uid);
+        data += UID"=";
+        data += ID;
+        data += ";";
+
+        sprintf(ID, "%u", EVP->gid);
+        data += GID"=";
+        data += ID;
+        data += ";";
+
+        if (EVP->EIDS) {
+            sprintf(ID, "%u", EVP->euid);
+            data += EUID"=";
+            data += ID;
+            data += ";";
+        }
+    }
+
     /* set volume parameters */
     status = RegSetValueEx( hKey, UUID, 0, REG_SZ, (BYTE *)
                             data.GetBuffer(data.GetLength()),
@@ -2246,7 +2397,7 @@ BOOLEAN Ext2IsNullUuid (__u8 * uuid)
 }
 
 BOOLEAN
-Ext2CheckVolumeRegistryProperty(PEXT2_VOLUME_PROPERTY2 EVP)
+Ext2CheckVolumeRegistryProperty(PEXT2_VOLUME_PROPERTY3 EVP)
 {
     CHAR    UUID[50];
     HKEY    hKey;
@@ -2279,10 +2430,10 @@ Ext2CheckVolumeRegistryProperty(PEXT2_VOLUME_PROPERTY2 EVP)
     /* Create or open ext2fsd volumes key */
     strcpy (keyPath, "SYSTEM\\CurrentControlSet\\Services\\Ext2Fsd\\Volumes") ;
     status = ::RegOpenKeyEx (HKEY_LOCAL_MACHINE,
-                             keyPath,
-                             0,
-                             KEY_ALL_ACCESS,
-                             &hKey) ;
+                            keyPath,
+                            0,
+                            KEY_ALL_ACCESS,
+                            &hKey) ;
     if (status != ERROR_SUCCESS) {
         rc = FALSE;
         goto errorout;
@@ -2291,11 +2442,11 @@ Ext2CheckVolumeRegistryProperty(PEXT2_VOLUME_PROPERTY2 EVP)
     /* Query volume parameters */
     len = MAX_PATH;
     status = RegQueryValueEx(hKey,
-                             &UUID[0],
-                             0,
-                             (LPDWORD)&type,
-                             (BYTE *)&content[0],
-                             (LPDWORD)&len);
+                            &UUID[0],
+                            0,
+                            (LPDWORD)&type,
+                            (BYTE *)&content[0],
+                            (LPDWORD)&len);
     if (status != ERROR_SUCCESS) {
         rc = FALSE;
     }
@@ -2307,7 +2458,7 @@ errorout:
 }
 
 VOID
-Ext2SetDefaultVolumeRegistryProperty(PEXT2_VOLUME_PROPERTY2 EVP)
+Ext2SetDefaultVolumeRegistryProperty(PEXT2_VOLUME_PROPERTY3 EVP)
 {
     ULONG   StartMode;
     BOOLEAN AutoMount = 0;
@@ -2318,71 +2469,41 @@ Ext2SetDefaultVolumeRegistryProperty(PEXT2_VOLUME_PROPERTY2 EVP)
 
     /* query global parameters */
     Ext2QueryGlobalProperty(
-        &StartMode,
-        (BOOLEAN *)&EVP->bReadonly,
-        (BOOLEAN *)&EVP->bExt3Writable,
-        (CHAR *)EVP->Codepage,
-        (CHAR *)NULL,
-        (CHAR *)NULL,
-        (BOOLEAN *)&AutoMount
-    );
+            &StartMode,
+            (BOOLEAN *)&EVP->bReadonly,
+            (BOOLEAN *)&EVP->bExt3Writable,
+            (CHAR *)EVP->Codepage,
+            (CHAR *)NULL,
+            (CHAR *)NULL,
+            (BOOLEAN *)&AutoMount
+            );
 
     if (EVP->bExt3 && !EVP->bExt3Writable)
         EVP->bReadonly = TRUE;
 
     EVP->DrvLetter = 0x80;
-
+    EVP->Flags2 |= EXT2_VPROP3_AUTOMOUNT;
     Ext2StorePropertyinRegistry(EVP);
 }
 
 BOOLEAN
 Ext2SetExt2Property (
     HANDLE                Handle,
-    PEXT2_VOLUME_PROPERTY2 EVP
-)
+    PEXT2_VOLUME_PROPERTY3 EVP
+    )
 {
     NT::NTSTATUS                status;
     NT::IO_STATUS_BLOCK         iosb;
 
     ASSERT(EVP->Magic == EXT2_VOLUME_PROPERTY_MAGIC);
-    EVP->Command = APP_CMD_SET_PROPERTY2;
+    EVP->Command = APP_CMD_SET_PROPERTY3;
 
     status = NT::ZwDeviceIoControlFile(
-                 Handle, NULL, NULL, NULL, &iosb,
-                 IOCTL_APP_VOLUME_PROPERTY,
-                 EVP, sizeof(EXT2_VOLUME_PROPERTY2),
-                 EVP, sizeof(EXT2_VOLUME_PROPERTY2)
-             );
-
-    if (NT_SUCCESS(status)) {
-        return TRUE;
-    } else {
-        CString s;
-        s.Format("Status = %xh\n", status);
-        AfxMessageBox(s);
-    }
-
-    return FALSE;
-}
-
-BOOLEAN
-Ext2SetExt2Property3 (
-    HANDLE                Handle,
-    PEXT2_VOLUME_PROPERTY3 EVP
-)
-{
-    NT::NTSTATUS                status;
-    NT::IO_STATUS_BLOCK         iosb;
-
-    ASSERT(EVP->Prop2.Magic == EXT2_VOLUME_PROPERTY_MAGIC);
-    EVP->Prop2.Command = APP_CMD_SET_PROPERTY3;
-
-    status = NT::ZwDeviceIoControlFile(
-                 Handle, NULL, NULL, NULL, &iosb,
-                 IOCTL_APP_VOLUME_PROPERTY,
-                 EVP, sizeof(EXT2_VOLUME_PROPERTY3),
-                 EVP, sizeof(EXT2_VOLUME_PROPERTY3)
-             );
+                Handle, NULL, NULL, NULL, &iosb,
+                IOCTL_APP_VOLUME_PROPERTY,
+                EVP, sizeof(EXT2_VOLUME_PROPERTY3),
+                EVP, sizeof(EXT2_VOLUME_PROPERTY3)
+            );
 
     if (NT_SUCCESS(status)) {
         return TRUE;
@@ -2405,7 +2526,7 @@ Ext2QueryGlobalProperty(
     CHAR *      sPrefix,
     CHAR *      sSuffix,
     BOOLEAN *   bAutoMount
-)
+    )
 {
     int     rc = TRUE;
     HKEY    hKey;
@@ -2416,10 +2537,10 @@ Ext2QueryGlobalProperty(
     /* Open ext2fsd sevice key */
     strcpy (keyPath, "SYSTEM\\CurrentControlSet\\Services\\Ext2Fsd") ;
     status = ::RegOpenKeyEx (HKEY_LOCAL_MACHINE,
-                             keyPath,
-                             0,
-                             KEY_ALL_ACCESS,
-                             &hKey) ;
+                            keyPath,
+                            0,
+                            KEY_ALL_ACCESS,
+                            &hKey) ;
     if (status != ERROR_SUCCESS) {
         rc = FALSE;
         goto errorout;
@@ -2428,11 +2549,11 @@ Ext2QueryGlobalProperty(
     /* Query Start type */
     len = sizeof(DWORD);
     status = RegQueryValueEx( hKey,
-                              "Start",
-                              0,
-                              (LPDWORD)&type,
-                              (BYTE *)&data,
-                              (LPDWORD)&len);
+                            "Start",
+                            0,
+                            (LPDWORD)&type,
+                            (BYTE *)&data,
+                            (LPDWORD)&len);
     if (status == ERROR_SUCCESS) {
         *ulStartup = data;
     }
@@ -2442,10 +2563,10 @@ Ext2QueryGlobalProperty(
     /* Open ext2fsd parameters key */
     strcpy (keyPath, "SYSTEM\\CurrentControlSet\\Services\\Ext2Fsd\\Parameters") ;
     status = ::RegOpenKeyEx (HKEY_LOCAL_MACHINE,
-                             keyPath,
-                             0,
-                             KEY_ALL_ACCESS,
-                             &hKey) ;
+                            keyPath,
+                            0,
+                            KEY_ALL_ACCESS,
+                            &hKey) ;
     if (status != ERROR_SUCCESS) {
         rc = FALSE;
         goto errorout;
@@ -2454,11 +2575,11 @@ Ext2QueryGlobalProperty(
     /* Query WritingSupport */
     len = sizeof(DWORD);
     status = RegQueryValueEx( hKey,
-                              "WritingSupport",
-                              0,
-                              (LPDWORD)&type,
-                              (BYTE *)&data,
-                              (LPDWORD)&len);
+                            "WritingSupport",
+                            0,
+                            (LPDWORD)&type,
+                            (BYTE *)&data,
+                            (LPDWORD)&len);
     if (status == ERROR_SUCCESS) {
         *bReadonly = (data == 0);
     }
@@ -2466,11 +2587,11 @@ Ext2QueryGlobalProperty(
     /* query Ext3ForceWriting */
     len = sizeof(DWORD);
     status = RegQueryValueEx( hKey,
-                              "Ext3ForceWriting",
-                              0,
-                              (LPDWORD)&type,
-                              (BYTE *)&data,
-                              (LPDWORD)&len);
+                            "Ext3ForceWriting",
+                            0,
+                            (LPDWORD)&type,
+                            (BYTE *)&data,
+                            (LPDWORD)&len);
 
     if (status == ERROR_SUCCESS) {
         *bExt3Writable = (data != 0);
@@ -2479,11 +2600,11 @@ Ext2QueryGlobalProperty(
     /* query AutoMount */
     len = sizeof(DWORD);
     status = RegQueryValueEx( hKey,
-                              "AutoMount",
-                              0,
-                              (LPDWORD)&type,
-                              (BYTE *)&data,
-                              (LPDWORD)&len);
+                            "AutoMount",
+                            0,
+                            (LPDWORD)&type,
+                            (BYTE *)&data,
+                            (LPDWORD)&len);
 
     if (status == ERROR_SUCCESS) {
         *bAutoMount = (data != 0);
@@ -2493,32 +2614,32 @@ Ext2QueryGlobalProperty(
         /* query codepage */
         len = CODEPAGE_MAXLEN;
         status = RegQueryValueEx( hKey,
-                                  "CodePage",
-                                  0,
-                                  (LPDWORD)&type,
-                                  (BYTE *)Codepage,
-                                  (LPDWORD)&len);
+                                "CodePage",
+                                0,
+                                (LPDWORD)&type,
+                                (BYTE *)Codepage,
+                                (LPDWORD)&len);
     }
 
     if (sPrefix) {
         /* querying hidding filter patterns */
         len = CODEPAGE_MAXLEN;
         status = RegQueryValueEx( hKey,
-                                  "HidingPrefix",
-                                  0,
-                                  (LPDWORD)&type,
-                                  (BYTE *)sPrefix,
-                                  (LPDWORD)&len);
+                                "HidingPrefix",
+                                0,
+                                (LPDWORD)&type,
+                                (BYTE *)sPrefix,
+                                (LPDWORD)&len);
     }
 
     if (sSuffix) {
         len = CODEPAGE_MAXLEN;
         status = RegQueryValueEx( hKey,
-                                  "HidingSuffix",
-                                  0,
-                                  (LPDWORD)&type,
-                                  (BYTE *)sSuffix,
-                                  (LPDWORD)&len);
+                                "HidingSuffix",
+                                0,
+                                (LPDWORD)&type,
+                                (BYTE *)sSuffix,
+                                (LPDWORD)&len);
     }
 
     RegCloseKey(hKey);
@@ -2534,7 +2655,7 @@ Ext2QueryDrvVersion(
     CHAR *      Version,
     CHAR *      Date,
     CHAR *      Time
-)
+    )
 {
     EXT2_VOLUME_PROPERTY_VERSION EVPV;
     NT::NTSTATUS                 status;
@@ -2547,7 +2668,7 @@ Ext2QueryDrvVersion(
     EVPV.Command = APP_CMD_QUERY_VERSION;
     EVPV.Flags |= EXT2_FLAG_VP_SET_GLOBAL;
 
-    status = Ext2Open("\\DosDevices\\Ext2Fsd",
+    status = Ext2Open("\\DosDevices\\Ext2Fsd", 
                       &handle, EXT2_DESIRED_ACCESS);
     if (!NT_SUCCESS(status)) {
         rc = -1;
@@ -2555,11 +2676,11 @@ Ext2QueryDrvVersion(
     }
 
     status = NT::ZwDeviceIoControlFile(
-                 handle, NULL, NULL, NULL, &iosb,
-                 IOCTL_APP_VOLUME_PROPERTY,
-                 &EVPV, sizeof(EXT2_VOLUME_PROPERTY_VERSION),
-                 &EVPV, sizeof(EXT2_VOLUME_PROPERTY_VERSION)
-             );
+                handle, NULL, NULL, NULL, &iosb,
+                IOCTL_APP_VOLUME_PROPERTY,
+                &EVPV, sizeof(EXT2_VOLUME_PROPERTY_VERSION),
+                &EVPV, sizeof(EXT2_VOLUME_PROPERTY_VERSION)
+            );
 
     if (NT_SUCCESS(status)) {
         strncpy(Version,  EVPV.Version, 0x1B);
@@ -2585,10 +2706,9 @@ Ext2SetGlobalProperty (
     CHAR *      sPrefix,
     CHAR *      sSuffix,
     BOOLEAN     bAutoMount
-)
+    )
 {
-    EXT2_VOLUME_PROPERTY2 EVP;
-    EXT2_VOLUME_PROPERTY3 EVP3;
+    EXT2_VOLUME_PROPERTY3 EVP;
 
     NT::NTSTATUS         status;
     HANDLE  Handle = NULL;
@@ -2598,9 +2718,9 @@ Ext2SetGlobalProperty (
 
     ULONG   data = 0;
 
-    memset(&EVP, 0, sizeof(EXT2_VOLUME_PROPERTY2));
+    memset(&EVP, 0, sizeof(EXT2_VOLUME_PROPERTY3));
     EVP.Magic = EXT2_VOLUME_PROPERTY_MAGIC;
-    EVP.Command = APP_CMD_SET_PROPERTY2;
+    EVP.Command = APP_CMD_SET_PROPERTY3;
     EVP.Flags |= EXT2_FLAG_VP_SET_GLOBAL;
     EVP.bReadonly = bReadonly;
     EVP.bExt3Writable = bExt3Writable;
@@ -2618,10 +2738,10 @@ Ext2SetGlobalProperty (
 
     strcpy (keyPath, "SYSTEM\\CurrentControlSet\\Services\\Ext2Fsd") ;
     status = ::RegOpenKeyEx (HKEY_LOCAL_MACHINE,
-                             keyPath,
-                             0,
-                             KEY_ALL_ACCESS,
-                             &hKey) ;
+                            keyPath,
+                            0,
+                            KEY_ALL_ACCESS,
+                            &hKey) ;
     if (status != ERROR_SUCCESS) {
         rc = FALSE;
         goto errorout;
@@ -2638,10 +2758,10 @@ Ext2SetGlobalProperty (
 
     strcpy (keyPath, "SYSTEM\\CurrentControlSet\\Services\\Ext2Fsd\\Parameters") ;
     status = ::RegOpenKeyEx (HKEY_LOCAL_MACHINE,
-                             keyPath,
-                             0,
-                             KEY_ALL_ACCESS,
-                             &hKey) ;
+                            keyPath,
+                            0,
+                            KEY_ALL_ACCESS,
+                            &hKey) ;
     if (status != ERROR_SUCCESS) {
         rc = FALSE;
         goto errorout;
@@ -2704,17 +2824,11 @@ Ext2SetGlobalProperty (
         goto errorout;
     }
 
-    memset(&EVP3, 0, sizeof(EXT2_VOLUME_PROPERTY3));
-    EVP3.Prop2 = EVP;
-    EVP3.Flags = EXT2_VPROP3_AUTOMOUNT;
-    EVP3.AutoMount = g_bAutoMount;
+    EVP.Flags2 = EXT2_VPROP3_AUTOMOUNT;
+    EVP.AutoMount = g_bAutoMount;
 
-    rc = Ext2SetExt2Property3(Handle, &EVP3);
+    rc = Ext2SetExt2Property(Handle, &EVP);
     if (!rc) {
-        rc = Ext2SetExt2Property(Handle, &EVP);
-        if (!rc) {
-            goto errorout;
-        }
     }
 
 errorout:
@@ -2725,32 +2839,171 @@ errorout:
 }
 
 BOOLEAN
-Ext2IsServiceStarted()
+Ext2SetService(PCHAR Target, PCHAR Name, PCHAR Desc, BOOL bInstall)
 {
-    NT::NTSTATUS         status;
-    HANDLE               Handle = NULL;
+    SC_HANDLE   hService;
+    SC_HANDLE   hManager;
 
-    status = Ext2Open("\\DosDevices\\Ext2Fsd",
-                      &Handle, EXT2_DESIRED_ACCESS);
-
-    if (NT_SUCCESS(status)) {
-        Ext2Close(&Handle);
-        return TRUE;
+    // open Service Control Manager
+    hManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+    if (hManager == NULL) {
+        // AfxMessageBox("Ext2Mgr: cannot open Service Control Manager",
+        //               MB_ICONEXCLAMATION | MB_OK);
+        return FALSE;
     }
 
-    return FALSE;
+    if (bInstall) {
+
+        // now create service entry
+        hService = CreateService(
+                hManager,                   // SCManager database
+                Name,                       // name of service
+                Desc,                       // name to display
+                SERVICE_ALL_ACCESS,	        // desired access
+                SERVICE_WIN32_OWN_PROCESS | SERVICE_INTERACTIVE_PROCESS,
+                                            // service type
+                SERVICE_AUTO_START,	        // start type
+                SERVICE_ERROR_NORMAL,       // error control type
+				Target,	                    // service's binary
+                NULL,                       // no load ordering group
+                NULL,                       // no tag identifier
+                NULL,			            // dependencies
+                NULL,						// LocalSystem account
+                NULL);                      // no password
+
+        if (hService == NULL) {
+            DWORD error = GetLastError();
+            if (error == ERROR_SERVICE_EXISTS) {
+                // AfxMessageBox("Service is already registered.",
+                //               MB_ICONEXCLAMATION | MB_OK);
+            } else {
+                // AfxMessageBox("Service couldn't be registered.",
+                //               MB_ICONEXCLAMATION | MB_OK);
+            }
+        } else {
+
+            CloseServiceHandle(hService);
+        }
+
+    } else {
+
+        /* open the service */
+        hService = OpenService(
+                hManager,
+                Name,
+                SERVICE_ALL_ACCESS
+                );
+
+        if (hService != NULL) {
+
+            // remove the service from the SCM
+            if (DeleteService(hService)) {
+            } else {
+                DWORD error = GetLastError();
+                if (error == ERROR_SERVICE_MARKED_FOR_DELETE) {
+                    // AfxMessageBox("Service is already unregistered",
+                    //               MB_ICONEXCLAMATION | MB_OK);
+                } else {
+                    // AfxMessageBox("Service could not be unregistered",
+                    //                MB_ICONEXCLAMATION | MB_OK);
+                }
+            }
+
+            CloseServiceHandle(hService);
+        }
+    }
+
+    CloseServiceHandle(hManager);
+
+	return TRUE;
 }
 
+
+BOOLEAN ExtSaveResourceToFile(UINT id, CHAR *target)
+{
+	HANDLE	handle;
+	ULONG	bytes = 0;
+    BOOLEAN rc = FALSE;
+
+    HRSRC   hr = FindResource(NULL, MAKEINTRESOURCE(id), RT_RCDATA);
+    ULONG   size = SizeofResource(NULL, hr);
+    HGLOBAL hg = LoadResource(NULL, hr);
+    PVOID   data = LockResource(hg);
+
+    if (!data)
+        goto errorout;
+
+	handle = CreateFile(target, GENERIC_READ | GENERIC_WRITE,
+                        FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+		                CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (handle == INVALID_HANDLE_VALUE) {
+		goto errorout;
+	}
+
+    rc = WriteFile(handle, data, size, &bytes, NULL);
+    if (rc)
+        rc = (bytes == size);
+
+	CloseHandle(handle);
+
+errorout:
+
+	return rc;
+}
+
+TCHAR *Ext2StrLastA(TCHAR *t, TCHAR *s);
+
+BOOLEAN Ext2InstallExt2Srv()
+{
+    TCHAR   cmd[512] = {0}, *p;
+    BOOL    rc = FALSE;
+
+    if (GetWindowsDirectory(cmd, 512)) {
+        if (g_isWow64)
+            strcat(cmd, "\\SysWOW64\\Ext2Srv.EXE");
+        else
+            strcat(cmd, "\\System32\\Ext2Srv.EXE");
+        rc = ExtSaveResourceToFile(IDR_RCDAT_SRV, cmd);
+    }
+
+    if (!rc) {
+        GetModuleFileName(NULL, cmd, 510);
+        p = Ext2StrLastA(cmd, ".EXE");
+        if (p && p > &cmd[3]) {
+            p[-3] = 'S';
+            p[-2] = 'r';
+            p[-1] = 'v';
+        } else {
+            strcat(cmd, "-Srv.EXE");
+        }
+        rc = ExtSaveResourceToFile(IDR_RCDAT_SRV, cmd);
+    }
+
+    if (!rc) {
+        GetTempPath(50, cmd);
+        strcat(cmd, "\\Ext2Srv.EXE");
+        rc = ExtSaveResourceToFile(IDR_RCDAT_SRV, cmd);
+    }
+
+    if (!rc) {
+        return rc;
+    }
+
+    rc = Ext2SetService(cmd, "Ext2Srv", "Ext2Fsd Service Manager", TRUE);
+    if (!rc) {
+        return rc;
+    }
+
+    return Ext2StartService("Ext2Srv");
+}
+
+
 BOOLEAN
-Ext2StartService()
+Ext2StartService(CHAR *service)
 {
     BOOLEAN     rc = FALSE;
     SC_HANDLE   scmHandle = NULL;
     SC_HANDLE   drvHandle = NULL;
-
-    if (Ext2IsServiceStarted()) {
-        return TRUE;
-    }
 
     scmHandle = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
     if (!scmHandle) {
@@ -2758,7 +3011,7 @@ Ext2StartService()
     }
 
     drvHandle = OpenService(scmHandle,
-                            "ext2fsd",
+                            service,
                             SERVICE_ALL_ACCESS);
     if (!drvHandle) {
         goto errorout;
@@ -2779,6 +3032,45 @@ errorout:
 }
 
 BOOLEAN
+Ext2StartExt2Srv()
+{
+    BOOLEAN rc = Ext2StartService("Ext2Srv");
+    if (!rc)
+        rc = Ext2InstallExt2Srv();
+
+    return rc;
+}
+
+
+BOOLEAN
+Ext2StartExt2Fsd()
+{
+    if (Ext2IsServiceStarted()) {
+        return TRUE;
+    }
+
+    return Ext2StartService("ext2fsd");
+}
+
+BOOLEAN
+Ext2IsServiceStarted()
+{
+    NT::NTSTATUS         status;
+    HANDLE               Handle = NULL;
+
+    status = Ext2Open("\\DosDevices\\Ext2Fsd",
+                      &Handle, EXT2_DESIRED_ACCESS);
+
+    if (NT_SUCCESS(status)) {
+        Ext2Close(&Handle);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+
+BOOLEAN
 Ext2IsRemovable(PEXT2_VOLUME volume)
 {
     STORAGE_BUS_TYPE busType = BusTypeAta;
@@ -2790,8 +3082,8 @@ Ext2IsRemovable(PEXT2_VOLUME volume)
     }
 
     if (busType == BusType1394 ||
-            busType == BusTypeUsb ||
-            bRemovableMedia  ) {
+        busType == BusTypeUsb ||
+        bRemovableMedia  ) {
         return TRUE;
     }
 
@@ -2799,10 +3091,31 @@ Ext2IsRemovable(PEXT2_VOLUME volume)
 }
 
 BOOLEAN
+Ext2RemoveDriveLetter(CHAR DrvLetter)
+{
+    PEXT2_LETTER drvLetter = NULL;
+    BOOLEAN rc = FALSE;
+
+    if (DrvLetter >= '0' && DrvLetter <= '9') {
+        drvLetter = &drvDigits[DrvLetter - '0'];
+    } else if (DrvLetter >= 'A' && DrvLetter <= 'Z') {
+        drvLetter = &drvLetters[DrvLetter - 'A'];
+    } else if (DrvLetter >= 'a' && DrvLetter <= 'z') {
+        drvLetter = &drvLetters[DrvLetter - 'a'];
+    }
+
+    if (drvLetter && drvLetter->bUsed) {
+        rc = Ext2RemoveDrvLetter(drvLetter);
+    }
+
+    return rc;
+}
+
+BOOLEAN
 Ext2InitializeVolume(
     PCHAR           NameString,
     PEXT2_VOLUME *  Volume
-)
+    )
 {
     BOOLEAN rc = FALSE;
     HANDLE hVolume = NULL;
@@ -2817,8 +3130,7 @@ Ext2InitializeVolume(
 
     status = Ext2Open(NameString, &hVolume, EXT2_DESIRED_ACCESS);
     if (!NT_SUCCESS(status)) {
-        free(volume);
-        volume = NULL;
+        free(volume); volume = NULL;
         goto errorout;
     }
 
@@ -2827,9 +3139,9 @@ Ext2InitializeVolume(
     strcpy(volume->Name, NameString);
 
     status = NT::ZwQueryVolumeInformationFile(
-                 hVolume, &ioSb, &volume->FsaInfo,
-                 MAX_PATH, NT::FileFsAttributeInformation
-             );
+                        hVolume, &ioSb, &volume->FsaInfo,
+                        MAX_PATH, NT::FileFsAttributeInformation
+                        );
 
     if (NT_SUCCESS(status)) {
 
@@ -2837,44 +3149,38 @@ Ext2InitializeVolume(
         NT::ANSI_STRING    aniString;
 
         NT::ZwQueryVolumeInformationFile(
-            hVolume, &ioSb, &volume->FsdInfo,
-            sizeof(NT::FILE_FS_DEVICE_INFORMATION),
-            NT::FileFsDeviceInformation
-        );
+                        hVolume, &ioSb, &volume->FsdInfo,
+                        sizeof(NT::FILE_FS_DEVICE_INFORMATION),
+                        NT::FileFsDeviceInformation
+                        );
 
         NT::ZwQueryVolumeInformationFile(
-            hVolume, &ioSb, &volume->FssInfo,
-            sizeof(NT::FILE_FS_SIZE_INFORMATION),
-            NT::FileFsSizeInformation
-        );
+                        hVolume, &ioSb, &volume->FssInfo,
+                        sizeof(NT::FILE_FS_SIZE_INFORMATION),
+                        NT::FileFsSizeInformation
+                        );
 
         if (volume->FsaInfo.FileSystemNameLength == 6 &&
-                (volume->FsaInfo.FileSystemName[0] == (WCHAR)'R' ||
-                 volume->FsaInfo.FileSystemName[0] == (WCHAR)'r') &&
-                (volume->FsaInfo.FileSystemName[1] == (WCHAR)'A' ||
-                 volume->FsaInfo.FileSystemName[1] == (WCHAR)'a') &&
-                (volume->FsaInfo.FileSystemName[2] == (WCHAR)'W' ||
-                 volume->FsaInfo.FileSystemName[2] == (WCHAR)'w')) {
+            (volume->FsaInfo.FileSystemName[0] == (WCHAR)'R' ||
+             volume->FsaInfo.FileSystemName[0] == (WCHAR)'r') &&
+            (volume->FsaInfo.FileSystemName[1] == (WCHAR)'A' ||
+             volume->FsaInfo.FileSystemName[1] == (WCHAR)'a') &&
+            (volume->FsaInfo.FileSystemName[2] == (WCHAR)'W' ||
+             volume->FsaInfo.FileSystemName[2] == (WCHAR)'w')) {
             if (!Ext2QueryVolumeFS(hVolume, volume)) {
                 /* memcpy(volume->Codepage, "N/A", 3); */
             }
 
         } else {
-            if (Ext2QueryExt2Property(hVolume, &volume->EVP) &&
-                    volume->EVP.DrvLetter != 0xFF &&
-                    volume->EVP.DrvLetter != 0 ) {
-                if (Ext2NotifyVolumePoint(volume, volume->EVP.DrvLetter)) {
-                    volume->EVP.DrvLetter = 0xFF;
-                    Ext2SetExt2Property(hVolume, &volume->EVP);
-                }
+            if (Ext2QueryExt2Property(hVolume, &volume->EVP)) {
+                volume->bRecognized = TRUE;
             }
-            volume->bRecognized = TRUE;
         }
 
         /* convert the unicode file system name to mbs */
 
-        uniString.MaximumLength = uniString.Length =
-                                      (USHORT)volume->FsaInfo.FileSystemNameLength;
+        uniString.MaximumLength = uniString.Length = 
+            (USHORT)volume->FsaInfo.FileSystemNameLength; 
         uniString.Buffer = volume->FsaInfo.FileSystemName;
 
         aniString.Buffer = volume->FileSystem;
@@ -2887,17 +3193,60 @@ Ext2InitializeVolume(
 
     volume->Extent = Ext2QueryVolumeExtents(hVolume);
     if (!volume->Extent) {
-        free(volume);
-        volume = NULL;
+        free(volume); volume = NULL;
         goto errorout;
     }
 
-    *Volume = volume;
-    rc = TRUE;
+    *Volume = volume; rc = TRUE;
 
 errorout:
 
     Ext2Close(&hVolume);
+    return rc;
+}
+
+
+CHAR
+Ext2ProcessExt2Property(PEXT2_VOLUME volume)
+{
+    HANDLE hVolume = NULL;
+    NT::NTSTATUS status;
+    CHAR rc = 0;
+
+    status = Ext2Open(volume->Name, &hVolume, EXT2_DESIRED_ACCESS);
+    if (!NT_SUCCESS(status)) {
+        goto errorout;
+    }
+
+    if (Ext2QueryExt2Property(hVolume, &volume->EVP)) {
+        if (volume->DrvLetters == 0 && volume->EVP.DrvLetter) {
+            CHAR DrvLetter = volume->EVP.DrvLetter & 0x7F;
+            if (DrvLetter && Ext2IsDrvLetterAvailable(DrvLetter)) {
+                rc = Ext2MountVolumeAs(volume->Name, DrvLetter);
+            } else {
+                rc = volume->EVP.DrvLetter = Ext2MountVolume(volume->Name);
+                volume->EVP.DrvLetter |= 0x80;
+            }
+        }
+    }
+
+errorout:
+
+    Ext2Close(&hVolume);
+    return rc;
+}
+
+BOOLEAN Ext2ProcessExt2Volumes()
+{
+    PEXT2_VOLUME    volume = gVols;
+    BOOLEAN         rc = FALSE;
+
+    while (volume) {
+        if (Ext2ProcessExt2Property(volume)) {
+            rc = TRUE;
+        }
+        volume = volume->Next;
+    }
     return rc;
 }
 
@@ -2906,16 +3255,16 @@ Ext2IsPartitionExtent(
     ULONG                  disk,
     PPARTITION_INFORMATION_EXT part,
     PVOLUME_DISK_EXTENTS   extent
-)
+    )
 {
     DWORD nExt = 0;
 
     for (nExt = 0; nExt < extent->NumberOfDiskExtents; nExt++) {
         if ((extent->Extents[nExt].DiskNumber == disk) &&
-                (extent->Extents[nExt].StartingOffset.QuadPart ==
-                 part->StartingOffset.QuadPart ) &&
-                (extent->Extents[nExt].ExtentLength.QuadPart ==
-                 part->PartitionLength.QuadPart)) {
+            (extent->Extents[nExt].StartingOffset.QuadPart == 
+             part->StartingOffset.QuadPart ) &&
+            (extent->Extents[nExt].ExtentLength.QuadPart ==
+             part->PartitionLength.QuadPart)) {
             return TRUE;
         }
     }
@@ -2936,7 +3285,7 @@ Ext2LoadDiskPartitions(PEXT2_DISK Disk)
     }
 
     Disk->DataParts = (PEXT2_PARTITION) malloc(
-                          sizeof(EXT2_PARTITION) * Disk->NumParts);
+                        sizeof(EXT2_PARTITION) * Disk->NumParts);
     if (!Disk->DataParts) {
         return FALSE;
     }
@@ -2944,23 +3293,23 @@ Ext2LoadDiskPartitions(PEXT2_DISK Disk)
     memset(Disk->DataParts, 0, sizeof(EXT2_PARTITION) * Disk->NumParts);
 
     if (Disk->Layout) {
-        if (Disk->Layout->PartitionStyle == PARTITION_STYLE_MBR &&
-                Disk->Layout->PartitionEntry->Mbr.PartitionType == PARTITION_LDM) {
+        if (Disk->Layout->PartitionStyle == PARTITION_STYLE_MBR && 
+            Disk->Layout->PartitionEntry->Mbr.PartitionType == PARTITION_LDM) {
             bDynamic = TRUE;
         }
 
 
         /* Now walk through driveLayout and pack partitions */
-        for (i = 0; (Disk->Layout != NULL) &&
-                (i < (UCHAR)Disk->Layout->PartitionCount); i++) {
+        for (i = 0; (Disk->Layout != NULL) && 
+             (i < (UCHAR)Disk->Layout->PartitionCount); i++) {
 
             PPARTITION_INFORMATION_EXT  Part;
             Part = &Disk->Layout->PartitionEntry[i];
 
             if (Disk->Layout->PartitionStyle == PARTITION_STYLE_MBR) {
                 if (Part->Mbr.PartitionType == PARTITION_ENTRY_UNUSED ||
-                        Part->Mbr.PartitionType == PARTITION_EXTENDED ||
-                        Part->Mbr.PartitionType == PARTITION_XINT13_EXTENDED) {
+                    Part->Mbr.PartitionType == PARTITION_EXTENDED || 
+                    Part->Mbr.PartitionType == PARTITION_XINT13_EXTENDED) {
                     continue;
                 }
             }
@@ -2979,9 +3328,9 @@ Ext2LoadDiskPartitions(PEXT2_DISK Disk)
 
             PEXT2_VOLUME   volume = gVols;
             for (j=0; (ULONG)j < g_nVols; j++) {
-                if (Ext2IsPartitionExtent(Disk->OrderNo,
-                                          Disk->DataParts[i].Entry,
-                                          volume->Extent )) {
+                if (Ext2IsPartitionExtent(Disk->OrderNo, 
+                        Disk->DataParts[i].Entry,
+                        volume->Extent )) {
                     volume->bDynamic = bDynamic;
                     if (volume->Extent->NumberOfDiskExtents == 1) {
                         volume->Part = &Disk->DataParts[i];
@@ -3044,25 +3393,25 @@ Ext2MountingVolumes()
 BOOLEAN
 Ext2LoadVolumes()
 {
-    BOOLEAN  rc = TRUE;
+    ULONG   rc = TRUE;
 
-    TCHAR * nameString = NULL;
+    TCHAR  *nameString = NULL;
     ULONG   nameLen = REGSTR_VAL_MAX_HCID_LEN;
 
     HMACHINE hMachine = NULL;
     DEVNODE  dnRoot, dnFirst;
 
     DEVINSTID  devIds[] = {
-        "ROOT\\FTDISK\\0000",
-        "ROOT\\DMIO\\0000",
-        NULL,
-        "ROOT\\VOLMGR\\0000",
-        NULL
-    };
+            "ROOT\\FTDISK\\0000",
+            "ROOT\\DMIO\\0000",
+            NULL,
+            "ROOT\\VOLMGR\\0000",
+            NULL
+            };
 
     int i = 0;
 
-    if (IsVista()) {
+    if (IsVistaOrAbove()) {
         i = 3;
     }
 
@@ -3073,10 +3422,8 @@ Ext2LoadVolumes()
 
     while (devIds[i] != NULL) {
 
-        int n = 0;
-
-        rc = CM_Locate_DevNode_Ex(&dnRoot, devIds[i],
-                                  CM_LOCATE_DEVNODE_NORMAL , hMachine);
+	    rc = CM_Locate_DevNode_Ex(&dnRoot, devIds[i], 
+                CM_LOCATE_DEVNODE_NORMAL , hMachine);
         if (rc != CR_SUCCESS) {
             break;
         }
@@ -3093,15 +3440,15 @@ Ext2LoadVolumes()
             nameLen = REGSTR_VAL_MAX_HCID_LEN;
             memset(nameString, 0, nameLen);
             rc = CM_Get_DevNode_Registry_Property_Ex(
-                     dnFirst, CM_DRP_PHYSICAL_DEVICE_OBJECT_NAME,
-                     NULL, nameString, &nameLen, 0, hMachine);
+                        dnFirst, CM_DRP_PHYSICAL_DEVICE_OBJECT_NAME,
+                        NULL, nameString, &nameLen, 0, hMachine);
             if (rc != CR_SUCCESS) {
                 break;
             }
 
             if (Ext2InitializeVolume(nameString, &volume)) {
 
-                volume->bDynamic = 0;
+                 volume->bDynamic = 0;
 
                 /* attach the volume to global list */
                 if (gVols) {
@@ -3115,7 +3462,7 @@ Ext2LoadVolumes()
                 }
                 g_nVols++;
             }
-
+            
             rc = CM_Get_Sibling_Ex(&dnFirst, dnFirst, 0, hMachine);
             if (rc != CR_SUCCESS) {
                 break;
@@ -3145,7 +3492,7 @@ Ext2LoadRemovableVolumes()
     PCHAR                       nameString;
     int                         nInterface = 0;
 
-    if (IsVista()) {
+    if (IsVistaOrAbove()) {
         return TRUE;
     }
 
@@ -3160,24 +3507,24 @@ Ext2LoadRemovableVolumes()
     }
 
     devInfo = SetupDiGetClassDevs(
-                  &VolumeClassGuid, NULL, NULL,
-                  DIGCF_PRESENT | DIGCF_DEVICEINTERFACE
-              );
+                    &VolumeClassGuid, NULL, NULL,
+                    DIGCF_PRESENT | DIGCF_DEVICEINTERFACE
+                    );
     if (devInfo == INVALID_HANDLE_VALUE) {
         goto errorout;
     }
 
-    while (TRUE) {
+	while (TRUE) {
 
         BOOLEAN bFound = FALSE;
 
-        ifData.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+		ifData.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
         bFound = SetupDiEnumDeviceInterfaces(
-                     devInfo,
-                     NULL,
-                     &VolumeClassGuid,
-                     (ULONG)nInterface++,
-                     &ifData);
+				        devInfo,
+				        NULL,
+				        &VolumeClassGuid,
+				        (ULONG)nInterface++,
+				        &ifData);
         if (!bFound) {
             break;
         }
@@ -3185,12 +3532,12 @@ Ext2LoadRemovableVolumes()
         memset(ifDetail, 0, PAGE_SIZE);
         ifDetail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
         if (SetupDiGetInterfaceDeviceDetail(
-                    devInfo,
-                    &ifData,
-                    ifDetail,
-                    PAGE_SIZE,
-                    NULL,
-                    NULL)) {
+					     devInfo,
+					     &ifData,
+					     ifDetail,
+					     PAGE_SIZE,
+					     NULL,
+					     NULL)) {
 
             PEXT2_VOLUME volume = NULL;
 
@@ -3247,13 +3594,13 @@ Ext2LoadAllVolumeDrvLetters()
     PEXT2_VOLUME volume = gVols;
     BOOLEAN      started = Ext2IsServiceStarted();
 
-    Ext2DrvLetters[0] = Ext2DrvLetters[1];
-    Ext2DrvLetters[1] = 0;
+    // Ext2DrvLetters[0] = Ext2DrvLetters[1];
+    // Ext2DrvLetters[1] = 0;
 
     while (volume) {
         volume->DrvLetters = Ext2QueryVolumeDrvLetters(volume);
         if ( started && volume->bRecognized &&
-                (volume->EVP.bExt2 || volume->EVP.bExt3)) {
+            (volume->EVP.bExt2 || volume->EVP.bExt3)) {
             Ext2DrvLetters[1] |=  volume->DrvLetters;
         }
         volume = volume->Next;
@@ -3265,7 +3612,7 @@ CString
 Ext2QueryVolumeLetterStrings(
     ULONGLONG       letters,
     PEXT2_LETTER *  first
-)
+    )
 {
     CHAR        drvName[] = "C:\0";
     CString     str;
@@ -3322,7 +3669,7 @@ Ext2RefreshVLVI(
     CListCtrl *List,
     PEXT2_VOLUME chain,
     int  nItem
-)
+    )
 {
     ULONGLONG   totalSize, usedSize;
     CString     sSize, sUnit, s;
@@ -3332,7 +3679,7 @@ Ext2RefreshVLVI(
                            chain->DrvLetters, &first);
 
     List->SetItem( nItem, 1, LVIF_TEXT, (LPCSTR)Letters, 0, 0, 0,0);
-
+    
     if (chain->bDynamic) {
         s.LoadString(IDS_DISK_TYPE_DYN);
     } else {
@@ -3352,11 +3699,11 @@ Ext2RefreshVLVI(
         totalSize = totalSize / ((ULONG)1024 * 1024 * 1024);
         usedSize  = usedSize / ((ULONG)1024 * 1024 * 1024);
         sUnit = " GB";
-    } else if (totalSize > 10 * 1024 * 1024) {
+    } else if (totalSize > 10 * 1024 * 1024){
         totalSize = totalSize / (1024 * 1024);
         usedSize  = usedSize / (1024 * 1024);
         sUnit = " MB";
-    } else if (totalSize > 10 * 1024) {
+    } else if (totalSize > 10 * 1024){
         totalSize = totalSize / (1024);
         usedSize  = usedSize / (1024);
         sUnit = " KB";
@@ -3377,10 +3724,10 @@ Ext2RefreshVLVI(
     List->SetItem(nItem, 6, LVIF_TEXT, (LPCSTR)chain->EVP.Codepage, 0, 0, 0,0);
     List->SetItem(nItem, 7, LVIF_TEXT, (LPCSTR)chain->Name, 0, 0, 0,0);
 
-    /*
-            List->SetItemState( nItem, LVIS_SELECTED | LVIS_FOCUSED ,
-                                       LVIS_SELECTED | LVIS_FOCUSED);
-    */
+/*
+        List->SetItemState( nItem, LVIS_SELECTED | LVIS_FOCUSED ,
+                                   LVIS_SELECTED | LVIS_FOCUSED);
+*/
 }
 
 
@@ -3388,7 +3735,7 @@ VOID
 Ext2InsertVolume(
     CListCtrl *List,
     PEXT2_VOLUME chain
-)
+    )
 {
     int nItem = 0, nImage = 0;
 
@@ -3404,7 +3751,7 @@ Ext2InsertVolume(
     }
 
     nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                              0, 0, nImage, (LONG)chain);
+                             0, 0, nImage, (LONG)chain);
 
     Ext2RefreshVLVI(List, chain, nItem);
 }
@@ -3414,7 +3761,7 @@ Ext2RefreshVLCD(
     CListCtrl *List,
     PEXT2_CDROM Cdrom,
     int nItem
-)
+    )
 {
     ULONGLONG   totalSize;
     CString     sSize, sUnit, s;
@@ -3422,7 +3769,7 @@ Ext2RefreshVLCD(
     PEXT2_LETTER  first = NULL;
 
     CString  Letters = Ext2QueryVolumeLetterStrings(
-                           Cdrom->DrvLetters, &first);
+                            Cdrom->DrvLetters, &first);
 
     List->SetItem( nItem, 1, LVIF_TEXT, (LPCSTR)Letters, 0, 0, 0,0);
 
@@ -3433,16 +3780,16 @@ Ext2RefreshVLCD(
 
     totalSize = (ULONGLONG)Cdrom->DiskGeometry.Cylinders.QuadPart;
     totalSize = totalSize * Cdrom->DiskGeometry.TracksPerCylinder *
-                Cdrom->DiskGeometry.SectorsPerTrack *
+                Cdrom->DiskGeometry.SectorsPerTrack * 
                 Cdrom->DiskGeometry.BytesPerSector;
 
     if (totalSize > 1024 * 1024 * 1024) {
         totalSize = totalSize / (1024 * 1024 * 1024);
         sUnit = " GB";
-    } else if (totalSize > 1024 * 1024) {
+    } else if (totalSize > 1024 * 1024){
         totalSize = totalSize / (1024 * 1024);
         sUnit = " MB";
-    } else if (totalSize > 1024) {
+    } else if (totalSize > 1024){
         totalSize = totalSize / (1024);
         sUnit = " KB";
     } else {
@@ -3464,7 +3811,7 @@ VOID
 Ext2InsertCdromAsVolume(
     CListCtrl *List,
     PEXT2_CDROM Cdrom
-)
+    )
 {
     int nItem = 0, nImage = 0;
 
@@ -3478,7 +3825,7 @@ Ext2InsertCdromAsVolume(
     }
 
     nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                              0, 0, nImage, (LONG)Cdrom);
+                             0, 0, nImage, (LONG)Cdrom);
 
     Ext2RefreshVLCD(List, Cdrom, nItem);
 }
@@ -3513,7 +3860,7 @@ Ext2RefreshDVPT(
     CListCtrl*      List,
     PEXT2_PARTITION Part,
     int             nItem
-)
+    )
 {
 
     ULONGLONG   totalSize, usedSize;
@@ -3523,7 +3870,7 @@ Ext2RefreshDVPT(
     PEXT2_VOLUME    chain = NULL;
 
     CString  Letters = Ext2QueryVolumeLetterStrings(
-                           Part->DrvLetters, &first);
+                            Part->DrvLetters, &first);
 
     List->SetItem( nItem, 0, LVIF_TEXT, (LPCSTR)Letters, 0, 0, 0,0);
 
@@ -3536,7 +3883,7 @@ Ext2RefreshDVPT(
         } else {
             PartType = "RAW";
         }
-
+        
         List->SetItem(nItem, 6, LVIF_TEXT, (LPCSTR)
                       PartType, 0, 0, 0,0);
     }
@@ -3548,17 +3895,17 @@ Ext2RefreshDVPT(
         CString s;
         if (disk->SDD.RemovableMedia) {
             s.LoadString(IDS_DISK_TYPE_BASIC);
-        } else if (disk->bLoaded) {
+        } else if (disk->bLoaded){
             if (disk->Layout) {
                 if (disk->Layout->PartitionStyle == PARTITION_STYLE_MBR) {
                     if (disk->Layout->PartitionEntry->Mbr.PartitionType
-                            == PARTITION_LDM) {
+                        == PARTITION_LDM) {
                         s.LoadString(IDS_DISK_TYPE_DYN);
                     } else {
                         s.LoadString(IDS_DISK_TYPE_BASIC);
                     }
                 } else if (disk->Layout->PartitionStyle == PARTITION_STYLE_MBR) {
-                    s = "GUID";
+                     s = "GUID";
                 }
             } else {
                 s = "RAW";
@@ -3591,11 +3938,11 @@ Ext2RefreshDVPT(
         totalSize = totalSize / ((ULONG)1024 * 1024 * 1024);
         usedSize  = usedSize / ((ULONG)1024 * 1024 * 1024);
         sUnit = " GB";
-    } else if (totalSize > 10 * 1024 * 1024) {
+    } else if (totalSize > 10 * 1024 * 1024){
         totalSize = totalSize / (1024 * 1024);
         usedSize  = usedSize / (1024 * 1024);
         sUnit = " MB";
-    } else if (totalSize > 10 * 1024) {
+    } else if (totalSize > 10 * 1024){
         totalSize = totalSize / (1024);
         usedSize  = usedSize / (1024);
         sUnit = " KB";
@@ -3621,7 +3968,7 @@ Ext2InsertPartition(
     CListCtrl*      List,
     PEXT2_DISK      Disk,
     PEXT2_PARTITION Part
-)
+    )
 {
     int nItem = 0, nImage = 0;
 
@@ -3630,19 +3977,19 @@ Ext2InsertPartition(
 
     if (!Disk) {
         nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                                  0, 0, nImage, (LONG)NULL);
+                                 0, 0, nImage, (LONG)NULL);
         return;
     }
 
     if (!Part) {
         nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                                  0, 0, nImage, (LONG)&Disk->Null);
+                                 0, 0, nImage, (LONG)&Disk->Null);
         List->SetItem( nItem, 1, LVIF_TEXT, (LPCSTR)"RAW", 0, 0, 0,0);
         return;
     }
 
     nItem = List->InsertItem( LVIF_PARAM| LVIF_IMAGE, nItem, NULL,
-                              0, 0, nImage, (LONG)Part);
+                               0, 0, nImage, (LONG)Part);
 
     Ext2RefreshDVPT(List, Part, nItem);
 }
@@ -3651,7 +3998,7 @@ VOID
 Ext2InsertDisk(
     CListCtrl *List,
     PEXT2_DISK Disk
-)
+    )
 {
     UCHAR   i;
     CHAR  devName[64];
@@ -3660,7 +4007,7 @@ Ext2InsertDisk(
     sprintf(devName, "DISK %d", Disk->OrderNo);
     nItem = List->GetItemCount();
     nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                              0, 0, nImage, (LONG)Disk);
+                             0, 0, nImage, (LONG)Disk);
     List->SetItem( nItem, 0, LVIF_TEXT, (LPCSTR)devName, 0, 0, 0,0);
 
     if (Disk->NumParts > 0) {
@@ -3678,7 +4025,7 @@ Ext2RefreshDVCM(
     CListCtrl *List,
     PEXT2_CDROM Cdrom,
     int nItem
-)
+    )
 {
     ULONGLONG   totalSize;
     CString     sSize, sUnit, s;
@@ -3686,7 +4033,7 @@ Ext2RefreshDVCM(
     PEXT2_LETTER  first = NULL;
 
     CString  Letters = Ext2QueryVolumeLetterStrings(
-                           Cdrom->DrvLetters, &first);
+                            Cdrom->DrvLetters, &first);
 
     if (!Cdrom->bLoaded) {
         List->SetItem( nItem, 1, LVIF_TEXT, (LPCSTR)"Stopped", 0, 0, 0,0);
@@ -3705,16 +4052,16 @@ Ext2RefreshDVCM(
 
     totalSize = (ULONGLONG)Cdrom->DiskGeometry.Cylinders.QuadPart;
     totalSize = totalSize * Cdrom->DiskGeometry.TracksPerCylinder *
-                Cdrom->DiskGeometry.SectorsPerTrack *
+                Cdrom->DiskGeometry.SectorsPerTrack * 
                 Cdrom->DiskGeometry.BytesPerSector;
 
     if (totalSize > 1024 * 1024 * 1024) {
         totalSize = totalSize / (1024 * 1024 * 1024);
         sUnit = " GB";
-    } else if (totalSize > 1024 * 1024) {
+    } else if (totalSize > 1024 * 1024){
         totalSize = totalSize / (1024 * 1024);
         sUnit = " MB";
-    } else if (totalSize > 1024) {
+    } else if (totalSize > 1024){
         totalSize = totalSize / (1024);
         sUnit = " KB";
     } else {
@@ -3737,7 +4084,7 @@ VOID
 Ext2InsertCdromAsDisk(
     CListCtrl *List,
     PEXT2_CDROM Cdrom
-)
+    )
 {
     CHAR  devName[64];
     int nItem = 0, nImage = 0;
@@ -3745,7 +4092,7 @@ Ext2InsertCdromAsDisk(
     sprintf(devName, "CDROM %d", Cdrom->OrderNo);
     nItem = List->GetItemCount();
     nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                              0, 0, nImage, (LONG)Cdrom);
+                             0, 0, nImage, (LONG)Cdrom);
     List->SetItem( nItem, 0, LVIF_TEXT, (LPCSTR)devName, 0, 0, 0,0);
 
     nItem = List->GetItemCount();
@@ -3758,7 +4105,7 @@ Ext2InsertCdromAsDisk(
     }
 
     nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                              0, 0, nImage, (LONG)(&Cdrom->Magic[1]));
+                             0, 0, nImage, (LONG)(&Cdrom->Magic[1]));
 
     Ext2RefreshDVCM(List, Cdrom, nItem);
 }
@@ -3799,8 +4146,7 @@ Ext2CleanupVolumes()
     }
 
     ASSERT(g_nVols == 0);
-    g_nVols = 0;
-    gVols = NULL;
+    g_nVols = 0; gVols = NULL;
 }
 
 VOID
@@ -3883,7 +4229,7 @@ Ext2DrvNotify(UCHAR drive, int mount)
 
     if (drive >= 'A' && drive <= 'Z')
         drv = drive - 'A';
-    else if (drive >= 'a' && drive <= 'z')
+    else if(drive >= 'a' && drive <= 'z')
         drv = drive - 'a';
     else
         return;
@@ -3895,7 +4241,7 @@ Ext2DrvNotify(UCHAR drive, int mount)
     dbv.dbcv_flags      = DBTF_NET;
     BroadcastSystemMessage(BSF_IGNORECURRENTTASK | BSF_FORCEIFHUNG |
                            BSF_NOHANG | BSF_NOTIMEOUTIFNOTHUNG,
-                           &target, WM_DEVICECHANGE,mount ?
+                           &target, WM_DEVICECHANGE, mount ?
                            DBT_DEVICEARRIVAL : DBT_DEVICEREMOVECOMPLETE,
                            (LPARAM)(DEV_BROADCAST_HDR *)&dbv );
 }
@@ -3903,7 +4249,7 @@ Ext2DrvNotify(UCHAR drive, int mount)
 BOOLEAN
 Ext2RemoveDrvLetter(
     PEXT2_LETTER   drvLetter
-)
+    )
 {
     CHAR drvPath[] = "A:\\\0";
     CHAR dosPath[] = "A:\0";
@@ -3918,24 +4264,22 @@ Ext2RemoveDrvLetter(
 
     if (drvLetter->bTemporary) {
 
-        rc = DefineDosDevice (
-                 DDD_RAW_TARGET_PATH|
-                 DDD_REMOVE_DEFINITION|
-                 DDD_EXACT_MATCH_ON_REMOVE,
-                 dosPath, drvLetter->SymLink);
+        rc = Ext2DefineDosDevice ( 
+                    DDD_RAW_TARGET_PATH|
+                    DDD_REMOVE_DEFINITION|
+                    DDD_EXACT_MATCH_ON_REMOVE,
+                    dosPath, drvLetter->SymLink);
         DeleteVolumeMountPoint(drvPath);
 
     } else {
 
-        DefineDosDevice (
-            DDD_RAW_TARGET_PATH|
-            DDD_REMOVE_DEFINITION|
-            DDD_EXACT_MATCH_ON_REMOVE,
-            dosPath, drvLetter->SymLink);
+        Ext2DefineDosDevice ( 
+                    DDD_RAW_TARGET_PATH|
+                    DDD_REMOVE_DEFINITION|
+                    DDD_EXACT_MATCH_ON_REMOVE,
+                    dosPath, drvLetter->SymLink);
         rc = DeleteVolumeMountPoint(drvPath);
     }
-
-    Ext2DrvNotify(drvLetter->Letter, FALSE);
 
     if (!rc) {
         return FALSE;
@@ -3947,7 +4291,7 @@ Ext2RemoveDrvLetter(
 CHAR
 Ext2QueryRegistryMountPoint (
     CHAR * devName
-)
+    )
 {
     DWORD    i = 0;
 
@@ -3983,7 +4327,7 @@ Ext2QueryRegistryMountPoint (
         dosSize = 64;
         drvSize = MAX_PATH;
 
-        status = RegEnumValue(hKey,
+        status = RegEnumValue(hKey, 
                               i++,
                               &dosPath[0],
                               &dosSize,
@@ -4010,7 +4354,7 @@ Ext2SetRegistryMountPoint (
     CHAR * dosPath,
     CHAR * devName,
     BOOLEAN bSet
-)
+    )
 {
     LONG    status;
     HKEY    hKey;
@@ -4036,16 +4380,16 @@ Ext2SetRegistryMountPoint (
     if (bSet) {
         /* set value */
         status = RegSetValueEx(
-                     hKey, drvPath,
-                     0, REG_SZ,
-                     (BYTE *)devName,
-                     strlen(devName)
-                 );
+                    hKey, drvPath,
+                    0, REG_SZ,
+                    (BYTE *)devName,
+                    strlen(devName)
+                    );
     } else {
         /* delete key */
         status = RegDeleteValue(
-                     hKey, drvPath
-                 );
+                    hKey, drvPath
+                    );
     }
 
     RegCloseKey(hKey);
@@ -4061,7 +4405,7 @@ VOID
 Ext2UpdateDrvLetter(
     PEXT2_LETTER   drvLetter,
     PCHAR          devPath
-)
+    )
 {
     CHAR dosPath[] = "A:\0";
     BOOL rc = 0;
@@ -4071,15 +4415,15 @@ Ext2UpdateDrvLetter(
     }
 
     dosPath[0] = drvLetter->Letter;
-    rc = DefineDosDevice(DDD_RAW_TARGET_PATH,
+    rc = Ext2DefineDosDevice(DDD_RAW_TARGET_PATH,
                          dosPath, devPath);
 
     if (rc) {
-        DefineDosDevice (
-            DDD_RAW_TARGET_PATH|
-            DDD_REMOVE_DEFINITION|
-            DDD_EXACT_MATCH_ON_REMOVE,
-            dosPath, devPath);
+        Ext2DefineDosDevice ( 
+                    DDD_RAW_TARGET_PATH|
+                    DDD_REMOVE_DEFINITION|
+                    DDD_EXACT_MATCH_ON_REMOVE,
+                    dosPath, devPath);
     }
 }
 
@@ -4088,7 +4432,7 @@ Ext2AssignDrvLetter(
     PEXT2_LETTER   drvLetter,
     PCHAR          devPath,
     BOOLEAN        bMountMgr
-)
+    )
 {
     CHAR dosPath[] = "A:\0";
     CHAR drvPath[] = "A:\\\0";
@@ -4103,7 +4447,7 @@ Ext2AssignDrvLetter(
     memset(volumeName, 0, MAX_PATH);
     dosPath[0] = drvPath[0] = drvLetter->Letter;
 
-    rc = DefineDosDevice(DDD_RAW_TARGET_PATH,
+    rc = Ext2DefineDosDevice(DDD_RAW_TARGET_PATH,
                          dosPath, devPath);
 
     if (rc) {
@@ -4115,16 +4459,16 @@ Ext2AssignDrvLetter(
         }
 
         rc = GetVolumeNameForVolumeMountPoint (
-                 drvPath, volumeName, MAX_PATH);
+                    drvPath, volumeName, MAX_PATH);
 
-        DefineDosDevice (
-            DDD_RAW_TARGET_PATH|
-            DDD_REMOVE_DEFINITION|
-            DDD_EXACT_MATCH_ON_REMOVE,
-            dosPath, devPath);
+        Ext2DefineDosDevice ( 
+                    DDD_RAW_TARGET_PATH|
+                    DDD_REMOVE_DEFINITION|
+                    DDD_EXACT_MATCH_ON_REMOVE,
+                    dosPath, devPath);
 
         if (rc) {
-            rc = SetVolumeMountPoint(drvPath, volumeName);
+            rc = SetVolumeMountPoint(drvPath, volumeName); 
         }
     }
 
@@ -4134,8 +4478,6 @@ Ext2AssignDrvLetter(
 
 DrvMounted:
 
-    if (rc)
-        Ext2DrvNotify(drvLetter->Letter, TRUE);
     drvLetter->bTemporary = !bMountMgr;
     Ext2QueryDrvLetter(drvLetter);
 
@@ -4151,7 +4493,7 @@ Ext2AnsiToUnicode(
     CHAR *      AnsiName,
     WCHAR*      UniName,
     USHORT      UniLength
-)
+    )
 {
     USHORT                  NameLength = 0;
     NT::ANSI_STRING         AnsiFilespec;
@@ -4179,7 +4521,7 @@ Ext2VolumeArrivalNotify(PCHAR  VolumePath)
 
     NT::IO_STATUS_BLOCK iosb;
     NT::NTSTATUS        status;
-    DWORD               rc = 0;
+    DWORD               rc = 0; 
 
     WCHAR      volPath[MAX_PATH + 2];
     PMOUNTMGR_TARGET_NAME target;
@@ -4194,11 +4536,55 @@ Ext2VolumeArrivalNotify(PCHAR  VolumePath)
     }
 
     status = NT::ZwDeviceIoControlFile(
-                 hMountMgr, NULL, NULL, NULL, &iosb,
-                 IOCTL_MOUNTMGR_VOLUME_ARRIVAL_NOTIFICATION,
-                 (PVOID)target, sizeof(USHORT) +
-                 target->DeviceNameLength, NULL, 0
-             );
+                hMountMgr, NULL, NULL, NULL, &iosb,
+                IOCTL_MOUNTMGR_VOLUME_ARRIVAL_NOTIFICATION,
+                (PVOID)target, sizeof(USHORT) +
+                target->DeviceNameLength, NULL, 0
+                );
+
+    if (!NT_SUCCESS(status)) {
+        goto errorout;
+    }
+
+errorout:
+
+    Ext2Close(&hMountMgr);
+    return NT_SUCCESS(status);
+}
+
+
+BOOL
+Ext2SymLinkRemoval(CHAR drvLetter)
+{
+    HANDLE              hMountMgr = NULL;
+
+    NT::IO_STATUS_BLOCK iosb;
+    NT::NTSTATUS        status;
+    DWORD               rc = 0; 
+
+    WCHAR buffer[MAX_PATH], *dosName;
+    PMOUNTMGR_MOUNT_POINT  pmp = NULL;
+    PMOUNTMGR_MOUNT_POINTS pms = NULL;
+
+    memset(buffer, 0, sizeof(WCHAR) * MAX_PATH);
+    pmp = (PMOUNTMGR_MOUNT_POINT) buffer;
+    pmp->SymbolicLinkNameOffset = sizeof(MOUNTMGR_MOUNT_POINT);
+    pmp->SymbolicLinkNameLength = 14 * sizeof(WCHAR);
+
+    dosName = (WCHAR *) (pmp + 1);
+    swprintf(dosName, L"\\DosDevices\\%c:\0", drvLetter);
+
+    status = Ext2Open("\\Device\\MountPointManager", &hMountMgr, EXT2_DESIRED_ACCESS);
+    if (!NT_SUCCESS(status)) {
+        goto errorout;
+    }
+
+    status = NT::ZwDeviceIoControlFile(
+                hMountMgr, NULL, NULL, NULL, &iosb,
+                IOCTL_MOUNTMGR_DELETE_POINTS,
+                (PVOID)pmp, sizeof(WCHAR) * MAX_PATH, 
+                (PVOID)pmp, sizeof(WCHAR) * MAX_PATH
+                );
 
     if (!NT_SUCCESS(status)) {
         goto errorout;
@@ -4214,13 +4600,13 @@ BOOLEAN
 Ext2SetVolumeMountPoint (
     CHAR * dosPath,
     CHAR * devName
-)
+    )
 {
     HANDLE              hMountMgr;
 
     NT::IO_STATUS_BLOCK iosb;
     NT::NTSTATUS        status;
-    DWORD               rc = 0;
+    DWORD               rc = 0; 
 
     CHAR       dosDevice[MAX_PATH];
     WCHAR      volPath[MAX_PATH];
@@ -4268,10 +4654,10 @@ Ext2SetVolumeMountPoint (
 
     /* ioctl .... */
     status = NT::ZwDeviceIoControlFile(
-                 hMountMgr, NULL, NULL, NULL, &iosb,
-                 IOCTL_MOUNTMGR_CREATE_POINT,
-                 (PVOID)mcpi, lmcpi, NULL, 0
-             );
+                hMountMgr, NULL, NULL, NULL, &iosb,
+                IOCTL_MOUNTMGR_CREATE_POINT,
+                (PVOID)mcpi, lmcpi, NULL, 0
+                );
 
     if (!NT_SUCCESS(status)) {
         goto errorout;
@@ -4291,7 +4677,7 @@ errorout:
 UCHAR
 Ext2QueryMountPoint(
     CHAR *      volume
-)
+    )
 {
     NT::IO_STATUS_BLOCK     iosb;
     NT::NTSTATUS            status;
@@ -4344,10 +4730,10 @@ Again:
 
     /* could MoungMgr to create volume points for us ? */
     status = NT::ZwDeviceIoControlFile(
-                 hMountMgr, NULL, NULL, NULL, &iosb,
-                 IOCTL_MOUNTMGR_QUERY_POINTS,
-                 point, lp, points, lps
-             );
+                hMountMgr, NULL, NULL, NULL, &iosb,
+                IOCTL_MOUNTMGR_QUERY_POINTS,
+                point, lp, points, lps
+                );
 
     if (status == STATUS_BUFFER_OVERFLOW) {
         lps = (ULONG)iosb.Information + 2;
@@ -4359,9 +4745,9 @@ Again:
     for (i = 0; i < points->NumberOfMountPoints; i++) {
 
         volPoint.Length = volPoint.MaximumLength =
-                              points->MountPoints[i].SymbolicLinkNameLength;
+                points->MountPoints[i].SymbolicLinkNameLength;
         volPoint.Buffer = (PWSTR) ((PCHAR) points +
-                                   points->MountPoints[i].SymbolicLinkNameOffset);
+                     points->MountPoints[i].SymbolicLinkNameOffset);
 
 #if 0
         if (MOUNTMGR_IS_VOLUME_NAME(&volPoint)) {
@@ -4375,7 +4761,7 @@ Again:
                 } else {
                     *length = 0;
                 }
-            }
+            } 
         }
 #endif
 
@@ -4423,7 +4809,7 @@ Ext2InsertMountPoint(
     CHAR * volume,
     UCHAR drvChar,
     BOOL  bGlobal
-)
+    )
 {
     CHAR volumeName[MAX_PATH];
 
@@ -4432,22 +4818,20 @@ Ext2InsertMountPoint(
     BOOLEAN rc = FALSE;
 
     dosPath[0] = drvPath[0] = drvChar & 0x7F;
-    rc = DefineDosDevice(DDD_RAW_TARGET_PATH,
-                         dosPath, volume);
+    rc = Ext2DefineDosDevice(DDD_RAW_TARGET_PATH,
+                             dosPath, volume);
 
     if (rc && bGlobal) {
         rc = GetVolumeNameForVolumeMountPoint (
-                 drvPath, volumeName, MAX_PATH);
+                    drvPath, volumeName, MAX_PATH);
 
-        DefineDosDevice (
-            DDD_RAW_TARGET_PATH|
-            DDD_REMOVE_DEFINITION,
-            dosPath, volume);
+        Ext2DefineDosDevice ( 
+                    DDD_RAW_TARGET_PATH|
+                    DDD_REMOVE_DEFINITION,
+                    dosPath, volume);
         if (rc) {
-            rc = SetVolumeMountPoint(drvPath, volumeName);
+            rc = SetVolumeMountPoint(drvPath, volumeName); 
         }
-        if (rc)
-            Ext2DrvNotify((drvChar & 0x7F), TRUE);
     }
 
     return rc;
@@ -4457,23 +4841,22 @@ VOID
 Ext2RemoveMountPoint(
     PEXT2_LETTER    drvLetter,
     BOOLEAN         bPermanent
-)
+    )
 {
     CHAR drvPath[] = "A:\\\0";
     CHAR dosPath[] = "A:\0";
 
     dosPath[0] = drvPath[0] = drvLetter->Letter;
 
-    DefineDosDevice (
-        DDD_RAW_TARGET_PATH|
-        DDD_REMOVE_DEFINITION|
-        DDD_EXACT_MATCH_ON_REMOVE,
-        dosPath, drvLetter->SymLink);
+    Ext2DefineDosDevice ( 
+            DDD_RAW_TARGET_PATH|
+            DDD_REMOVE_DEFINITION|
+            DDD_EXACT_MATCH_ON_REMOVE,
+            dosPath, drvLetter->SymLink);
     if (bPermanent) {
         DeleteVolumeMountPoint(drvPath);
     }
 
-    Ext2DrvNotify(drvLetter->Letter, FALSE);
     Ext2CleanDrvLetter(drvLetter);
     Ext2QueryDrvLetter(drvLetter);
 }
@@ -4482,7 +4865,7 @@ BOOL
 Ext2RefreshVolumePoint(
     CHAR *          volume,
     UCHAR           drvChar
-)
+    )
 {
     PEXT2_LETTER    drvLetter = NULL;
     BOOLEAN         rc = TRUE;
@@ -4506,7 +4889,7 @@ Ext2RefreshVolumePoint(
     }
 
     cLetter = Ext2QueryMountPoint(volume);
-    if (!cLetter && (cLetter != (drvChar & 0x7F))) {
+	if (!cLetter && (cLetter != (drvChar & 0x7F))) {
         Ext2InsertMountPoint(volume, drvChar & 0x7F, TRUE);
     }
 
@@ -4522,34 +4905,88 @@ errorout:
     return rc;
 }
 
+
+BOOL Ext2IsDrvLetterAvailable(CHAR drive)
+{
+    CHAR            symLink[MAX_PATH] = {0};
+    UINT            drvType;
+
+    drvType = Ext2QueryDrive(drive, symLink);
+    if (drvType == DRIVE_NO_ROOT_DIR) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+
+CHAR Ext2GetFirstAvailableDrvLetter()
+{
+    int             i;
+
+    for (i = 2; i < 24; i++) {
+        if (Ext2IsDrvLetterAvailable('A' + i))
+            return ('A' + i);
+    }
+
+    return 0;
+}
+
+
 BOOL
 Ext2NotifyVolumePoint(
     PEXT2_VOLUME    volume,
     UCHAR           drvChar
-)
+    )
 {
-    BOOL rc = FALSE;
-    PCHAR  Name = NULL;
+    PEXT2_LETTER letter;
+    UCHAR   mounted = 0;
+    BOOL    rc = FALSE;
+    PCHAR   Name = NULL;
+
+    drvChar = toupper(drvChar);
+    letter  = &drvLetters[drvChar - 'A'];
 
     if (volume->Part) {
         Name = &volume->Part->Name[0];
     } else {
         Name = &volume->Name[0];
     }
-    rc = Ext2VolumeArrivalNotify(Name);
-    Sleep(1000);
 
-    drvChar = Ext2QueryMountPoint(Name);
-    if (drvChar) {
-        Ext2InsertMountPoint(Name, drvChar, FALSE);
+    /* do drive update */
+    if (Ext2IsDrvLetterAvailable(drvChar))
+        Ext2UpdateDrvLetter(letter, Name);
+
+    rc = Ext2VolumeArrivalNotify(Name);
+
+    Sleep(500);
+
+    mounted = Ext2QueryMountPoint(Name);
+    if (mounted) {
         rc = TRUE;
+        goto errorout;
     }
+
+    if (!Ext2IsDrvLetterAvailable(drvChar)) {
+        drvChar = Ext2GetFirstAvailableDrvLetter();
+        if ((drvChar|0x20) >= 'a' && (drvChar | 0x20) <= 'z') {
+            letter  = &drvLetters[drvChar - 'A'];
+        } else {
+            letter = NULL;
+        }
+    }
+
+    if (letter) {
+        rc = Ext2AssignDrvLetter(letter, Name, FALSE);
+    }
+
+errorout:
 
     return rc;
 }
 
 #define EXT2_MANAGER_NAME  "Ext2 Volume Manager"
-
+	
 BOOL
 Ext2SetAppAutorun(BOOL bInstall)
 {
@@ -4565,10 +5002,10 @@ Ext2SetAppAutorun(BOOL bInstall)
 
     strcpy (keyPath, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run") ;
     status = RegOpenKeyEx (HKEY_LOCAL_MACHINE,
-                           keyPath,
-                           0,
-                           KEY_ALL_ACCESS,
-                           &key) ;
+                              keyPath,
+                              0,
+                              KEY_ALL_ACCESS,
+                              &key) ;
 
     if (status != ERROR_SUCCESS) {
         return FALSE;
@@ -4580,8 +5017,8 @@ Ext2SetAppAutorun(BOOL bInstall)
             goto errorout;
         }
     } else {
-        status = RegSetValueEx( key, EXT2_MANAGER_NAME, 0, REG_SZ,
-                                (BYTE *)appPath, strlen(appPath));
+        status = RegSetValueEx( key, EXT2_MANAGER_NAME, 0, REG_SZ, 
+                                   (BYTE *)appPath, strlen(appPath));
         if (status != ERROR_SUCCESS) {
             goto errorout;
         }
@@ -4600,9 +5037,10 @@ errorout:
 int
 Ext2SetManagerAsService(BOOL bInstall)
 {
-    CHAR Target[SERVICE_CMD_LENGTH];
     SC_HANDLE   hService;
     SC_HANDLE   hManager;
+
+    CHAR Target[SERVICE_CMD_LENGTH];
 
     // get the filename of this executable
     if (GetModuleFileName(NULL, Target, SERVICE_CMD_LENGTH - 20) == 0) {
@@ -4626,20 +5064,20 @@ Ext2SetManagerAsService(BOOL bInstall)
 
         // now create service entry for Ext2Mgr
         hService = CreateService(
-                       hManager,                   // SCManager database
-                       "Ext2Mgr",                  // name of service
-                       "Ext2 Volume Manger",       // name to display
-                       SERVICE_ALL_ACCESS,	        // desired access
-                       SERVICE_WIN32_OWN_PROCESS | SERVICE_INTERACTIVE_PROCESS,
-                       // service type
-                       SERVICE_AUTO_START,	        // start type
-                       SERVICE_ERROR_NORMAL,       // error control type
-                       Target,	                    // service's binary
-                       NULL,                       // no load ordering group
-                       NULL,                       // no tag identifier
-                       NULL,			            // dependencies
-                       NULL,						// LocalSystem account
-                       NULL);                      // no password
+                hManager,                   // SCManager database
+                "Ext2Mgr",                  // name of service
+                "Ext2 Volume Manger",       // name to display
+                SERVICE_ALL_ACCESS,	        // desired access
+                SERVICE_WIN32_OWN_PROCESS | SERVICE_INTERACTIVE_PROCESS,
+                                            // service type
+                SERVICE_AUTO_START,	        // start type
+                SERVICE_ERROR_NORMAL,       // error control type
+				Target,	                    // service's binary
+                NULL,                       // no load ordering group
+                NULL,                       // no tag identifier
+                NULL,			            // dependencies
+                NULL,						// LocalSystem account
+                NULL);                      // no password
 
         if (hService == NULL) {
             DWORD error = GetLastError();
@@ -4654,12 +5092,12 @@ Ext2SetManagerAsService(BOOL bInstall)
 
             CloseServiceHandle(hService);
 
-            // got Ext2Mgr installed as a service
+			// got Ext2Mgr installed as a service
             AfxMessageBox(
                 "Ext2Mgr service was successfully registered. \n\n"
-                "You can modify the default settings and start/stop it from Control Panel.\n"
-                "The service will automatically run the next time when system is restarted.\n",
-                MB_ICONINFORMATION | MB_OK);
+				"You can modify the default settings and start/stop it from Control Panel.\n"
+				"The service will automatically run the next time when system is restarted.\n",
+				MB_ICONINFORMATION | MB_OK);
         }
 
         Ext2SetAppAutorun(FALSE);
@@ -4668,10 +5106,10 @@ Ext2SetManagerAsService(BOOL bInstall)
 
         /* open the service of Ext2Mgr */
         hService = OpenService(
-                       hManager,
-                       "Ext2Mgr",
-                       SERVICE_ALL_ACCESS
-                   );
+                hManager,
+                "Ext2Mgr",
+                SERVICE_ALL_ACCESS
+                );
 
         if (hService != NULL) {
 
@@ -4681,7 +5119,7 @@ Ext2SetManagerAsService(BOOL bInstall)
             // stop the service
             if (ControlService(hService, SERVICE_CONTROL_STOP, &status)) {
 
-                while (QueryServiceStatus(hService, &status)) {
+                while(QueryServiceStatus(hService, &status)) {
                     if (status.dwCurrentState == SERVICE_STOP_PENDING) {
                         Sleep(1000);
                     } else {
@@ -4698,7 +5136,7 @@ Ext2SetManagerAsService(BOOL bInstall)
             // remove the service from the SCM
             if (DeleteService(hService)) {
                 AfxMessageBox("The Ext2Mgr service has been unregistered.",
-                              MB_ICONINFORMATION | MB_OK);
+                MB_ICONINFORMATION | MB_OK);
             } else {
                 DWORD error = GetLastError();
                 if (error == ERROR_SERVICE_MARKED_FOR_DELETE) {
@@ -4706,7 +5144,7 @@ Ext2SetManagerAsService(BOOL bInstall)
                                   MB_ICONEXCLAMATION | MB_OK);
                 } else {
                     AfxMessageBox("Ext2Mgr service could not be unregistered",
-                                  MB_ICONEXCLAMATION | MB_OK);
+                                   MB_ICONEXCLAMATION | MB_OK);
                 }
             }
 
@@ -4716,10 +5154,16 @@ Ext2SetManagerAsService(BOOL bInstall)
 
     CloseServiceHandle(hManager);
 
-    return TRUE;
+	return TRUE;
 }
 
 BOOL g_bAutoRemoveDeadLetters = TRUE;
+
+VOID
+Ext2AddLetterMask(ULONGLONG LetterMask)
+{
+    Ext2DrvLetters[1] |= LetterMask;
+}
 
 VOID
 Ext2AutoRemoveDeadLetters()
@@ -4730,6 +5174,10 @@ Ext2AutoRemoveDeadLetters()
     PEXT2_PARTITION part;
     PEXT2_CDROM     cdrom;
 
+    if (LetterMask != -1) {
+        AfxMessageBox("Different Mask");
+    }
+
     for (i = 0; i < g_nDisks; i++) {
         disk = &gDisks[i];
         if (disk->DataParts == NULL) {
@@ -4738,7 +5186,7 @@ Ext2AutoRemoveDeadLetters()
         for (j=0; j < disk->NumParts; j++) {
             part = &disk->DataParts[j];
             if (part) {
-                LetterMask &= ~(part->DrvLetters);
+                 LetterMask &= ~(part->DrvLetters);
             }
         }
     }
@@ -4750,8 +5198,8 @@ Ext2AutoRemoveDeadLetters()
 
     for (i=0; i < 10; i++) {
         if (drvDigits[i].bUsed && (drvDigits[i].Extent == NULL) &&
-                (LetterMask & (((ULONGLONG) 1) << (i + 32)) ) ) {
-            if (drvDigits[i].DrvType == DRIVE_FIXED) {
+            (LetterMask & (((ULONGLONG) 1) << (i + 32)) ) ) {
+            if (drvDigits[i].bInvalid && drvDigits[i].DrvType == DRIVE_FIXED) {
                 LetterMask &= (~(((ULONGLONG) 1) << (i + 32)));
                 Ext2RemoveMountPoint(&drvDigits[i], FALSE);
                 Ext2RemoveDosSymLink(drvDigits[i].Letter);
@@ -4761,8 +5209,8 @@ Ext2AutoRemoveDeadLetters()
 
     for (i=2; i <26; i++) {
         if (drvLetters[i].bUsed && (drvLetters[i].Extent == NULL) &&
-                (LetterMask & (((ULONGLONG) 1) << i)) ) {
-            if (drvLetters[i].DrvType == DRIVE_FIXED) {
+            (LetterMask & (((ULONGLONG) 1) << i)) ) {
+            if (drvLetters[i].bInvalid && drvLetters[i].DrvType == DRIVE_FIXED) {
                 LetterMask &= (~(((ULONGLONG) 1) << i));
                 Ext2RemoveMountPoint(&drvLetters[i], FALSE);
                 Ext2RemoveDosSymLink(drvLetters[i].Letter);
@@ -4770,7 +5218,7 @@ Ext2AutoRemoveDeadLetters()
         }
     }
 
-    Ext2DrvLetters[0] = LetterMask;
+    // Ext2DrvLetters[0] = LetterMask;
 }
 
 BOOLEAN
@@ -4781,23 +5229,25 @@ Ext2RemoveDosSymLink(CHAR drvChar)
     HANDLE                       handle = NULL;
     NT::IO_STATUS_BLOCK          iosb;
 
+    Ext2SymLinkRemoval(drvChar);
+
     memset(&E2MP, 0, sizeof(EXT2_MOUNT_POINT));
     E2MP.Magic = EXT2_APP_MOUNTPOINT_MAGIC;
     E2MP.Command = APP_CMD_DEL_DOS_SYMLINK;
     E2MP.Link[0] = (USHORT) drvChar;
 
-    status = Ext2Open("\\DosDevices\\Ext2Fsd",
+    status = Ext2Open("\\DosDevices\\Ext2Fsd", 
                       &handle, EXT2_DESIRED_ACCESS);
     if (!NT_SUCCESS(status)) {
         goto errorout;
     }
 
     status = NT::ZwDeviceIoControlFile(
-                 handle, NULL, NULL, NULL, &iosb,
-                 IOCTL_APP_MOUNT_POINT,
-                 &E2MP, sizeof(EXT2_MOUNT_POINT),
-                 &E2MP, sizeof(EXT2_MOUNT_POINT)
-             );
+                handle, NULL, NULL, NULL, &iosb,
+                IOCTL_APP_MOUNT_POINT,
+                &E2MP, sizeof(EXT2_MOUNT_POINT),
+                &E2MP, sizeof(EXT2_MOUNT_POINT)
+            );
 
 errorout:
 

@@ -15,33 +15,33 @@ class CDonate : public CDialog
 {
 // Construction
 public:
-    CDonate(CWnd* pParent = NULL);   // standard constructor
+	CDonate(CWnd* pParent = NULL);   // standard constructor
 
 // Dialog Data
-    //{{AFX_DATA(CDonate)
-    enum { IDD = IDD_DONATE_DIALOG };
-    CMyHyperLink	m_SF;
-    CMyHyperLink	m_Paypal;
-    //}}AFX_DATA
+	//{{AFX_DATA(CDonate)
+	enum { IDD = IDD_DONATE_DIALOG };
+	CMyHyperLink	m_SF;
+	CMyHyperLink	m_Paypal;
+	//}}AFX_DATA
 
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CDonate)
-protected:
-    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CDonate)
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	//}}AFX_VIRTUAL
 
 // Implementation
 protected:
 
-    // Generated message map functions
-    //{{AFX_MSG(CDonate)
-    virtual BOOL OnInitDialog();
-    afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
-    afx_msg void OnKillFocus(CWnd* pNewWnd);
-    //}}AFX_MSG
-    DECLARE_MESSAGE_MAP()
+	// Generated message map functions
+	//{{AFX_MSG(CDonate)
+	virtual BOOL OnInitDialog();
+	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
+	afx_msg void OnKillFocus(CWnd* pNewWnd);
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
 };
 
 //{{AFX_INSERT_LOCATION}}

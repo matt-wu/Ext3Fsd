@@ -14,30 +14,30 @@ class CDiskBox : public CButton
 {
 // Construction
 public:
-    CDiskBox();
+	CDiskBox();
 
 // Operations
 public:
     void SetListboxHeight(HWND);
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CDiskBox)
-protected:
-    virtual void PreSubclassWindow();
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CDiskBox)
+	protected:
+	virtual void PreSubclassWindow();
+	//}}AFX_VIRTUAL
 
 // Implementation
 public:
-    virtual ~CDiskBox();
+	virtual ~CDiskBox();
 
-    // Generated message map functions
+	// Generated message map functions
 protected:
-    //{{AFX_MSG(CDiskBox)
-    afx_msg void OnSetFocus(CWnd* pOldWnd);
-    afx_msg void OnSelectChanged();
-    //}}AFX_MSG
-    DECLARE_MESSAGE_MAP()
+	//{{AFX_MSG(CDiskBox)
+	afx_msg void OnSetFocus(CWnd* pOldWnd);
+	afx_msg void OnSelectChanged();
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
 
 public:
 
@@ -49,7 +49,7 @@ public:
 
 private:
 
-    int AssemblingTitle();
+	int AssemblingTitle();
 };
 
 /////////////////////////////////////////////////////////////////////////////

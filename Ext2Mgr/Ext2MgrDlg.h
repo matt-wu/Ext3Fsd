@@ -28,7 +28,7 @@ class CExt2List : public CListCtrl
 {
 // Construction
 public:
-    CExt2List();
+	CExt2List();
 
 // Attributes
 public:
@@ -42,21 +42,21 @@ public:
 
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CExt2List)
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CExt2List)
+	//}}AFX_VIRTUAL
 
 // Implementation
 public:
-    virtual ~CExt2List();
+	virtual ~CExt2List();
 
-    // Generated message map functions
+	// Generated message map functions
 protected:
-    //{{AFX_MSG(CExt2List)
-    afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
-    //}}AFX_MSG
+	//{{AFX_MSG(CExt2List)
+	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
+	//}}AFX_MSG
 
-    DECLARE_MESSAGE_MAP()
+	DECLARE_MESSAGE_MAP()
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -68,23 +68,23 @@ class CExt2MgrDlg : public CDialog
 {
 // Construction
 public:
-    CExt2MgrDlg(CWnd* pParent = NULL);	// standard constructor
+	CExt2MgrDlg(CWnd* pParent = NULL);	// standard constructor
 
 // Dialog Data
-    //{{AFX_DATA(CExt2MgrDlg)
-    enum { IDD = IDD_EXT2MGR_DIALOG };
-    CTreeList	m_DiskView;
-    CExt2List	m_VolumeList;
-    //}}AFX_DATA
+	//{{AFX_DATA(CExt2MgrDlg)
+	enum { IDD = IDD_EXT2MGR_DIALOG };
+	CTreeList	m_DiskView;
+	CExt2List	m_VolumeList;
+	//}}AFX_DATA
 
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CExt2MgrDlg)
-public:
-    virtual BOOL PreTranslateMessage(MSG* pMsg);
-protected:
-    virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
-    virtual BOOL OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult);
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CExt2MgrDlg)
+	public:
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
+	virtual BOOL OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult);
+	//}}AFX_VIRTUAL
 
 public:
 
@@ -123,9 +123,9 @@ public:
 // Implementation
 protected:
 
-    HICON       m_hIcon;
+	HICON       m_hIcon;
 
-    CSystemTray  m_Tray;
+	CSystemTray  m_Tray;
     CStatusBar   m_bar;
     CImageList   m_ImageList;
 
@@ -141,62 +141,63 @@ protected:
 
     /* global parameters */
     ULONG   m_nStartmode;
-    CString	m_Codepage;
-    BOOL	m_bExt3Writable;
-    BOOL	m_bReadonly;
-    CString	m_srvStatus;
-    CString	m_sPrefix;
-    CString	m_sSuffix;
-    BOOL	m_bAutoMount;
+	CString	m_Codepage;
+	BOOL	m_bExt3Writable;
+	BOOL	m_bReadonly;
+	CString	m_srvStatus;
+	CString	m_sPrefix;
+	CString	m_sSuffix;
+	BOOL	m_bAutoMount;
 
-    // Generated message map functions
-    //{{AFX_MSG(CExt2MgrDlg)
-    virtual BOOL OnInitDialog();
+	// Generated message map functions
+	//{{AFX_MSG(CExt2MgrDlg)
+	virtual BOOL OnInitDialog();
     virtual void OnWindowPosChanging(WINDOWPOS* lpwndpos);
-    afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
+	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
     afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD dwData);
-    afx_msg void OnDestroy();
-    afx_msg void OnPaint();
-    afx_msg HCURSOR OnQueryDragIcon();
-    afx_msg void OnSize(UINT nType, int cx, int cy);
-    afx_msg void OnChangeProperty();
-    afx_msg void OnRefresh();
-    afx_msg void OnFormat();
-    afx_msg void OnService();
-    virtual void OnCancel();
-    afx_msg void OnAbout();
-    afx_msg void OnExit();
-    virtual void OnOK();
-    afx_msg void OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct);
-    afx_msg void OnDblclkDiskList(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnKillfocusDiskList(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnRclickDiskList(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnDblclkVolumeList(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnKillfocusVolumeList(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnRclickVolumeList(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnClickDiskList(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnClickVolumeList(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnSetfocusDiskList(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnSetfocusVolumeList(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnProperty();
-    afx_msg void OnDonate();
-    afx_msg void OnCopy();
-    afx_msg void OnInstallService();
-    afx_msg void OnRemoveService();
-    afx_msg void OnEnableAutorun();
+	afx_msg void OnDestroy();
+	afx_msg void OnPaint();
+	afx_msg HCURSOR OnQueryDragIcon();
+	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg void OnChangeProperty();
+	afx_msg void OnRefresh();
+	afx_msg void OnFormat();
+	afx_msg void OnService();
+	virtual void OnCancel();
+	afx_msg void OnAbout();
+	afx_msg void OnExit();
+	virtual void OnOK();
+	afx_msg void OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct);
+	afx_msg void OnDblclkDiskList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnKillfocusDiskList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnRclickDiskList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnDblclkVolumeList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnKillfocusVolumeList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnRclickVolumeList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnClickDiskList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnClickVolumeList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnSetfocusDiskList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnSetfocusVolumeList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnProperty();
+	afx_msg void OnDonate();
+	afx_msg void OnCopy();
+	afx_msg void OnInstallService();
+	afx_msg void OnRemoveService();
+    afx_msg void OnEnableAutorun(); 
     afx_msg void OnDisableAutorun();
-    afx_msg void OnTimer(UINT nIDEvent);
-    afx_msg void OnDrvLetter();
-    afx_msg void OnShowMain();
-    afx_msg void OnHelp();
-    afx_msg void OnPerfStat();
-    afx_msg void OnPerfStop();
-    afx_msg void OnCopyAll();
-    //}}AFX_MSG
-    afx_msg LRESULT OnTrayNotification(WPARAM wParam=0,LPARAM lParam=0);
-    afx_msg LRESULT OnTerminate(WPARAM wParam=0,LPARAM lParam=0);
-    afx_msg LRESULT OnMountPointNotify(WPARAM wParam=0,LPARAM lParam=0);
-    DECLARE_MESSAGE_MAP()
+	afx_msg void OnTimer(UINT nIDEvent);
+	afx_msg void OnDrvLetter();
+	afx_msg void OnDrvQuickMount();
+	afx_msg void OnShowMain();
+	afx_msg void OnHelp();
+	afx_msg void OnPerfStat();
+	afx_msg void OnPerfStop();
+	afx_msg void OnCopyAll();
+	//}}AFX_MSG
+	afx_msg LRESULT OnTrayNotification(WPARAM wParam=0,LPARAM lParam=0);
+	afx_msg LRESULT OnTerminate(WPARAM wParam=0,LPARAM lParam=0);
+	afx_msg LRESULT OnMountPointNotify(WPARAM wParam=0,LPARAM lParam=0);
+	DECLARE_MESSAGE_MAP()
 };
 
 //{{AFX_INSERT_LOCATION}}

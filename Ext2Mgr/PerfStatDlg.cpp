@@ -16,48 +16,48 @@ static char THIS_FILE[] = __FILE__;
 
 
 CPerfStatDlg::CPerfStatDlg(CWnd* pParent /*=NULL*/)
-        : CDialog(CPerfStatDlg::IDD, pParent)
+	: CDialog(CPerfStatDlg::IDD, pParent)
 {
-    //{{AFX_DATA_INIT(CPerfStatDlg)
-    m_Interval = 30;
+	//{{AFX_DATA_INIT(CPerfStatDlg)
+	m_Interval = 30;
     m_Handle = 0;
-    //}}AFX_DATA_INIT
-    m_IrpList = NULL;
-    m_MemList = NULL;
+	//}}AFX_DATA_INIT
+	m_IrpList = NULL;
+	m_MemList = NULL;
 }
 
 void CPerfStatDlg::DoDataExchange(CDataExchange* pDX)
 {
-    CDialog::DoDataExchange(pDX);
-    //{{AFX_DATA_MAP(CPerfStatDlg)
-    DDX_Text(pDX, IDC_PERFSTAT_INTERVAL, m_Interval);
-    //}}AFX_DATA_MAP
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CPerfStatDlg)
+	DDX_Text(pDX, IDC_PERFSTAT_INTERVAL, m_Interval);
+	//}}AFX_DATA_MAP
 }
 
 
 BEGIN_MESSAGE_MAP(CPerfStatDlg, CDialog)
-    //{{AFX_MSG_MAP(CPerfStatDlg)
-    ON_WM_TIMER()
-    ON_WM_DESTROY()
+	//{{AFX_MSG_MAP(CPerfStatDlg)
+	ON_WM_TIMER()
+	ON_WM_DESTROY()
     ON_COMMAND(ID_QUERYPERF, OnQueryPerf)
-    ON_EN_CHANGE(IDC_PERFSTAT_INTERVAL, OnChangePerfstatInterval)
-    //}}AFX_MSG_MAP
+	ON_EN_CHANGE(IDC_PERFSTAT_INTERVAL, OnChangePerfstatInterval)
+	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
 // CPerfStatDlg message handlers
 
-BOOL CPerfStatDlg::OnInitDialog()
+BOOL CPerfStatDlg::OnInitDialog() 
 {
     DWORD   dwStyle = 0;
     int     i;
     CString s;
 
-    CDialog::OnInitDialog();
+	CDialog::OnInitDialog();
 
 
-    m_IrpList = (CListCtrl *)GetDlgItem(IDC_IRP_LIST);
-    m_MemList = (CListCtrl *)GetDlgItem(IDC_MEMORY_LIST);;
+ 	m_IrpList = (CListCtrl *)GetDlgItem(IDC_IRP_LIST);
+	m_MemList = (CListCtrl *)GetDlgItem(IDC_MEMORY_LIST);;
 
     if (m_IrpList == NULL || m_MemList == NULL) {
         return FALSE;
@@ -65,12 +65,12 @@ BOOL CPerfStatDlg::OnInitDialog()
 
     /* initialize the memory list */
     dwStyle=GetWindowLong(m_MemList->GetSafeHwnd(), GWL_STYLE);
-    dwStyle&=~LVS_TYPEMASK;
-    dwStyle|= (LVS_REPORT | LVS_AUTOARRANGE);
-    SetWindowLong(m_MemList->GetSafeHwnd(),GWL_STYLE,dwStyle);
-    m_MemList->SetExtendedStyle(LVS_EX_GRIDLINES);
-    ListView_SetExtendedListViewStyleEx (
-        m_MemList->GetSafeHwnd(),
+	dwStyle&=~LVS_TYPEMASK;
+	dwStyle|= (LVS_REPORT | LVS_AUTOARRANGE);
+	SetWindowLong(m_MemList->GetSafeHwnd(),GWL_STYLE,dwStyle);
+	m_MemList->SetExtendedStyle(LVS_EX_GRIDLINES);
+    ListView_SetExtendedListViewStyleEx ( 
+        m_MemList->GetSafeHwnd(), 
         LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT );
 
     m_MemList->DeleteAllItems();
@@ -91,16 +91,16 @@ BOOL CPerfStatDlg::OnInitDialog()
     m_MemList->InsertColumn(4, (LPCSTR)s, LVCFMT_RIGHT, 120);
     for (i = 0; PerfStatStrings[i] != NULL ; i++) {
         m_MemList->InsertItem(i, PerfStatStrings[i]);
-    }
+    } 
 
     /* initialize the irp list */
     dwStyle=GetWindowLong(m_IrpList->GetSafeHwnd(), GWL_STYLE);
-    dwStyle&=~LVS_TYPEMASK;
-    dwStyle|= (LVS_REPORT | LVS_AUTOARRANGE);
-    SetWindowLong(m_IrpList->GetSafeHwnd(),GWL_STYLE,dwStyle);
-    m_IrpList->SetExtendedStyle(LVS_EX_GRIDLINES);
-    ListView_SetExtendedListViewStyleEx (
-        m_IrpList->GetSafeHwnd(),
+	dwStyle&=~LVS_TYPEMASK;
+	dwStyle|= (LVS_REPORT | LVS_AUTOARRANGE);
+	SetWindowLong(m_IrpList->GetSafeHwnd(),GWL_STYLE,dwStyle);
+	m_IrpList->SetExtendedStyle(LVS_EX_GRIDLINES);
+    ListView_SetExtendedListViewStyleEx ( 
+        m_IrpList->GetSafeHwnd(), 
         LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT );
 
     m_IrpList->DeleteAllItems();
@@ -115,15 +115,15 @@ BOOL CPerfStatDlg::OnInitDialog()
     m_IrpList->InsertColumn(2, (LPCSTR)s, LVCFMT_RIGHT, 100);
     for (i=0; i <= IRP_MJ_MAXIMUM_FUNCTION; i++) {
         m_IrpList->InsertItem(i, IrpMjStrings[i]);
-    }
+    } 
 
     RefreshPerfStat();
 
     SetTimer('STAT', m_Interval * 1000, NULL);
     UpdateData(FALSE);
 
-    return TRUE;  // return TRUE unless you set the focus to a control
-    // EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;  // return TRUE unless you set the focus to a control
+	              // EXCEPTION: OCX Property Pages should return FALSE
 }
 
 void CPerfStatDlg::RefreshPerfStat()
@@ -157,7 +157,7 @@ void CPerfStatDlg::RefreshPerfStat()
                     else
                         s.Format("%u", PerfV2->Unit.Slot[i]);
                     m_MemList->SetItem(i, 1, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
-
+      
                     s.Format("%u", PerfV2->Current.Slot[i]);
                     m_MemList->SetItem(i, 2, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
 
@@ -188,7 +188,7 @@ void CPerfStatDlg::RefreshPerfStat()
                     else
                         s.Format("%u", PerfV1->Unit.Slot[i]);
                     m_MemList->SetItem(i, 1, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
-
+      
                     s.Format("%u", PerfV1->Current.Slot[i]);
                     m_MemList->SetItem(i, 2, LVIF_TEXT, (LPCSTR)s, 0, 0, 0, 0);
 
@@ -219,21 +219,21 @@ errorout:
     return;
 }
 
-void CPerfStatDlg::OnTimer(UINT nIDEvent)
+void CPerfStatDlg::OnTimer(UINT nIDEvent) 
 {
     RefreshPerfStat();
-
-    CDialog::OnTimer(nIDEvent);
+	
+	CDialog::OnTimer(nIDEvent);
 }
 
-void CPerfStatDlg::OnDestroy()
+void CPerfStatDlg::OnDestroy() 
 {
-    KillTimer('STAT');
+	KillTimer('STAT');
     Ext2Close(&m_Handle);
-    CDialog::OnDestroy();
+	CDialog::OnDestroy();
 }
 
-void CPerfStatDlg::OnChangePerfstatInterval()
+void CPerfStatDlg::OnChangePerfstatInterval() 
 {
     UpdateData(TRUE);
 
@@ -243,23 +243,23 @@ void CPerfStatDlg::OnChangePerfstatInterval()
     SetTimer('STAT', m_Interval * 1000, NULL);
 }
 
-void CPerfStatDlg::OnOK()
+void CPerfStatDlg::OnOK() 
 {
-    // TODO: Add extra validation here
-    KillTimer('STAT');
+	// TODO: Add extra validation here
+	KillTimer('STAT');
     GetParent()->PostMessage(WM_COMMAND, ID_PERFSTOP, 0);
-    CDialog::OnOK();
+	CDialog::OnOK();
 }
 
-void CPerfStatDlg::OnCancel()
+void CPerfStatDlg::OnCancel() 
 {
-    // TODO: Add extra validation here
-    KillTimer('STAT');
+	// TODO: Add extra validation here
+	KillTimer('STAT');
     GetParent()->PostMessage(WM_COMMAND, ID_PERFSTOP, 0);
-    CDialog::OnCancel();
+	CDialog::OnCancel();
 }
 
-void CPerfStatDlg::OnQueryPerf()
+void CPerfStatDlg::OnQueryPerf() 
 {
     RefreshPerfStat();
 }

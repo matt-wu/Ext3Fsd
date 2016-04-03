@@ -17,11 +17,11 @@ static char THIS_FILE[] = __FILE__;
 
 
 CMountPoints::CMountPoints(CWnd* pParent /*=NULL*/)
-        : CDialog(CMountPoints::IDD, pParent)
+	: CDialog(CMountPoints::IDD, pParent)
 {
-    //{{AFX_DATA_INIT(CMountPoints)
-    // NOTE: the ClassWizard will add member initialization here
-    //}}AFX_DATA_INIT
+	//{{AFX_DATA_INIT(CMountPoints)
+		// NOTE: the ClassWizard will add member initialization here
+	//}}AFX_DATA_INIT
     m_Cdrom = NULL;
     m_Volume = NULL;
     m_Part = NULL;
@@ -33,27 +33,27 @@ CMountPoints::CMountPoints(CWnd* pParent /*=NULL*/)
 
 void CMountPoints::DoDataExchange(CDataExchange* pDX)
 {
-    CDialog::DoDataExchange(pDX);
-    //{{AFX_DATA_MAP(CMountPoints)
-    DDX_Control(pDX, IDC_DRV_LETTER_LIST, m_drvList);
-    //}}AFX_DATA_MAP
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CMountPoints)
+	DDX_Control(pDX, IDC_DRV_LETTER_LIST, m_drvList);
+	//}}AFX_DATA_MAP
 }
 
 BEGIN_MESSAGE_MAP(CMountPoints, CDialog)
-    //{{AFX_MSG_MAP(CMountPoints)
-    ON_NOTIFY(NM_CLICK, IDC_DRV_LETTER_LIST, OnClickDrvLetterList)
-    ON_BN_CLICKED(ID_ADD_MOUNTPOINT, OnAddMountpoint)
-    ON_BN_CLICKED(ID_CHANGE_MOUNTPOINT, OnChangeMountpoint)
-    ON_BN_CLICKED(ID_REMOVE_MOUNTPOINT, OnRemoveMountpoint)
-    //}}AFX_MSG_MAP
+	//{{AFX_MSG_MAP(CMountPoints)
+	ON_NOTIFY(NM_CLICK, IDC_DRV_LETTER_LIST, OnClickDrvLetterList)
+	ON_BN_CLICKED(ID_ADD_MOUNTPOINT, OnAddMountpoint)
+	ON_BN_CLICKED(ID_CHANGE_MOUNTPOINT, OnChangeMountpoint)
+	ON_BN_CLICKED(ID_REMOVE_MOUNTPOINT, OnRemoveMountpoint)
+	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
 // CMountPoints message handlers
 
-void CMountPoints::OnClickDrvLetterList(NMHDR* pNMHDR, LRESULT* pResult)
+void CMountPoints::OnClickDrvLetterList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
-    // TODO: Add your control notification handler code here
+	// TODO: Add your control notification handler code here
     int item = m_drvList.GetSelectionMark();
     if (item != -1) {
         m_Letter = m_drvList.GetItemText(item, 0);
@@ -65,7 +65,7 @@ void CMountPoints::OnClickDrvLetterList(NMHDR* pNMHDR, LRESULT* pResult)
     }
 
     if (pResult) {
-        *pResult = 0;
+	    *pResult = 0;
     }
 }
 
@@ -74,15 +74,15 @@ CMountPoints::AddMountPoint(
     CHAR    drvChar,
     BOOLEAN bRegistry,
     BOOLEAN bMountMgr
-)
+    )
 {
     CHAR            devPath[MAX_PATH];
     PEXT2_LETTER    drvLetter = NULL;
     ULONGLONG       letterMask = 0;
     BOOLEAN         rc = TRUE;
-    BOOLEAN         bFirstMount = FALSE;
+    BOOLEAN         bMount = FALSE;
 
-    PEXT2_VOLUME_PROPERTY2   EVP = NULL;
+    PEXT2_VOLUME_PROPERTY3   EVP = NULL;
 
     memset(devPath, 0, MAX_PATH);
 
@@ -121,23 +121,26 @@ CMountPoints::AddMountPoint(
         CString str;
 
         if (Ext2SetRegistryMountPoint(&drvChar, devPath, bRegistry)) {
+            Ext2AssignDrvLetter(drvLetter, devPath, FALSE);
+            EndDialog(0);
         } else {
             str.Format("Failed to modify registry: SYSTEM\\CurrentControlSet\\Control\\Session Manager\\DOS Devices\n");
             AfxMessageBox(str, MB_OK|MB_ICONWARNING);
+            return FALSE;
         }
     }
 
-    if (bMountMgr) {
+    if (drvLetter->bUsed)
+        return FALSE;
 
-        if ((m_Volume != NULL) && (m_Volume->DrvLetters == 0) &&
-                (m_Volume->EVP.bExt2 || m_Volume->EVP.bExt3) ) {
-            bFirstMount = TRUE;
-        } else if (m_Part != NULL && m_Part->Volume &&
-                   (m_Part->Volume->DrvLetters == 0) &&
-                   (m_Part->Volume->EVP.bExt2 || m_Part->Volume->EVP.bExt3) ) {
-            EVP = &m_Part->Volume->EVP;
-            bFirstMount = TRUE;
-        }
+    if ((m_Volume != NULL) && (m_Volume->DrvLetters == 0) &&
+        (m_Volume->EVP.bExt2 || m_Volume->EVP.bExt3) ) {
+        bMount = TRUE;
+    } else if (m_Part != NULL && m_Part->Volume &&
+          (m_Part->Volume->DrvLetters == 0) &&
+          (m_Part->Volume->EVP.bExt2 || m_Part->Volume->EVP.bExt3) ) {
+        EVP = &m_Part->Volume->EVP;
+        bMount = TRUE;
     }
 
     if (EVP) {
@@ -149,7 +152,8 @@ CMountPoints::AddMountPoint(
         }
     }
 
-    if (bFirstMount) {
+    /* create an entry in regisgtry */
+    {
 
         NT::NTSTATUS status;
         HANDLE  Handle = NULL;
@@ -168,20 +172,18 @@ CMountPoints::AddMountPoint(
         }
 
         EVP->DrvLetter = drvLetter->Letter | 0x80;
+        EVP->Flags2 |= EXT2_VPROP3_AUTOMOUNT;
         Ext2StorePropertyinRegistry(EVP);
-
-        if (Ext2RefreshVolumePoint(devPath, EVP->DrvLetter)) {
-            EVP->DrvLetter = 0xFF;
-        }
 
         rc = Ext2SetExt2Property(Handle, EVP);
 
 errorout:
 
         Ext2Close(&Handle);
+    }
 
-    } else {
-
+    if (bMount)
+    {
         rc = Ext2AssignDrvLetter(drvLetter, devPath, bMountMgr);
         if (!rc && !bMountMgr) {
             CString str;
@@ -189,17 +191,19 @@ errorout:
             AfxMessageBox(str, MB_OK|MB_ICONWARNING);
             return FALSE;
         }
+    } else {
+        rc = FALSE;
     }
 
-    if (bMountMgr) {
+    if (0 && bMountMgr) {
 
         Ext2UpdateDrvLetter(drvLetter, devPath);
 
-        if (!bFirstMount) {
+        if (!bMount) {
             Ext2RefreshVolumePoint(devPath, drvLetter->Letter);
         }
 
-        Sleep(2000);
+        Sleep(500);
         drvChar = Ext2QueryMountPoint(devPath);
 
         if (drvChar >= '0' && drvChar <= '9') {
@@ -209,11 +213,10 @@ errorout:
             drvLetter = &drvLetters[drvChar - 'A'];
             letterMask =  ((ULONGLONG) 1) << (drvChar - 'A');
         } else {
-            drvLetter = NULL;
-            letterMask = 0;
+            drvLetter = NULL; letterMask = 0;
         }
 
-        rc = drvLetter ? TRUE : FALSE;
+        rc = drvLetter ? TRUE : FALSE; 
     }
 
     if (rc) {
@@ -240,16 +243,16 @@ errorout:
         */
 
         m_MainDlg->SendMessage(
-            WM_MOUNTPOINT_NOTIFY,
-            'DA', (LPARAM)drvLetter->Letter);
+                    WM_MOUNTPOINT_NOTIFY,
+                    'DA', (LPARAM)drvLetter->Letter);
     }
 
     return TRUE;
 }
 
-void CMountPoints::OnAddMountpoint()
+void CMountPoints::OnAddMountpoint() 
 {
-    CSelectDrvLetter drvSel;
+	CSelectDrvLetter drvSel;
     STORAGE_BUS_TYPE busType = BusTypeAta;
 
     if (m_Part) {
@@ -260,14 +263,20 @@ void CMountPoints::OnAddMountpoint()
         busType = m_Volume->Part->Disk->SDD.BusType;
     }
 
+#if TRUE
+    drvSel.m_bDosDev = TRUE;
+    drvSel.m_bMountMgr = FALSE;
+    drvSel.m_bRegistry = FALSE;
+#else
     if (m_Cdrom ||
-            busType == BusType1394 ||
-            busType == BusTypeUsb ) {
+        busType == BusType1394 ||
+        busType == BusTypeUsb ) {
 
         drvSel.m_bMountMgr = TRUE;
-        drvSel.m_bRegistry = FALSE;
-        drvSel.m_bDosDev = FALSE;
+	    drvSel.m_bRegistry = FALSE;
+	    drvSel.m_bDosDev = FALSE;
     }
+#endif
 
     if (drvSel.DoModal() != IDOK) {
         return;
@@ -276,15 +285,17 @@ void CMountPoints::OnAddMountpoint()
     AddMountPoint(drvSel.m_DrvLetter.GetAt(0),
                   drvSel.m_bRegistry,
                   drvSel.m_bMountMgr
-                 );
+                );
+
+    OnOK();
 }
 
-void CMountPoints::OnChangeMountpoint()
+void CMountPoints::OnChangeMountpoint() 
 {
     CHAR            odrvChar = 0;
     CHAR            ndrvChar = 0;
 
-    CSelectDrvLetter drvSel;
+	CSelectDrvLetter drvSel;
     STORAGE_BUS_TYPE busType = BusTypeAta;
 
     if (m_Part) {
@@ -295,29 +306,39 @@ void CMountPoints::OnChangeMountpoint()
         busType = m_Volume->Part->Disk->SDD.BusType;
     }
 
+#if TRUE
+
+    drvSel.m_bMountMgr = FALSE;
+    drvSel.m_bRegistry = FALSE;
+    drvSel.m_bDosDev = TRUE;
+
+#else
     if (m_Cdrom ||
-            busType == BusType1394 ||
-            busType == BusTypeUsb ) {
+        busType == BusType1394 ||
+        busType == BusTypeUsb ) {
 
         drvSel.m_bMountMgr = TRUE;
-        drvSel.m_bRegistry = FALSE;
-        drvSel.m_bDosDev = FALSE;
+	    drvSel.m_bRegistry = FALSE;
+	    drvSel.m_bDosDev = FALSE;
     }
+#endif
 
     if (drvSel.DoModal() != IDOK) {
         return;
     }
 
-    ndrvChar = drvSel.m_DrvLetter.GetAt(0);
-    odrvChar = m_Letter.GetAt(0);
+	ndrvChar = drvSel.m_DrvLetter.GetAt(0);
+	odrvChar = m_Letter.GetAt(0);
 
     if (RemoveMountPoint(odrvChar)) {
         AddMountPoint(
-            ndrvChar,
-            drvSel.m_bRegistry,
-            drvSel.m_bMountMgr
-        );
+                ndrvChar,
+                drvSel.m_bRegistry,
+                drvSel.m_bMountMgr
+            );
     }
+
+    OnOK();
 }
 
 BOOLEAN
@@ -341,8 +362,8 @@ CMountPoints::RemoveMountPoint(CHAR drvChar)
     Ext2SetRegistryMountPoint(&drvChar, NULL, FALSE);
     if (Ext2RemoveDrvLetter(drvLetter)) {
 
-        m_MainDlg->SendMessage(WM_MOUNTPOINT_NOTIFY,
-                               'DR', (LPARAM)drvLetter->Letter);
+       m_MainDlg->SendMessage(WM_MOUNTPOINT_NOTIFY,
+                              'DR', (LPARAM)drvLetter->Letter);
 
     } else {
 
@@ -377,24 +398,26 @@ CMountPoints::RemoveMountPoint(CHAR drvChar)
     return TRUE;
 }
 
-void CMountPoints::OnRemoveMountpoint()
+void CMountPoints::OnRemoveMountpoint() 
 {
     CHAR drvChar = m_Letter.GetAt(0);
 
     if (RemoveMountPoint(drvChar)) {
         SET_WIN(ID_CHANGE_MOUNTPOINT, FALSE);
         SET_WIN(ID_REMOVE_MOUNTPOINT, FALSE);
-    }
+        if (m_drvList.GetItemCount() == 0)
+            OnOK();
+     }
 }
 
-void CMountPoints::OnOK()
+void CMountPoints::OnOK() 
 {
-    // TODO: Add extra validation here
-
-    CDialog::OnOK();
+	// TODO: Add extra validation here
+	
+	CDialog::OnOK();
 }
 
-void CMountPoints::OnCancel()
+void CMountPoints::OnCancel() 
 {
     CDialog::OnCancel();
 }
@@ -429,11 +452,11 @@ void CMountPoints::InitializeList(ULONGLONG letters)
     }
 }
 
-BOOL CMountPoints::OnInitDialog()
+BOOL CMountPoints::OnInitDialog() 
 {
-    CDialog::OnInitDialog();
-
-    // TODO: Add extra initialization here
+	CDialog::OnInitDialog();
+	
+	// TODO: Add extra initialization here
     ASSERT(m_Volume || m_Part);
 
     if (m_Part) {
@@ -444,16 +467,25 @@ BOOL CMountPoints::OnInitDialog()
         InitializeList(m_Cdrom->DrvLetters);
     }
 
-    SET_WIN(ID_CHANGE_MOUNTPOINT, FALSE);
-    SET_WIN(ID_REMOVE_MOUNTPOINT, FALSE);
+    m_drvList.SetSelectionMark(0);
+    m_drvList.SetFocus();
+    m_Letter = m_drvList.GetItemText(0, 0);
 
-    return TRUE;  // return TRUE unless you set the focus to a control
-    // EXCEPTION: OCX Property Pages should return FALSE
+    if (m_Letter.IsEmpty()) {
+        SET_WIN(ID_CHANGE_MOUNTPOINT, FALSE);
+        SET_WIN(ID_REMOVE_MOUNTPOINT, FALSE);
+    } else {
+        SET_WIN(ID_CHANGE_MOUNTPOINT, TRUE);
+        SET_WIN(ID_REMOVE_MOUNTPOINT, TRUE);
+    }
+
+	return TRUE;  // return TRUE unless you set the focus to a control
+	              // EXCEPTION: OCX Property Pages should return FALSE
 }
 
-BOOL CMountPoints::PreTranslateMessage(MSG* pMsg)
+BOOL CMountPoints::PreTranslateMessage(MSG* pMsg) 
 {
-    // TODO: Add your specialized code here and/or call the base class
+	// TODO: Add your specialized code here and/or call the base class
 
 #if 0
     if (pMsg->message==WM_KEYDOWN) {
@@ -462,6 +494,6 @@ BOOL CMountPoints::PreTranslateMessage(MSG* pMsg)
         }
     }
 #endif
-
-    return CDialog::PreTranslateMessage(pMsg);
+	
+	return CDialog::PreTranslateMessage(pMsg);
 }

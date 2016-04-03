@@ -16,11 +16,11 @@ static char THIS_FILE[] = __FILE__;
 // CExt2MgrApp
 
 BEGIN_MESSAGE_MAP(CExt2MgrApp, CWinApp)
-    //{{AFX_MSG_MAP(CExt2MgrApp)
-    // NOTE - the ClassWizard will add and remove mapping macros here.
-    //    DO NOT EDIT what you see in these blocks of generated code!
-    //}}AFX_MSG
-    ON_COMMAND(ID_HELP, CWinApp::OnHelp)
+	//{{AFX_MSG_MAP(CExt2MgrApp)
+		// NOTE - the ClassWizard will add and remove mapping macros here.
+		//    DO NOT EDIT what you see in these blocks of generated code!
+	//}}AFX_MSG
+	ON_COMMAND(ID_HELP, CWinApp::OnHelp)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -28,8 +28,8 @@ END_MESSAGE_MAP()
 
 CExt2MgrApp::CExt2MgrApp()
 {
-    // TODO: add construction code here,
-    // Place all significant initialization in InitInstance
+	// TODO: add construction code here,
+	// Place all significant initialization in InitInstance
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -58,36 +58,36 @@ void WINAPI ManagerServiceCtrl(DWORD ctrlcode);
 
 BOOLEAN
 ManagerReportStatus(
-    SERVICE_STATUS_HANDLE Handle,
-    SERVICE_STATUS* Status,
-    DWORD           State,
-    DWORD           Exitcode,
-    DWORD           Timeout
-)
+        SERVICE_STATUS_HANDLE Handle,
+        SERVICE_STATUS* Status,
+        DWORD           State,
+		DWORD           Exitcode,
+		DWORD           Timeout
+    )
 {
-    // If we're in the start state then we don't want the control manager
-    // sending us control messages because they'll confuse us.
+	// If we're in the start state then we don't want the control manager
+	// sending us control messages because they'll confuse us.
     if (State == SERVICE_START_PENDING) {
-        Status->dwControlsAccepted = 0;
-    } else {
-        Status->dwControlsAccepted = SERVICE_ACCEPT_STOP;
+		Status->dwControlsAccepted = 0;
+	} else {
+		Status->dwControlsAccepted = SERVICE_ACCEPT_STOP;
     }
 
-    // Save the new status we've been given
-    Status->dwCurrentState = State;
-    Status->dwWin32ExitCode = Exitcode;
-    Status->dwWaitHint = Timeout;
+	// Save the new status we've been given
+	Status->dwCurrentState = State;
+	Status->dwWin32ExitCode = Exitcode;
+	Status->dwWaitHint = Timeout;
 
-    // Update the checkpoint variable to let the SCM know that we
-    // haven't died if requests take a long time
-    if ((State == SERVICE_RUNNING) || (State == SERVICE_STOPPED)) {
-        Status->dwCheckPoint = 0;
-    } else {
+	// Update the checkpoint variable to let the SCM know that we
+	// haven't died if requests take a long time
+	if ((State == SERVICE_RUNNING) || (State == SERVICE_STOPPED)) {
+		Status->dwCheckPoint = 0;
+	} else {
         Status->dwCheckPoint = Checkpoint++;
     }
 
-    // Tell the SCM our new status
-    return SetServiceStatus(Handle, Status);
+	// Tell the SCM our new status
+	return SetServiceStatus(Handle, Status);
 }
 
 void ManagerStopService()
@@ -98,25 +98,25 @@ void ManagerStopService()
 
 void WINAPI ManagerCtrlService(DWORD ctrlcode)
 {
-    switch (ctrlcode)
+    switch(ctrlcode)
     {
 
-    case SERVICE_CONTROL_STOP:
-        // STOP : The service must stop
+	case SERVICE_CONTROL_STOP:
+		// STOP : The service must stop
         ManagerStopService();
         break;
 
     case SERVICE_CONTROL_INTERROGATE:
-        // QUERY : Service control manager just wants to know our state
-        break;
+		// QUERY : Service control manager just wants to know our state
+		break;
 
-    default:
-        // Control code not recognised
-        break;
+	default:
+		// Control code not recognised
+		break;
 
     }
 
-    // Tell the control manager what we're up to.
+	// Tell the control manager what we're up to.
     ManagerReportStatus(
         ServiceHandle,
         &ServiceStatus,
@@ -132,7 +132,8 @@ ManagerStartMain(VOID * arg)
 
     if (dlg) {
 
-        if (!dlg->m_bQuiet) {
+        /* always be quiet ! */
+        if (0 && !dlg->m_bQuiet) {
             CSplash* splash = new CSplash(IDB_ABOUT_SCREEN, RGB(128, 128, 128));
             splash->ShowSplash();
             dlg->m_splash = splash;
@@ -147,53 +148,55 @@ ManagerStartMain(VOID * arg)
         }
 
         dlg->DoModal();
+
+        Ext2StopPipeSrv();
     }
 
     if (isService) {
         ManagerReportStatus(
-            ServiceHandle,
-            &ServiceStatus,
-            SERVICE_STOPPED,
-            NO_ERROR, 0   );
+                ServiceHandle,
+                &ServiceStatus,
+                SERVICE_STOPPED,
+                NO_ERROR, 0   );
     }
 }
 
 void WINAPI
 ManagerServiceEntry(DWORD argc, char**argv)
 {
-    // register the service control handler
-    ServiceHandle =
-        RegisterServiceCtrlHandler(
-            "Ext2Mgr",
-            ManagerCtrlService   );
+	// register the service control handler
+    ServiceHandle = 
+            RegisterServiceCtrlHandler(
+                "Ext2Mgr",
+                ManagerCtrlService   );
 
     if (ServiceHandle == 0) {
-        return;
+		return;
     }
 
     // setup standard service state values
     ServiceStatus.dwServiceType = SERVICE_WIN32 | SERVICE_INTERACTIVE_PROCESS;
     ServiceStatus.dwServiceSpecificExitCode = 0;
 
-    // report our status to the SCM
+	// report our status to the SCM
     if (!ManagerReportStatus(
-                ServiceHandle,
-                &ServiceStatus,
-                SERVICE_START_PENDING,
-                NO_ERROR,
-                600000
-            ))
-    {
+        ServiceHandle,
+        &ServiceStatus,
+        SERVICE_START_PENDING,
+        NO_ERROR,
+        600000
+        ))
+	{
         ManagerReportStatus(
             ServiceHandle,
             &ServiceStatus,
-            SERVICE_STOPPED,
-            NO_ERROR,
+			SERVICE_STOPPED,
+			NO_ERROR,
             0);
-        return;
-    }
+		return;
+	}
 
-    // Now start the service for real
+	// Now start the service for real
     _beginthread(ManagerStartMain, 0, (PVOID)TRUE);
     return;
 }
@@ -204,8 +207,8 @@ ManagerStartService(VOID *arg)
 {
     SERVICE_TABLE_ENTRY ManagerSeriveTable[] =
     {
-        {"Ext2Mgr", (LPSERVICE_MAIN_FUNCTION)ManagerServiceEntry},
-        {NULL, NULL}
+      {"Ext2Mgr", (LPSERVICE_MAIN_FUNCTION)ManagerServiceEntry},
+      {NULL, NULL}
     };
 
     // let service control dispatcher start Ext2Mgr
@@ -214,17 +217,17 @@ ManagerStartService(VOID *arg)
 
 BOOL CExt2MgrApp::InitInstance()
 {
-    AfxEnableControlContainer();
+	AfxEnableControlContainer();
 
-    // Standard initialization
-    // If you are not using these features and wish to reduce the size
-    //  of your final executable, you should remove from the following
-    //  the specific initialization routines you do not need.
+	// Standard initialization
+	// If you are not using these features and wish to reduce the size
+	//  of your final executable, you should remove from the following
+	//  the specific initialization routines you do not need.
 
 #ifdef _AFXDLL
-    Enable3dControls();			// Call this when using MFC in a shared DLL
+	Enable3dControls();			// Call this when using MFC in a shared DLL
 #else
-    Enable3dControlsStatic();	// Call this when linking to MFC statically
+	Enable3dControlsStatic();	// Call this when linking to MFC statically
 #endif
 
     HWND hWnd = ::FindWindow(NULL, "Ext2 Volume Manager");
@@ -249,28 +252,28 @@ BOOL CExt2MgrApp::InitInstance()
         if (cmds[i] == (char)' ') {
             cmds[i] = 0;
             if ( strlen(&cmds[i+1]) == 5 &&
-                    _stricmp(&cmds[i+2], "hide") == 0 &&
-                    (cmds[i+1] == '/' || cmds[i+1] == '-')) {
+                 _stricmp(&cmds[i+2], "hide") == 0 &&
+                (cmds[i+1] == '/' || cmds[i+1] == '-')) {
                 bHide = TRUE;
             } else if (strlen(&cmds[i+1]) == 6 &&
-                       _stricmp(&cmds[i+2], "quiet") == 0 &&
-                       (cmds[i+1] == '/' || cmds[i+1] == '-')) {
+                 _stricmp(&cmds[i+2], "quiet") == 0 &&
+                (cmds[i+1] == '/' || cmds[i+1] == '-')) {
                 bHide = bQuiet = TRUE;
             } else if (strlen(&cmds[i+1]) == 8 &&
-                       _stricmp(&cmds[i+2], "install") == 0 &&
-                       (cmds[i+1] == '/' || cmds[i+1] == '-')) {
+                 _stricmp(&cmds[i+2], "install") == 0 &&
+                (cmds[i+1] == '/' || cmds[i+1] == '-')) {
                 bInstall = TRUE;
             } else if (strlen(&cmds[i+1]) == 7 &&
-                       _stricmp(&cmds[i+2], "remove") == 0 &&
-                       (cmds[i+1] == '/' || cmds[i+1] == '-')) {
+                 _stricmp(&cmds[i+2], "remove") == 0 &&
+                (cmds[i+1] == '/' || cmds[i+1] == '-')) {
                 bRemove = TRUE;
             } else if  (strlen(&cmds[i+1]) == 8 &&
-                        _stricmp(&cmds[i+2], "service") == 0 &&
-                        (cmds[i+1] == '/' || cmds[i+1] == '-')) {
+                 _stricmp(&cmds[i+2], "service") == 0 &&
+                (cmds[i+1] == '/' || cmds[i+1] == '-')) {
                 bHide = bService = TRUE;
             } else if  (strlen(&cmds[i+1]) == 5 &&
-                        _stricmp(&cmds[i+2], "stat") == 0 &&
-                        (cmds[i+1] == '/' || cmds[i+1] == '-')) {
+                 _stricmp(&cmds[i+2], "stat") == 0 &&
+                (cmds[i+1] == '/' || cmds[i+1] == '-')) {
                 bHide = bStat = TRUE;
             }
         }
@@ -286,6 +289,8 @@ BOOL CExt2MgrApp::InitInstance()
         return FALSE;
     }
 
+    Ext2IsX64System();
+
     CExt2MgrDlg theDlg;
 
     theDlg.m_bHide = bHide;
@@ -293,7 +298,7 @@ BOOL CExt2MgrApp::InitInstance()
     theDlg.m_bService = bService;
     theDlg.m_bStat = bStat;
 
-    m_pMainWnd = &theDlg;
+	m_pMainWnd = &theDlg;
 
     if (bService) {
         ManagerStartService(NULL);
@@ -301,7 +306,7 @@ BOOL CExt2MgrApp::InitInstance()
         ManagerStartMain(NULL);
     }
 
-    // Since the dialog has been closed, return FALSE so that we exit the
-    //  application, rather than start the application's message pump.
-    return FALSE;
+	// Since the dialog has been closed, return FALSE so that we exit the
+	//  application, rather than start the application's message pump.
+	return FALSE;
 }

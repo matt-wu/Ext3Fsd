@@ -13,38 +13,38 @@
 class CDlgView : public CScrollView
 {
 protected:
-    CDlgView();           // protected constructor used by dynamic creation
-    DECLARE_DYNCREATE(CDlgView)
+	CDlgView();           // protected constructor used by dynamic creation
+	DECLARE_DYNCREATE(CDlgView)
 
 // Attributes
 public:
 
 // Operations
 public:
-    CString m_csText;
+   CString m_csText;
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CDlgView)
-public:
-    virtual void OnInitialUpdate();
-protected:
-    virtual void OnDraw(CDC* pDC);      // overridden to draw this view
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CDlgView)
+	public:
+	virtual void OnInitialUpdate();
+	protected:
+	virtual void OnDraw(CDC* pDC);      // overridden to draw this view
+	//}}AFX_VIRTUAL
 
 // Implementation
 protected:
-    virtual ~CDlgView();
+	virtual ~CDlgView();
 #ifdef _DEBUG
-    virtual void AssertValid() const;
-    virtual void Dump(CDumpContext& dc) const;
+	virtual void AssertValid() const;
+	virtual void Dump(CDumpContext& dc) const;
 #endif
 
-    // Generated message map functions
+	// Generated message map functions
 protected:
-    //{{AFX_MSG(CDlgView)
-    // NOTE - the ClassWizard will add and remove member functions here.
-    //}}AFX_MSG
-    DECLARE_MESSAGE_MAP()
+	//{{AFX_MSG(CDlgView)
+		// NOTE - the ClassWizard will add and remove member functions here.
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
 };
 
 /////////////////////////////////////////////////////////////////////////////

@@ -14,7 +14,7 @@ class CTreeList : public CListCtrl
 {
 // Construction
 public:
-    CTreeList();
+	CTreeList();
 
 // Attributes
 public:
@@ -26,9 +26,9 @@ public:
     CRect       m_SelectionRect;
     BOOLEAN     m_SelectionFlag;
     CPoint      m_Point;
-    int		    m_Rows;
-    int         m_Columns;
-    int		    m_PrevItem;
+	int		    m_Rows;
+	int         m_Columns;
+	int		    m_PrevItem;
 
     /* bitmap information */
     HBITMAP     m_hBitmap;
@@ -41,29 +41,29 @@ public:
     VOID        Redraw();
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CTreeList)
-    virtual void DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct);
-    virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CTreeList)
+	virtual void DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct);
+	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
+	//}}AFX_VIRTUAL
     afx_msg LRESULT OnSetFont(WPARAM wParam, LPARAM);
     afx_msg void MeasureItem ( LPMEASUREITEMSTRUCT lpMeasureItemStruct );
 
 // Implementation
 public:
-    virtual ~CTreeList();
+	virtual ~CTreeList();
     int QuerySubItemText(int item, CHAR *Data, int length);
 
-    // Generated message map functions
+	// Generated message map functions
 protected:
-    //{{AFX_MSG(CTreeList)
-    afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
-    afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
-    afx_msg void OnKillfocus(NMHDR* pNMHDR, LRESULT* pResult);
-    afx_msg void OnSetfocus(NMHDR* pNMHDR, LRESULT* pResult);
-    //}}AFX_MSG
+	//{{AFX_MSG(CTreeList)
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnKillfocus(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnSetfocus(NMHDR* pNMHDR, LRESULT* pResult);
+	//}}AFX_MSG
 
-    DECLARE_MESSAGE_MAP()
+	DECLARE_MESSAGE_MAP()
 };
 
 /////////////////////////////////////////////////////////////////////////////

@@ -3,8 +3,6 @@
 //      are changed infrequently
 //
 
-#pragma runtime_checks("", off)
-
 #if !defined(AFX_STDAFX_H__A7E6CA3E_7403_4367_BC73_C64644BB42F9__INCLUDED_)
 #define AFX_STDAFX_H__A7E6CA3E_7403_4367_BC73_C64644BB42F9__INCLUDED_
 
@@ -43,6 +41,18 @@
 
 extern CHAR *IrpMjStrings[];
 extern CHAR *PerfStatStrings[];
+
+
+
+/*
+ * Ext2Pipe.cpp
+ */
+
+BOOL Ext2DefineDosDevice(DWORD flags,  CHAR *dos,  CHAR *symlink);
+DWORD Ext2QueryDrive(CHAR drive, CHAR *symlink);
+
+BOOLEAN Ext2StartPipeSrv();
+VOID Ext2StopPipeSrv();
 
 //{{AFX_INSERT_LOCATION}}
 // Microsoft Visual C++ will insert additional declarations immediately before the previous line.

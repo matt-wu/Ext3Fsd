@@ -2,9 +2,9 @@
 // Class Name : CMyHyperLink
 // Written By : Renjith.R
 // Email : renjith_sree@hotmail.com
-// Details :Derived from MFC CStatic
+// Details :Derived from MFC CStatic 
 // Date :Nov 25 2002
-// This can be used as a Hyperlink
+// This can be used as a Hyperlink 
 //Feel free to use this class in your project
 
 ///////////////////////////////////////////////////////////
@@ -22,7 +22,7 @@
 //This is the EventID , Which Will  send to the Parent
 //by the hyperlink  control
 
-# define _HYPERLINK_EVENT WM_USER + 101
+# define _HYPERLINK_EVENT WM_USER + 101 
 
 /////////////////////////////////////////////////////////////////////////////
 // CMyHyperLink window
@@ -31,7 +31,7 @@ class CMyHyperLink : public CStatic
 {
 // Construction
 public:
-    CMyHyperLink();
+	CMyHyperLink();
 
 // Attributes
 public:
@@ -40,64 +40,64 @@ public:
 public:
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CMyHyperLink)
-public:
-    virtual BOOL PreTranslateMessage(MSG* pMsg);
-protected:
-    virtual void PreSubclassWindow();
-    virtual BOOL OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult);
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CMyHyperLink)
+	public:
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	protected:
+	virtual void PreSubclassWindow();
+	virtual BOOL OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult);
+	//}}AFX_VIRTUAL
 
 // Implementation
 public:
-    void SetFireChild(int nFlag);
-    CString GetLinkText();
-    CString GetLinkUrl();
+	void SetFireChild(int nFlag);
+	CString GetLinkText();
+	CString GetLinkUrl();
+	
+	bool GoToLinkUrl(CString csLink);
+	
+	void SetHoverColor(COLORREF cHoverColor);
+	void SetVisitedColor(COLORREF sVisitedColor);
+	void SetLinkUrl(CString csUrl);
+	void SetToolTipBgColor(COLORREF sToolTipBgColor);
+	void SetToolTipTextColor(COLORREF sToolTipText);
+	void SetLinkText(CString csLinkText);
+	void SetTootTipText(LPCSTR szToolTip);
+	void ActiveToolTip(int nFlag);
+	void SetLinkColor(COLORREF sLinkColor);
+	
+	virtual ~CMyHyperLink();
 
-    bool GoToLinkUrl(CString csLink);
-
-    void SetHoverColor(COLORREF cHoverColor);
-    void SetVisitedColor(COLORREF sVisitedColor);
-    void SetLinkUrl(CString csUrl);
-    void SetToolTipBgColor(COLORREF sToolTipBgColor);
-    void SetToolTipTextColor(COLORREF sToolTipText);
-    void SetLinkText(CString csLinkText);
-    void SetTootTipText(LPCSTR szToolTip);
-    void ActiveToolTip(int nFlag);
-    void SetLinkColor(COLORREF sLinkColor);
-
-    virtual ~CMyHyperLink();
-
-    // Generated message map functions
+	// Generated message map functions
 protected:
-    bool m_bFireChild;
+	bool m_bFireChild;
+	
+	HCURSOR m_hHyperCursor;	
+	
+	bool m_bEnableToolTip;
+	bool m_bMouseOver;
+	bool m_bVisited;
 
-    HCURSOR m_hHyperCursor;
+	CFont m_oTextFont;
+	CToolTipCtrl m_ToolTip;
 
-    bool m_bEnableToolTip;
-    bool m_bMouseOver;
-    bool m_bVisited;
+	CString m_csToolTipText;
+	CString m_csLinkText;
+	CString m_csUrl;
 
-    CFont m_oTextFont;
-    CToolTipCtrl m_ToolTip;
+	COLORREF m_sHoverColor;
+	COLORREF m_sLinkColor;
+	COLORREF m_sVisitedColor;
 
-    CString m_csToolTipText;
-    CString m_csLinkText;
-    CString m_csUrl;
+	//{{AFX_MSG(CMyHyperLink)
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
+	afx_msg void OnClicked();
+	afx_msg HBRUSH CtlColor(CDC* pDC, UINT nCtlColor);
+	//}}AFX_MSG
 
-    COLORREF m_sHoverColor;
-    COLORREF m_sLinkColor;
-    COLORREF m_sVisitedColor;
-
-    //{{AFX_MSG(CMyHyperLink)
-    afx_msg void OnMouseMove(UINT nFlags, CPoint point);
-    afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
-    afx_msg void OnClicked();
-    afx_msg HBRUSH CtlColor(CDC* pDC, UINT nCtlColor);
-    //}}AFX_MSG
-
-    DECLARE_MESSAGE_MAP()
+	DECLARE_MESSAGE_MAP()
 };
 
 /////////////////////////////////////////////////////////////////////////////

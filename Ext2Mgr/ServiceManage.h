@@ -14,43 +14,43 @@ class CServiceManage : public CDialog
 {
 // Construction
 public:
-    CServiceManage(CWnd* pParent = NULL);   // standard constructor
+	CServiceManage(CWnd* pParent = NULL);   // standard constructor
 
 // Dialog Data
-    //{{AFX_DATA(CServiceManage)
-    enum { IDD = IDD_SERVICE_MANAGE };
-    CString	m_Codepage;
-    BOOL	m_bExt3Writable;
-    BOOL	m_bReadonly;
-    CString	m_srvStatus;
-    CString	m_sPrefix;
-    CString	m_sSuffix;
-    BOOL	m_bAutoMount;
-    //}}AFX_DATA
+	//{{AFX_DATA(CServiceManage)
+	enum { IDD = IDD_SERVICE_MANAGE };
+	CString	m_Codepage;
+	BOOL	m_bExt3Writable;
+	BOOL	m_bReadonly;
+	CString	m_srvStatus;
+	CString	m_sPrefix;
+	CString	m_sSuffix;
+	BOOL	m_bAutoMount;
+	//}}AFX_DATA
     ULONG   m_nStartmode;
     BOOLEAN m_bInited;
     BOOLEAN m_bStarted;
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CServiceManage)
-protected:
-    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CServiceManage)
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	//}}AFX_VIRTUAL
 
 // Implementation
 protected:
 
-    // Generated message map functions
-    //{{AFX_MSG(CServiceManage)
-    afx_msg void OnReadOnly();
-    afx_msg void OnExt3Writable();
-    virtual void OnCancel();
-    virtual void OnOK();
-    virtual BOOL OnInitDialog();
-    afx_msg void OnStartService();
-    //}}AFX_MSG
-    DECLARE_MESSAGE_MAP()
+	// Generated message map functions
+	//{{AFX_MSG(CServiceManage)
+	afx_msg void OnReadOnly();
+	afx_msg void OnExt3Writable();
+	virtual void OnCancel();
+	virtual void OnOK();
+	virtual BOOL OnInitDialog();
+	afx_msg void OnStartService();
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
 };
 
 //{{AFX_INSERT_LOCATION}}

@@ -14,38 +14,38 @@ class CSelectDrvLetter : public CDialog
 {
 // Construction
 public:
-    CSelectDrvLetter(CWnd* pParent = NULL);   // standard constructor
+	CSelectDrvLetter(CWnd* pParent = NULL);   // standard constructor
 
 // Dialog Data
-    //{{AFX_DATA(CSelectDrvLetter)
-    enum { IDD = IDD_NEW_MOUNTPOINT };
-    CString	m_DrvLetter;
-    //}}AFX_DATA
+	//{{AFX_DATA(CSelectDrvLetter)
+	enum { IDD = IDD_NEW_MOUNTPOINT };
+	CString	m_DrvLetter;
+	//}}AFX_DATA
 
-    BOOL m_bMountMgr;
-    BOOL m_bRegistry;
-    BOOL m_bDosDev;
+	BOOL m_bMountMgr;
+	BOOL m_bRegistry;
+	BOOL m_bDosDev;
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CSelectDrvLetter)
-protected:
-    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CSelectDrvLetter)
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	//}}AFX_VIRTUAL
 
 // Implementation
 protected:
 
-    // Generated message map functions
-    //{{AFX_MSG(CSelectDrvLetter)
-    virtual void OnOK();
-    virtual void OnCancel();
-    virtual BOOL OnInitDialog();
-    afx_msg void OnDosdevMount();
-    afx_msg void OnMMgrMount();
-    afx_msg void OnRegistryMount();
-    //}}AFX_MSG
-    DECLARE_MESSAGE_MAP()
+	// Generated message map functions
+	//{{AFX_MSG(CSelectDrvLetter)
+	virtual void OnOK();
+	virtual void OnCancel();
+	virtual BOOL OnInitDialog();
+	afx_msg void OnDosdevMount();
+	afx_msg void OnMMgrMount();
+	afx_msg void OnRegistryMount();
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
 };
 
 //{{AFX_INSERT_LOCATION}}

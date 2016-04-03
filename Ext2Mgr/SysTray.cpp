@@ -1,8 +1,8 @@
 /////////////////////////////////////////////////////////////////////////////
-// SystemTray.cpp : implementation file
+// SystemTray.cpp : implementation file 
 //
 /////////////////////////////////////////////////////////////////////////////
-
+    
 #include "stdafx.h"
 #include "SysTray.h"
 
@@ -24,26 +24,26 @@ CSystemTray::CSystemTray()
     m_bHidden  = FALSE;
 }
 
-CSystemTray::CSystemTray(CWnd* pWnd, UINT uCallbackMessage, LPCTSTR szToolTip,
-                         HICON icon, UINT uID)
+CSystemTray::CSystemTray(CWnd* pWnd, UINT uCallbackMessage, LPCTSTR szToolTip, 
+                     HICON icon, UINT uID)
 {
     Create(pWnd, uCallbackMessage, szToolTip, icon, uID);
     m_bHidden = FALSE;
 }
 
-BOOL CSystemTray::Create(CWnd* pWnd, UINT uCallbackMessage, LPCTSTR szToolTip,
-                         HICON icon, UINT uID)
+BOOL CSystemTray::Create(CWnd* pWnd, UINT uCallbackMessage, LPCTSTR szToolTip, 
+                       HICON icon, UINT uID)
 {
     // this is only for Windows 95 (or higher)
-    m_bEnabled = ( GetVersion() & 0xff );
+	m_bEnabled = ( GetVersion() & 0xff );
     ASSERT(m_bEnabled >= 4);
-    if (!m_bEnabled)
-        return FALSE;
+    if (!m_bEnabled) 
+		return FALSE;
 
     //Make sure Notification window is valid
     m_bEnabled = (pWnd && ::IsWindow(pWnd->GetSafeHwnd()));
     if (!m_bEnabled) return FALSE;
-
+    
     //Make sure we avoid conflict with other messages
     ASSERT(uCallbackMessage >= WM_USER);
 
@@ -60,7 +60,7 @@ BOOL CSystemTray::Create(CWnd* pWnd, UINT uCallbackMessage, LPCTSTR szToolTip,
     strcpy (m_tnd.szTip, szToolTip);
 
     // Set the tray icon
-    m_bEnabled = Shell_NotifyIcon(NIM_ADD, &m_tnd);
+	m_bEnabled = Shell_NotifyIcon(NIM_ADD, &m_tnd);
     ASSERT(m_bEnabled);
     return m_bEnabled;
 }
@@ -144,7 +144,7 @@ BOOL CSystemTray::SetStandardIcon(UINT nIDResource)
 
     return SetIcon(hIcon);
 }
-
+ 
 HICON CSystemTray::GetIcon() const
 {
     HICON hIcon = NULL;
@@ -208,7 +208,7 @@ CWnd* CSystemTray::GetNotificationWnd() const
 /////////////////////////////////////////////////////////////////////////////
 // CSystemTray implentation of OnTrayNotification
 
-LRESULT CSystemTray::OnTrayNotification(UINT wParam, LONG lParam)
+LRESULT CSystemTray::OnTrayNotification(UINT wParam, LONG lParam) 
 {
     //Return quickly if its not for this tray icon
     if (wParam != m_tnd.uID)
@@ -217,51 +217,51 @@ LRESULT CSystemTray::OnTrayNotification(UINT wParam, LONG lParam)
     CMenu menu, *pSubMenu;
 
     // Clicking with right button brings up a context menu
-    switch (LOWORD(lParam))
-    {
-    case WM_RBUTTONUP:
-    {
-        if (!menu.LoadMenu(m_tnd.uID))
-            return 0;
-        pSubMenu = menu.GetSubMenu(0);
-        if (!pSubMenu)
-            return 0;
+	switch(LOWORD(lParam))
+	{
+	case WM_RBUTTONUP:
+		{
+			if (!menu.LoadMenu(m_tnd.uID)) 
+				return 0;
+			pSubMenu = menu.GetSubMenu(0);
+			if (!pSubMenu) 
+				return 0;
 
-        // Make first menu item the default (bold font)
-        ::SetMenuDefaultItem(pSubMenu->m_hMenu, 0, TRUE);
+			// Make first menu item the default (bold font)
+			::SetMenuDefaultItem(pSubMenu->m_hMenu, 0, TRUE);
 
-        //Display and track the popup menu
-        CPoint pos;
-        GetCursorPos(&pos);
+			//Display and track the popup menu
+			CPoint pos;
+			GetCursorPos(&pos);
 
+			::SetForegroundWindow(m_tnd.hWnd);  
+			::TrackPopupMenu(pSubMenu->m_hMenu, 0, pos.x, pos.y, 0, m_tnd.hWnd, NULL);
+
+			// BUGFIX: See "PRB: Menus for Notification Icons Don't Work Correctly"
+			::PostMessage(m_tnd.hWnd, WM_NULL, 0, 0);
+
+			menu.DestroyMenu();
+		}
+		break;
+	case WM_LBUTTONDBLCLK:
+		{
+			if (!menu.LoadMenu(m_tnd.uID)) 
+				return 0;
+			pSubMenu = menu.GetSubMenu(0);
+			if (!pSubMenu) 
+				return 0;
+
+			// double click received, the default action is to execute first menu item
+			::SetForegroundWindow(m_tnd.hWnd);
+			::SendMessage(m_tnd.hWnd, WM_COMMAND, pSubMenu->GetMenuItemID(0), 0);
+
+			menu.DestroyMenu();
+		}
+		break;
+	case WM_LBUTTONUP:
         ::SetForegroundWindow(m_tnd.hWnd);
-        ::TrackPopupMenu(pSubMenu->m_hMenu, 0, pos.x, pos.y, 0, m_tnd.hWnd, NULL);
-
-        // BUGFIX: See "PRB: Menus for Notification Icons Don't Work Correctly"
-        ::PostMessage(m_tnd.hWnd, WM_NULL, 0, 0);
-
-        menu.DestroyMenu();
-    }
-    break;
-    case WM_LBUTTONDBLCLK:
-    {
-        if (!menu.LoadMenu(m_tnd.uID))
-            return 0;
-        pSubMenu = menu.GetSubMenu(0);
-        if (!pSubMenu)
-            return 0;
-
-        // double click received, the default action is to execute first menu item
-        ::SetForegroundWindow(m_tnd.hWnd);
-        ::SendMessage(m_tnd.hWnd, WM_COMMAND, pSubMenu->GetMenuItemID(0), 0);
-
-        menu.DestroyMenu();
-    }
-    break;
-    case WM_LBUTTONUP:
-        ::SetForegroundWindow(m_tnd.hWnd);
-        break;
-    }
+		break;
+	}
 
     return 1;
 }

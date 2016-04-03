@@ -14,44 +14,44 @@ class CPerfStatDlg : public CDialog
 {
 // Construction
 public:
-    CPerfStatDlg(CWnd* pParent = NULL);   // standard constructor
+	CPerfStatDlg(CWnd* pParent = NULL);   // standard constructor
 
 // Dialog Data
-    //{{AFX_DATA(CPerfStatDlg)
-    enum { IDD = IDD_PERFSTAT_DIALOG };
-    int		m_Interval;
-    //}}AFX_DATA
+	//{{AFX_DATA(CPerfStatDlg)
+	enum { IDD = IDD_PERFSTAT_DIALOG };
+	int		m_Interval;
+	//}}AFX_DATA
 
-    CListCtrl *         m_IrpList;
-    CListCtrl *         m_MemList;
+	CListCtrl *         m_IrpList;
+	CListCtrl *         m_MemList;
 
     HANDLE               m_Handle;
     EXT2_QUERY_PERFSTAT  m_PerfStat;
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CPerfStatDlg)
-protected:
-    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CPerfStatDlg)
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	//}}AFX_VIRTUAL
 
 // Implementation
 protected:
 
-    // Generated message map functions
-    //{{AFX_MSG(CPerfStatDlg)
-    virtual BOOL OnInitDialog();
-    afx_msg void OnTimer(UINT nIDEvent);
-    afx_msg void OnDestroy();
-    afx_msg void OnChangePerfstatInterval();
-    virtual void OnOK();
-    virtual void OnCancel();
+	// Generated message map functions
+	//{{AFX_MSG(CPerfStatDlg)
+	virtual BOOL OnInitDialog();
+	afx_msg void OnTimer(UINT nIDEvent);
+	afx_msg void OnDestroy();
+	afx_msg void OnChangePerfstatInterval();
+	virtual void OnOK();
+	virtual void OnCancel();
 
     afx_msg void OnQueryPerf();
 
     void RefreshPerfStat();
-    //}}AFX_MSG
-    DECLARE_MESSAGE_MAP()
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
 };
 
 //{{AFX_INSERT_LOCATION}}

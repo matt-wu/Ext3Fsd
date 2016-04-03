@@ -14,7 +14,7 @@ class CPartBox : public CButton
 {
 // Construction
 public:
-    CPartBox();
+	CPartBox();
 
 // Operations
 public:
@@ -22,23 +22,23 @@ public:
     void SetListboxHeight(HWND hWnd);
 
 // Overrides
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CPartBox)
-protected:
-    virtual void PreSubclassWindow();
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CPartBox)
+	protected:
+	virtual void PreSubclassWindow();
+	//}}AFX_VIRTUAL
 
 // Implementation
 public:
-    virtual ~CPartBox();
+	virtual ~CPartBox();
 
-    // Generated message map functions
+	// Generated message map functions
 protected:
-    //{{AFX_MSG(CPartBox)
-    afx_msg void OnSetFocus(CWnd* pOldWnd);
-    afx_msg void OnSelectChanged();
-    //}}AFX_MSG
-    DECLARE_MESSAGE_MAP()
+	//{{AFX_MSG(CPartBox)
+	afx_msg void OnSetFocus(CWnd* pOldWnd);
+	afx_msg void OnSelectChanged();
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
 
 public:
 
@@ -50,7 +50,7 @@ public:
 
 private:
 
-    int AssemblingTitle();
+	int AssemblingTitle();
 };
 
 /////////////////////////////////////////////////////////////////////////////

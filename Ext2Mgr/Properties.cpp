@@ -19,11 +19,11 @@ static char THIS_FILE[] = __FILE__;
 
 
 CProperties::CProperties(CWnd* pParent /*=NULL*/)
-        : CDialog(CProperties::IDD, pParent)
+	: CDialog(CProperties::IDD, pParent)
 {
-    //{{AFX_DATA_INIT(CProperties)
-    // NOTE: the ClassWizard will add member initialization here
-    //}}AFX_DATA_INIT
+	//{{AFX_DATA_INIT(CProperties)
+		// NOTE: the ClassWizard will add member initialization here
+	//}}AFX_DATA_INIT
     m_bdisk = FALSE;
     m_type = 0;
     m_sdev = NULL;
@@ -40,21 +40,22 @@ CProperties::CProperties(CWnd* pParent /*=NULL*/)
 
 void CProperties::DoDataExchange(CDataExchange* pDX)
 {
-    CDialog::DoDataExchange(pDX);
-    //{{AFX_DATA_MAP(CProperties)
-    // NOTE: the ClassWizard will add DDX and DDV calls here
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CProperties)
+		// NOTE: the ClassWizard will add DDX and DDV calls here
     DDX_Control(pDX, IDC_PROPERTY_DEVICE, m_DiskBox);
     DDX_Control(pDX, IDC_PROPERTY_SDEV,   m_PartBox);
-    //}}AFX_DATA_MAP
+	//}}AFX_DATA_MAP
 }
 
 
 BEGIN_MESSAGE_MAP(CProperties, CDialog)
-    //{{AFX_MSG_MAP(CProperties)
-    ON_BN_CLICKED(IDC_SDEV_CHANGE_MP, OnSdevChangeMp)
-    ON_BN_CLICKED(IDC_SDEV_EXT2_INFO, OnSdevExt2Info)
+	//{{AFX_MSG_MAP(CProperties)
+	ON_BN_CLICKED(IDC_SDEV_QUICK_MOUNT, OnSdevQuickMount)
+	ON_BN_CLICKED(IDC_SDEV_CHANGE_MP, OnSdevChangeMp)
+	ON_BN_CLICKED(IDC_SDEV_EXT2_INFO, OnSdevExt2Info)
     ON_MESSAGE(WM_GROUP_BOX_UPDATED,  OnGroupBoxUpdated)
-    //}}AFX_MSG_MAP
+	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -83,10 +84,11 @@ void CProperties::ResetPartGroup()
     SET_TEXT(IDC_SDEV_FREE_SIZE, s);
     SET_TEXT(IDC_FILE_SYSTEM, s);
     SET_WIN(IDC_SDEV_CHANGE_MP, FALSE);
+    SET_WIN(IDC_SDEV_QUICK_MOUNT, FALSE);
     SET_WIN(IDC_SDEV_EXT2_INFO, FALSE);
 }
 
-void CProperties::OnSdevChangeMp()
+void CProperties::OnSdevChangeMp() 
 {
     CMountPoints    mntPoint;
     BOOLEAN         bInited = FALSE;
@@ -129,16 +131,55 @@ void CProperties::OnSdevChangeMp()
             Parent->UpdatePartition(mntPoint.m_Part);
         }
     }
+
+    OnOK();
 }
 
-void CProperties::OnSdevExt2Info()
+void CProperties::OnSdevQuickMount() 
+{
+    PCHAR           dev = NULL;
+
+    if (m_cdrom) {
+        dev = m_cdrom->Name;
+    }
+
+    if (m_part) {
+        if (m_part->Volume)
+            dev = m_part->Volume->Name;
+        else
+            dev = m_part->Name;
+    }
+
+    if (m_volume) {
+        dev = m_volume->Name;
+    }
+
+    if (!dev) {
+        return;
+    }
+
+    if (Ext2MountVolume(dev)) {
+        CExt2MgrDlg * Parent = (CExt2MgrDlg *)GetParent();
+        if (m_cdrom) {
+            Parent->UpdateCdrom(m_cdrom);
+        } else if (m_volume) {
+            Parent->UpdateVolume(m_volume);
+        } else if (m_part) {
+            Parent->UpdateVolume(m_part->Volume);
+        }
+    }
+
+    OnOK();
+}
+
+void CProperties::OnSdevExt2Info() 
 {
     NT::NTSTATUS status;
     HANDLE  Handle = NULL;
     CString s;
 
     CExt2Attribute EA;
-    PEXT2_VOLUME_PROPERTY2 EVP = NULL;
+    PEXT2_VOLUME_PROPERTY3 EVP = NULL;
 
     if (m_cdrom && (m_cdrom->EVP.bExt2 || m_cdrom->EVP.bExt3)) {
         EVP = &m_cdrom->EVP;
@@ -215,10 +256,20 @@ void CProperties::SetVolume(PEXT2_VOLUME vol)
         m_disk = NULL;
         m_volume = NULL;
         SetPartition(m_part);
+        if (0 == m_part->DrvLetters)
+            SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
+        else
+            SET_WIN(IDC_SDEV_QUICK_MOUNT, FALSE);
         return;
     } else {
         m_disk = NULL;
         ResetDiskGroup();
+        if (m_volume) {
+            if (0 == m_volume->DrvLetters)
+                SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
+            else
+                SET_WIN(IDC_SDEV_QUICK_MOUNT, FALSE);
+        }
     }
 
     cbDiskBox->SetCurSel(-1);
@@ -229,9 +280,9 @@ void CProperties::SetVolume(PEXT2_VOLUME vol)
     cbPartBox->SetCurSel(0);
 
     /* set mount points */
-    SET_TEXT(IDC_MOUNT_POINTS,
+    SET_TEXT(IDC_MOUNT_POINTS, 
              Ext2QueryVolumeLetterStrings(
-                 vol->DrvLetters, NULL));
+                            vol->DrvLetters, NULL));
 
     /* set volume status */
     s = "Online";
@@ -261,6 +312,10 @@ void CProperties::SetVolume(PEXT2_VOLUME vol)
     SET_TEXT(IDC_FILE_SYSTEM, vol->FileSystem);
 
     SET_WIN(IDC_SDEV_CHANGE_MP, TRUE);
+    if (0 == vol->DrvLetters){
+        SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
+    }
+
     if (vol->bRecognized && (vol->EVP.bExt2 || vol->EVP.bExt3)) {
         SET_WIN(IDC_SDEV_EXT2_INFO, TRUE);
     }
@@ -284,9 +339,9 @@ void CProperties::SetPartition(PEXT2_PARTITION part)
     cbPartBox->SetCurSel(part->Number - 1);
 
     /* set mount points */
-    SET_TEXT(IDC_MOUNT_POINTS,
+    SET_TEXT(IDC_MOUNT_POINTS, 
              Ext2QueryVolumeLetterStrings(
-                 part->DrvLetters, NULL));
+                            part->DrvLetters, NULL));
 
     if (m_disk->SDD.RemovableMedia) {
         SET_WIN(IDC_SDEV_CHANGE_MP, TRUE);
@@ -295,6 +350,9 @@ void CProperties::SetPartition(PEXT2_PARTITION part)
     if (part->Volume) {
         if (!part->Volume->bDynamic) {
             SET_WIN(IDC_SDEV_CHANGE_MP, TRUE);
+        }
+        if (0 == part->Volume->DrvLetters){
+            SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
         }
     } else {
         s.Format("PARTITION %d", 0);
@@ -314,12 +372,16 @@ void CProperties::SetPartition(PEXT2_PARTITION part)
             }
         }
 
+        if (0 == part->DrvLetters){
+            SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
+        }
+
         SET_TEXT(IDC_SDEV_STATUS, s);
         return;
     }
 
     if (part->Volume->bRecognized &&
-            (part->Volume->EVP.bExt2 || part->Volume->EVP.bExt3)) {
+        (part->Volume->EVP.bExt2 || part->Volume->EVP.bExt3)) {
         SET_WIN(IDC_SDEV_EXT2_INFO, TRUE);
     }
 
@@ -329,8 +391,8 @@ void CProperties::SetPartition(PEXT2_PARTITION part)
     } else {
         s += "GPT";
     }
-    if ( part->Volume->bRecognized &&
-            (part->Volume->EVP.bExt2 || part->Volume->EVP.bExt3)) {
+    if ( part->Volume->bRecognized && 
+         (part->Volume->EVP.bExt2 || part->Volume->EVP.bExt3)) {
         s += ",codepage:";
         s += part->Volume->EVP.Codepage;
         if (part->Volume->EVP.bReadonly) {
@@ -413,13 +475,13 @@ void CProperties::SetDisk(PEXT2_DISK disk)
         if (disk->Layout) {
             if (disk->Layout->PartitionStyle == PARTITION_STYLE_MBR) {
                 if (disk->Layout->PartitionEntry->Mbr.PartitionType
-                        == PARTITION_LDM) {
+                    == PARTITION_LDM) {
                     s.LoadString(IDS_DISK_TYPE_DYN);
                 } else {
                     s.LoadString(IDS_DISK_TYPE_BASIC);
                 }
             } else if (disk->Layout->PartitionStyle == PARTITION_STYLE_MBR) {
-                s = "GUID";
+                 s = "GUID";
             }
         }
     }
@@ -438,35 +500,18 @@ void CProperties::SetDisk(PEXT2_DISK disk)
         SET_TEXT(IDC_TOTAL_SIZE, s);
 
         switch (disk->DiskGeometry.MediaType) {
-        case FixedMedia:
-            s="Fixed";
-            break;
-        case RemovableMedia:
-            s="Removable";
-            break;
-        case CD_ROM:
-            s="CDROM";
-            break;
-        case CD_R:
-            s="CDR";
-            break;
-        case CD_RW:
-            s="CDRW";
-            break;
-        case DVD_ROM:
-            s="DVD";
-            break;
-        case DVD_R:
-            s="DVDR";
-            break;
-        case DVD_RW:
-            s="DVDRW";
-            break;
-        default:
-            s="Unkown";
+		        case FixedMedia: s="Fixed"; break;
+		        case RemovableMedia: s="Removable"; break;
+		        case CD_ROM: s="CDROM"; break;
+		        case CD_R: s="CDR"; break;
+		        case CD_RW: s="CDRW"; break;
+		        case DVD_ROM: s="DVD"; break;
+		        case DVD_R: s="DVDR"; break;
+		        case DVD_RW: s="DVDRW"; break;
+		        default: s="Unkown";
         }
     }
-
+ 
     SET_TEXT(IDC_MEDIA_TYPE, s);
 }
 
@@ -484,6 +529,10 @@ void CProperties::SetCdrom(PEXT2_CDROM cdrom)
     cbPartBox->SetCurSel(0);
 
     SET_WIN(IDC_SDEV_CHANGE_MP, TRUE);
+
+    if (0 == cdrom->DrvLetters)
+        SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
+
 
     if (cdrom->SDD.VendorIdOffset) {
         s = (PCHAR)&cdrom->SDD + cdrom->SDD.VendorIdOffset;
@@ -530,7 +579,7 @@ void CProperties::SetCdrom(PEXT2_CDROM cdrom)
 
     if (cdrom->bLoaded) {
         if (cdrom->bEjected) {
-            s = "Media ejected";
+	        s = "Media ejected";
         } else {
             s.Format("%I64u", size);
             SET_TEXT(IDC_TOTAL_SIZE, s);
@@ -547,33 +596,16 @@ void CProperties::SetCdrom(PEXT2_CDROM cdrom)
             SET_TEXT(IDC_FILE_SYSTEM, s);
 
             s = "Online,";
-            switch (cdrom->DiskGeometry.MediaType) {
-            case FixedMedia:
-                s +="Fixed";
-                break;
-            case RemovableMedia:
-                s += "Media Removable";
-                break;
-            case CD_ROM:
-                s +=" CDROM";
-                break;
-            case CD_R:
-                s += "CDR";
-                break;
-            case CD_RW:
-                s += "CDRW";
-                break;
-            case DVD_ROM:
-                s += "DVD";
-                break;
-            case DVD_R:
-                s += "DVDR";
-                break;
-            case DVD_RW:
-                s += "DVDRW";
-                break;
-            default:
-                s += "Unkown";
+	        switch (cdrom->DiskGeometry.MediaType) {
+		        case FixedMedia: s +="Fixed"; break;
+		        case RemovableMedia: s += "Media Removable"; break;
+		        case CD_ROM: s +=" CDROM"; break;
+		        case CD_R: s += "CDR"; break;
+		        case CD_RW: s += "CDRW"; break;
+		        case DVD_ROM: s += "DVD"; break;
+		        case DVD_R: s += "DVDR"; break;
+		        case DVD_RW: s += "DVDRW"; break;
+		        default: s += "Unkown";
             }
         }
     } else {
@@ -581,16 +613,20 @@ void CProperties::SetCdrom(PEXT2_CDROM cdrom)
     }
     SET_TEXT(IDC_SDEV_STATUS, s);
 
-    SET_TEXT(IDC_MOUNT_POINTS,
+    if (0 == cdrom->DrvLetters){
+        SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
+    }
+
+    SET_TEXT(IDC_MOUNT_POINTS, 
              Ext2QueryVolumeLetterStrings(
-                 cdrom->DrvLetters, NULL));
+                            cdrom->DrvLetters, NULL));
 }
 
-BOOL CProperties::OnInitDialog()
+BOOL CProperties::OnInitDialog() 
 {
     CString str;
 
-    CDialog::OnInitDialog();
+	CDialog::OnInitDialog();
 
     for (ULONG i=0; i < g_nDisks; i++) {
         str.Format("DISK %u", i);
@@ -604,6 +640,7 @@ BOOL CProperties::OnInitDialog()
 
     SET_WIN(IDC_SDEV_CHANGE_MP, FALSE);
     SET_WIN(IDC_SDEV_EXT2_INFO, FALSE);
+    SET_WIN(IDC_SDEV_QUICK_MOUNT, FALSE);
 
     if (m_bdisk) {
         if (m_type == EXT2_DISK_MAGIC) {
@@ -612,21 +649,33 @@ BOOL CProperties::OnInitDialog()
         } else if (m_type == EXT2_PART_MAGIC) {
             m_part = (PEXT2_PARTITION) m_sdev;
             SetPartition(m_part);
+            if (0 == m_part->DrvLetters)
+                SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
+            if (m_part->Volume && 0 == m_part->Volume->DrvLetters)
+                SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
         } else if (m_type == EXT2_DISK_NULL_MAGIC) {
             m_disk = (PEXT2_DISK)m_sdev;
             SetDisk(m_disk);
         } else if (m_type == EXT2_CDROM_VOLUME_MAGIC) {
             m_cdrom = (PEXT2_CDROM)m_sdev;
             SetCdrom(m_cdrom);
-        } else if (m_type == EXT2_CDROM_DEVICE_MAGIC) {
+            if (0 == m_cdrom->DrvLetters)
+                SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
+        } else if (m_type == EXT2_CDROM_DEVICE_MAGIC){
             m_cdrom = (PEXT2_CDROM)m_sdev;
             SetCdrom(m_cdrom);
+            if (0 == m_cdrom->DrvLetters)
+                SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
         }
 
         if (m_disk && NULL == m_part) {
             if (m_disk->bLoaded && m_disk->NumParts > 0) {
                 m_part = &m_disk->DataParts[0];
                 SetPartition(m_part);
+                if (0 == m_part->DrvLetters)
+                    SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
+                if (m_part->Volume && 0 == m_part->Volume->DrvLetters)
+                    SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
             }
         }
 
@@ -634,15 +683,20 @@ BOOL CProperties::OnInitDialog()
         if (m_type == EXT2_VOLUME_MAGIC) {
             m_volume = (PEXT2_VOLUME)m_sdev;
             SetVolume(m_volume);
+            if (m_volume && 0 == m_volume->DrvLetters) {
+                SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
+            }
         } else {
             ASSERT(m_type == EXT2_CDROM_DEVICE_MAGIC);
             m_cdrom = (PEXT2_CDROM)m_sdev;
             SetCdrom(m_cdrom);
+            if (0 == m_cdrom->DrvLetters)
+                SET_WIN(IDC_SDEV_QUICK_MOUNT, TRUE);
         }
     }
 
-    return TRUE;  // return TRUE unless you set the focus to a control
-    // EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;  // return TRUE unless you set the focus to a control
+	              // EXCEPTION: OCX Property Pages should return FALSE
 }
 
 
@@ -652,11 +706,11 @@ LRESULT CProperties::OnGroupBoxUpdated(WPARAM wParam,LPARAM lParam)
     BOOLEAN bChanged = FALSE;
 
     if (wParam == 'GB') {
-        if (lParam == 'DVLU') {
+	    if (lParam == 'DVLU') {
             i = (ULONG)cbDiskBox->GetCurSel();
             if (i >= g_nDisks) {
                 if (m_disk != NULL || (m_cdrom != NULL &&
-                                       m_cdrom != &gCdroms[i - g_nDisks])) {
+                        m_cdrom != &gCdroms[i - g_nDisks])) {
                     m_disk = NULL;
                     m_part = NULL;
                     m_volume = NULL;
@@ -669,13 +723,13 @@ LRESULT CProperties::OnGroupBoxUpdated(WPARAM wParam,LPARAM lParam)
                 }
             } else {
                 if (m_cdrom != NULL || (m_disk != NULL &&
-                                        m_disk != &gDisks[i])) {
+                        m_disk != &gDisks[i])) {
                     m_disk = &gDisks[i];
                     m_cdrom = NULL;
                     m_volume = NULL;
                     m_part = NULL;
                     bChanged = TRUE;
-                } else if (m_volume) {
+                } else if (m_volume){
                     m_volume = NULL;
                     m_disk = &gDisks[i];
                     bChanged = TRUE;
@@ -697,15 +751,15 @@ LRESULT CProperties::OnGroupBoxUpdated(WPARAM wParam,LPARAM lParam)
                     }
                 }
             }
-        }
+ 	    }
 
-        if (lParam == 'PVLU') {
+	    if (lParam == 'PVLU') {
             i = cbPartBox->GetCurSel();
             if (m_part && ((i + 1) != m_part->Number)) {
                 m_part = &m_disk->DataParts[i];
                 SetPartition(m_part);
             }
-        }
+ 	    }
     }
 
     return TRUE;

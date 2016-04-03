@@ -21,66 +21,66 @@ static char THIS_FILE[] = __FILE__;
 class CAboutDlg : public CDialog
 {
 public:
-    CAboutDlg();
+	CAboutDlg();
 
     HBITMAP     m_hBitmap;
     HDC         m_hMemDC;
     HBITMAP     m_hOldBmp;
 
 // Dialog Data
-    //{{AFX_DATA(CAboutDlg)
-    enum { IDD = IDD_ABOUTBOX };
+	//{{AFX_DATA(CAboutDlg)
+	enum { IDD = IDD_ABOUTBOX };
     // CMyHyperLink m_lMail;
-    //}}AFX_DATA
+	//}}AFX_DATA
 
-    // ClassWizard generated virtual function overrides
-    //{{AFX_VIRTUAL(CAboutDlg)
-public:
-    virtual BOOL DestroyWindow();
-protected:
-    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-    //}}AFX_VIRTUAL
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CAboutDlg)
+	public:
+	virtual BOOL DestroyWindow();
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	//}}AFX_VIRTUAL
 
 // Implementation
 protected:
-    //{{AFX_MSG(CAboutDlg)
-    virtual BOOL OnInitDialog();
-    afx_msg void OnPaint();
-    afx_msg void OnExt2fsd();
-    afx_msg void OnDonate();
-    afx_msg void OnTimer(UINT nIDEvent);
-    //}}AFX_MSG
-    DECLARE_MESSAGE_MAP()
+	//{{AFX_MSG(CAboutDlg)
+	virtual BOOL OnInitDialog();
+	afx_msg void OnPaint();
+	afx_msg void OnExt2fsd();
+	afx_msg void OnDonate();
+	afx_msg void OnTimer(UINT nIDEvent);
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
 
 };
 
 CAboutDlg::CAboutDlg() : CDialog(CAboutDlg::IDD)
 {
-    //{{AFX_DATA_INIT(CAboutDlg)
-    //}}AFX_DATA_INIT
+	//{{AFX_DATA_INIT(CAboutDlg)
+	//}}AFX_DATA_INIT
 }
 
 void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 {
-    CDialog::DoDataExchange(pDX);
-    //{{AFX_DATA_MAP(CAboutDlg)
-    // DDX_Control(pDX, IDC_AUTHOR, m_lMail);
-    //}}AFX_DATA_MAP
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CAboutDlg)
+	// DDX_Control(pDX, IDC_AUTHOR, m_lMail);
+	//}}AFX_DATA_MAP
 }
 
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialog)
-    //{{AFX_MSG_MAP(CAboutDlg)
-    ON_WM_PAINT()
-    ON_BN_CLICKED(IDC_EXT2FSD, OnExt2fsd)
-    ON_BN_CLICKED(ID_DONATE, OnDonate)
-    ON_WM_TIMER()
-    //}}AFX_MSG_MAP
+	//{{AFX_MSG_MAP(CAboutDlg)
+	ON_WM_PAINT()
+	ON_BN_CLICKED(IDC_EXT2FSD, OnExt2fsd)
+	ON_BN_CLICKED(ID_DONATE, OnDonate)
+	ON_WM_TIMER()
+	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
-BOOL CAboutDlg::DestroyWindow()
+BOOL CAboutDlg::DestroyWindow() 
 {
-    // TODO: Add your specialized code here and/or call the base class
-    if (m_hBitmap) {
+	// TODO: Add your specialized code here and/or call the base class
+	if (m_hBitmap) {
 
         if (m_hMemDC) {
             ::SelectObject(m_hMemDC, m_hOldBmp);
@@ -91,21 +91,21 @@ BOOL CAboutDlg::DestroyWindow()
         m_hBitmap = NULL;
     }
 
-    return CDialog::DestroyWindow();
+	return CDialog::DestroyWindow();
 }
 
-BOOL CAboutDlg::OnInitDialog()
+BOOL CAboutDlg::OnInitDialog() 
 {
     CString s;
     CHAR    Version[0x20];
     CHAR    Date[0x20];
     CHAR    Time[0x20];
 
-    CDialog::OnInitDialog();
-
-    m_hBitmap = (HBITMAP)::LoadImage(GetModuleHandle(NULL),
-                                     MAKEINTRESOURCE(IDB_ABOUT_SMALL),
-                                     IMAGE_BITMAP, 0, 0, 0);
+	CDialog::OnInitDialog();
+	
+    m_hBitmap = (HBITMAP)::LoadImage(GetModuleHandle(NULL), 
+                             MAKEINTRESOURCE(IDB_ABOUT_SMALL),
+                             IMAGE_BITMAP, 0, 0, 0);
 
     if (m_hBitmap) {
         m_hMemDC  = ::CreateCompatibleDC(this->GetDC()->m_hDC);
@@ -122,26 +122,26 @@ BOOL CAboutDlg::OnInitDialog()
         s.Format("Ext2Fsd: < 0.42 (Dec 2007)\0");
     }
     SET_TEXT(IDC_DRIVER, s);
-    s  = "Ext2Mgr: 2.50 (";
+    s  = "Ext2Mgr: 2.60 (";
     s += __DATE__;
     s += ")\0";
     SET_TEXT(IDC_PROGRAM, s);
 
-    // Set the target URL
+    // Set the target URL 
     // m_lMail.SetLinkUrl("mailto:Matt Wu<matt@ext2fsd.com>?subject=Ext2Fsd Support");
     // Enable showing the Tooltip
     // m_lMail.ActiveToolTip(TRUE);
     // Set the Tooltiptext
     // m_lMail.SetTootTipText("Write a mail to Ext2Fsd group.");
 
-    return TRUE;  // return TRUE unless you set the focus to a control
-    // EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;  // return TRUE unless you set the focus to a control
+	              // EXCEPTION: OCX Property Pages should return FALSE
 }
 
-void CAboutDlg::OnPaint()
+void CAboutDlg::OnPaint() 
 {
-    CPaintDC dc(this); // device context for painting
-
+	CPaintDC dc(this); // device context for painting
+	
     int     rc;
     BITMAP  cs;
 
@@ -151,36 +151,36 @@ void CAboutDlg::OnPaint()
     }
 
     CRect  rect;
-    CWnd *pAboutWnd = GetDlgItem(IDC_ABOUT_SHOW);
-    pAboutWnd->GetWindowRect(rect);
-    ScreenToClient(rect);
-
+	CWnd *pAboutWnd = GetDlgItem(IDC_ABOUT_SHOW);
+	pAboutWnd->GetWindowRect(rect);
+	ScreenToClient(rect);
+  
     ::StretchBlt(dc.m_hDC, rect.left, rect.top, rect.Width(), rect.Height(),
                  m_hMemDC, 0, 0, cs.bmWidth, cs.bmHeight, SRCCOPY);
 
-    // Do not call CDialog::OnPaint() for painting messages
+	// Do not call CDialog::OnPaint() for painting messages
 }
 
 
-void CAboutDlg::OnExt2fsd()
+void CAboutDlg::OnExt2fsd() 
 {
-    // TODO: Add your control notification handler code here
-    ShellExecute(this->GetSafeHwnd(), "open",
-                 "http://www.ext2fsd.com",
-                 NULL, NULL, SW_SHOW );
+	// TODO: Add your control notification handler code here
+    ShellExecute(this->GetSafeHwnd(), "open", 
+                 "http://www.ext2fsd.com", 
+                 NULL, NULL, SW_SHOW );	
 }
 
-void CAboutDlg::OnDonate()
+void CAboutDlg::OnDonate() 
 {
-    // TODO: Add your control notification handler code here
-    GetParent()->SendMessage(WM_COMMAND, ID_DONATE);
+	// TODO: Add your control notification handler code here
+	GetParent()->SendMessage(WM_COMMAND, ID_DONATE);
 }
 
-void CAboutDlg::OnTimer(UINT nIDEvent)
+void CAboutDlg::OnTimer(UINT nIDEvent) 
 {
-    // TODO: Add your message handler code here and/or call default
-
-    CDialog::OnTimer(nIDEvent);
+	// TODO: Add your message handler code here and/or call default
+	
+	CDialog::OnTimer(nIDEvent);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -196,16 +196,16 @@ CExt2List::~CExt2List()
 
 
 BEGIN_MESSAGE_MAP(CExt2List, CListCtrl)
-    //{{AFX_MSG_MAP(CExt2List)
-    ON_WM_RBUTTONDOWN()
-    //}}AFX_MSG_MAP
+	//{{AFX_MSG_MAP(CExt2List)
+	ON_WM_RBUTTONDOWN()
+	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
-void CExt2List::OnRButtonDown(UINT nFlags, CPoint point)
+void CExt2List::OnRButtonDown(UINT nFlags, CPoint point) 
 {
-    // TODO: Add your message handler code here and/or call default
-    m_Point = point;
-    CListCtrl::OnRButtonDown(nFlags, point);
+	// TODO: Add your message handler code here and/or call default
+	m_Point = point;
+	CListCtrl::OnRButtonDown(nFlags, point);
 }
 
 int CExt2List::QuerySubItemText(int item, CHAR *Data, int length)
@@ -252,13 +252,13 @@ int CExt2List::QuerySubItemText(int item, CHAR *Data, int length)
 // CExt2MgrDlg dialog
 
 CExt2MgrDlg::CExt2MgrDlg(CWnd* pParent /*=NULL*/)
-        : CDialog(CExt2MgrDlg::IDD, pParent)
+	: CDialog(CExt2MgrDlg::IDD, pParent)
 {
-    //{{AFX_DATA_INIT(CExt2MgrDlg)
-    // NOTE: the ClassWizard will add member initialization here
-    //}}AFX_DATA_INIT
-    // Note that LoadIcon does not require a subsequent DestroyIcon in Win32
-    m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	//{{AFX_DATA_INIT(CExt2MgrDlg)
+		// NOTE: the ClassWizard will add member initialization here
+	//}}AFX_DATA_INIT
+	// Note that LoadIcon does not require a subsequent DestroyIcon in Win32
+	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
     m_bHide = FALSE;
     m_bQuiet = FALSE;
     m_bService = FALSE;
@@ -284,66 +284,67 @@ CExt2MgrDlg::CExt2MgrDlg(CWnd* pParent /*=NULL*/)
 
     m_nStartmode = 0;
     m_bAutoMount = FALSE;
-    m_bExt3Writable = FALSE;
-    m_bReadonly = FALSE;
+	m_bExt3Writable = FALSE;
+	m_bReadonly = FALSE;
 }
 
 void CExt2MgrDlg::DoDataExchange(CDataExchange* pDX)
 {
-    CDialog::DoDataExchange(pDX);
-    //{{AFX_DATA_MAP(CExt2MgrDlg)
-    DDX_Control(pDX, IDC_VOLUME_LIST, m_VolumeList);
-    DDX_Control(pDX, IDC_DISK_LIST, m_DiskView);
-    //}}AFX_DATA_MAP
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CExt2MgrDlg)
+	DDX_Control(pDX, IDC_VOLUME_LIST, m_VolumeList);
+	DDX_Control(pDX, IDC_DISK_LIST, m_DiskView);
+	//}}AFX_DATA_MAP
 }
 
 BEGIN_MESSAGE_MAP(CExt2MgrDlg, CDialog)
-    //{{AFX_MSG_MAP(CExt2MgrDlg)
+	//{{AFX_MSG_MAP(CExt2MgrDlg)
     ON_WM_WINDOWPOSCHANGING()
-    ON_WM_SYSCOMMAND()
+	ON_WM_SYSCOMMAND()
     ON_WM_DEVICECHANGE()
-    ON_WM_DESTROY()
-    ON_WM_PAINT()
-    ON_WM_QUERYDRAGICON()
-    ON_WM_SIZE()
-    ON_COMMAND(ID_CHANGE, OnChangeProperty)
-    ON_COMMAND(ID_REFRESH, OnRefresh)
-    ON_COMMAND(ID_FORMAT, OnFormat)
-    ON_COMMAND(ID_SERVICE, OnService)
-    ON_COMMAND(ID_ABOUT, OnAbout)
-    ON_COMMAND(ID_EXIT, OnExit)
-    ON_WM_MEASUREITEM()
-    ON_NOTIFY(NM_DBLCLK, IDC_DISK_LIST, OnDblclkDiskList)
-    ON_NOTIFY(NM_KILLFOCUS, IDC_DISK_LIST, OnKillfocusDiskList)
-    ON_NOTIFY(NM_RCLICK, IDC_DISK_LIST, OnRclickDiskList)
-    ON_NOTIFY(NM_DBLCLK, IDC_VOLUME_LIST, OnDblclkVolumeList)
-    ON_NOTIFY(NM_KILLFOCUS, IDC_VOLUME_LIST, OnKillfocusVolumeList)
-    ON_NOTIFY(NM_RCLICK, IDC_VOLUME_LIST, OnRclickVolumeList)
-    ON_NOTIFY(NM_CLICK, IDC_DISK_LIST, OnClickDiskList)
-    ON_NOTIFY(NM_CLICK, IDC_VOLUME_LIST, OnClickVolumeList)
-    ON_NOTIFY(NM_SETFOCUS, IDC_DISK_LIST, OnSetfocusDiskList)
-    ON_NOTIFY(NM_SETFOCUS, IDC_VOLUME_LIST, OnSetfocusVolumeList)
-    ON_COMMAND(ID_PROPERTY, OnProperty)
-    ON_COMMAND(ID_DONATE, OnDonate)
-    ON_COMMAND(ID_COPY,   OnCopy)
-    ON_COMMAND(ID_COPYALL, OnCopyAll)
-    ON_WM_TIMER()
-    ON_COMMAND(ID_DRV_LETTER, OnDrvLetter)
-    ON_COMMAND(ID_INSTALL_SERVICE, OnInstallService)
-    ON_COMMAND(ID_REMOVE_SERVICE, OnRemoveService)
-    ON_COMMAND(ID_ENABLE_AUTOSTART, OnEnableAutorun)
-    ON_COMMAND(ID_DISABLE_AUTOSTART, OnDisableAutorun)
-    ON_COMMAND(ID_SHOW_MAIN, OnShowMain)
-    ON_MESSAGE(WM_TRAY_ICON_NOTIFY,  OnTrayNotification)
+	ON_WM_DESTROY()
+	ON_WM_PAINT()
+	ON_WM_QUERYDRAGICON()
+	ON_WM_SIZE()
+	ON_COMMAND(ID_CHANGE, OnChangeProperty)
+	ON_COMMAND(ID_REFRESH, OnRefresh)
+	ON_COMMAND(ID_FORMAT, OnFormat)
+	ON_COMMAND(ID_SERVICE, OnService)
+	ON_COMMAND(ID_ABOUT, OnAbout)
+	ON_COMMAND(ID_EXIT, OnExit)
+	ON_WM_MEASUREITEM()
+	ON_NOTIFY(NM_DBLCLK, IDC_DISK_LIST, OnDblclkDiskList)
+	ON_NOTIFY(NM_KILLFOCUS, IDC_DISK_LIST, OnKillfocusDiskList)
+	ON_NOTIFY(NM_RCLICK, IDC_DISK_LIST, OnRclickDiskList)
+	ON_NOTIFY(NM_DBLCLK, IDC_VOLUME_LIST, OnDblclkVolumeList)
+	ON_NOTIFY(NM_KILLFOCUS, IDC_VOLUME_LIST, OnKillfocusVolumeList)
+	ON_NOTIFY(NM_RCLICK, IDC_VOLUME_LIST, OnRclickVolumeList)
+	ON_NOTIFY(NM_CLICK, IDC_DISK_LIST, OnClickDiskList)
+	ON_NOTIFY(NM_CLICK, IDC_VOLUME_LIST, OnClickVolumeList)
+	ON_NOTIFY(NM_SETFOCUS, IDC_DISK_LIST, OnSetfocusDiskList)
+	ON_NOTIFY(NM_SETFOCUS, IDC_VOLUME_LIST, OnSetfocusVolumeList)
+	ON_COMMAND(ID_PROPERTY, OnProperty)
+	ON_COMMAND(ID_DONATE, OnDonate)
+	ON_COMMAND(ID_COPY,   OnCopy)
+	ON_COMMAND(ID_COPYALL, OnCopyAll)
+	ON_WM_TIMER()
+	ON_COMMAND(ID_DRV_LETTER, OnDrvLetter)
+	ON_COMMAND(ID_DRV_QUICK_MOUNT, OnDrvQuickMount)
+	ON_COMMAND(ID_INSTALL_SERVICE, OnInstallService)
+	ON_COMMAND(ID_REMOVE_SERVICE, OnRemoveService)
+	ON_COMMAND(ID_ENABLE_AUTOSTART, OnEnableAutorun)
+	ON_COMMAND(ID_DISABLE_AUTOSTART, OnDisableAutorun)
+	ON_COMMAND(ID_SHOW_MAIN, OnShowMain)
+	ON_MESSAGE(WM_TRAY_ICON_NOTIFY,  OnTrayNotification)
     ON_MESSAGE(WM_TERMINATE_PROGRAM, OnTerminate)
     ON_MESSAGE(WM_MOUNTPOINT_NOTIFY, OnMountPointNotify)
-    ON_COMMAND(ID_HELP, OnHelp)
-    ON_COMMAND(ID_PERFSTAT, OnPerfStat)
-    ON_COMMAND(ID_PERFSTOP, OnPerfStop)
-    ON_COMMAND(ID_FLUSH_BUFFER, OnFlush)
-    ON_COMMAND(ID_CHANGE_PARTTYPE, OnPartType)
-    ON_COMMAND(ID_REMOVE_DEAD_LETTER, OnRemoveDeadLetter)
-    //}}AFX_MSG_MAP
+	ON_COMMAND(ID_HELP, OnHelp)
+	ON_COMMAND(ID_PERFSTAT, OnPerfStat)
+	ON_COMMAND(ID_PERFSTOP, OnPerfStop)
+	ON_COMMAND(ID_FLUSH_BUFFER, OnFlush)
+	ON_COMMAND(ID_CHANGE_PARTTYPE, OnPartType)
+	ON_COMMAND(ID_REMOVE_DEAD_LETTER, OnRemoveDeadLetter)
+	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -358,7 +359,7 @@ static UINT BASED_CODE indicators[] =
 
 /* A5DCBF10-6530-11D2-901F-00C04FB951ED */
 DEFINE_GUID(GUID_CLASS_USB_DEVICE, 0xA5DCBF10L, 0x6530, 0x11D2, 0x90, 0x1F, 0x00, \
-            0xC0, 0x4F, 0xB9, 0x51, 0xED);
+             0xC0, 0x4F, 0xB9, 0x51, 0xED);
 
 
 BOOL CExt2MgrDlg::OnInitDialog()
@@ -366,46 +367,46 @@ BOOL CExt2MgrDlg::OnInitDialog()
     CString str;
     DWORD   dwStyle = 0;
 
-    CDialog::OnInitDialog();
+	CDialog::OnInitDialog();
 
     /* set windows identifier */
     SetWindowLong(this->GetSafeHwnd(), DWL_USER, EXT2_DIALOG_MAGIC);
 
-    /* minimize the dialog during startup */
+	/* minimize the dialog during startup */
     if (m_bHide) {
         PostMessage(WM_SYSCOMMAND, SC_MINIMIZE, 0);
     }
 
-    // IDM_ABOUTBOX must be in the system command range.
-    ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
-    ASSERT(IDM_ABOUTBOX < 0xF000);
+	// IDM_ABOUTBOX must be in the system command range.
+	ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
+	ASSERT(IDM_ABOUTBOX < 0xF000);
 
-    CMenu* pSysMenu = GetSystemMenu(FALSE);
-    if (pSysMenu != NULL)
-    {
-        CString strAboutMenu;
-        strAboutMenu.LoadString(IDS_ABOUTBOX);
-        if (!strAboutMenu.IsEmpty())
-        {
-            pSysMenu->AppendMenu(MF_SEPARATOR);
-            pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
-        }
-    }
+	CMenu* pSysMenu = GetSystemMenu(FALSE);
+	if (pSysMenu != NULL)
+	{
+		CString strAboutMenu;
+		strAboutMenu.LoadString(IDS_ABOUTBOX);
+		if (!strAboutMenu.IsEmpty())
+		{
+			pSysMenu->AppendMenu(MF_SEPARATOR);
+			pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
+		}
+	}
 
     /* F1 - F12 key */
-    m_hAccel = ::LoadAccelerators(AfxGetInstanceHandle(),
-                                  MAKEINTRESOURCE(IDR_AKEY_EXT2MGR));
+    m_hAccel = ::LoadAccelerators(AfxGetInstanceHandle(), 
+                        MAKEINTRESOURCE(IDR_AKEY_EXT2MGR));
 
-    // Set the icon for this dialog.  The framework does this automatically
-    //  when the application's main window is not a dialog
-    SetIcon(m_hIcon, TRUE);         // Set large icon
-    SetIcon(m_hIcon, FALSE);        // Set small icon
-
+	// Set the icon for this dialog.  The framework does this automatically
+	//  when the application's main window is not a dialog
+	SetIcon(m_hIcon, TRUE);         // Set large icon
+	SetIcon(m_hIcon, FALSE);        // Set small icon
+	
     /* initialize the disk view */
     dwStyle=GetWindowLong(m_DiskView.GetSafeHwnd(),GWL_STYLE);
-    dwStyle&=~LVS_TYPEMASK;
-    dwStyle|=(LVS_REPORT | LVS_OWNERDRAWFIXED);
-    SetWindowLong(m_DiskView.GetSafeHwnd(),GWL_STYLE,dwStyle);
+	dwStyle&=~LVS_TYPEMASK;
+	dwStyle|=(LVS_REPORT | LVS_OWNERDRAWFIXED);
+	SetWindowLong(m_DiskView.GetSafeHwnd(),GWL_STYLE,dwStyle);
 
     m_DiskView.InsertColumn(0, (LPCSTR)"", LVCFMT_CENTER, 80);
     str.LoadString(IDS_LISTITEM_TYPE);
@@ -428,10 +429,10 @@ BOOL CExt2MgrDlg::OnInitDialog()
 
     /* initialize volume list */
     dwStyle=GetWindowLong(m_VolumeList.GetSafeHwnd(),GWL_STYLE);
-    dwStyle&=~LVS_TYPEMASK;
-    dwStyle|= (LVS_REPORT | LVS_AUTOARRANGE);
-    SetWindowLong(m_VolumeList.GetSafeHwnd(),GWL_STYLE,dwStyle);
-    m_VolumeList.SetExtendedStyle(LVS_EX_GRIDLINES);
+	dwStyle&=~LVS_TYPEMASK;
+	dwStyle|= (LVS_REPORT | LVS_AUTOARRANGE);
+	SetWindowLong(m_VolumeList.GetSafeHwnd(),GWL_STYLE,dwStyle);
+	m_VolumeList.SetExtendedStyle(LVS_EX_GRIDLINES);
 
     m_VolumeList.InsertColumn(0, NULL, LVCFMT_CENTER, 20);
     str.LoadString(IDS_LISTITEM_VOLUME);
@@ -455,24 +456,24 @@ BOOL CExt2MgrDlg::OnInitDialog()
     str.LoadString(IDS_LISTITEM_DEVOBJ);
     m_VolumeList.InsertColumn(7, (LPCSTR)str, LVCFMT_LEFT, 200);
 
-    ListView_SetExtendedListViewStyleEx (
-        m_VolumeList.GetSafeHwnd(),
+    ListView_SetExtendedListViewStyleEx ( 
+        m_VolumeList.GetSafeHwnd(), 
         LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT );
 
     /* initialize ImageList */
-    m_ImageList.Create(16, 16, ILC_COLOR8 | ILC_MASK, 5, 5);
-    for (UINT nID = IDI_FLOPPY; nID <= IDI_DYNAMIC; nID++) {
-        CBitmap     bitmap;
+	m_ImageList.Create(16, 16, ILC_COLOR8 | ILC_MASK, 5, 5);
+	for (UINT nID = IDI_FLOPPY; nID <= IDI_DYNAMIC; nID++) {
+      	CBitmap     bitmap;
         if (bitmap.LoadBitmap(nID)) {
-            m_ImageList.Add(&bitmap, RGB(0,0,0));
-            bitmap.DeleteObject();
+		    m_ImageList.Add(&bitmap, RGB(0,0,0));
+		    bitmap.DeleteObject();
         }
-    }
-    m_VolumeList.SetImageList(&m_ImageList, LVSIL_SMALL);
+	}
+	m_VolumeList.SetImageList(&m_ImageList, LVSIL_SMALL);
 
     /* Status Bar Initialization */
     m_bar.Create(this); //We create the status bar
-    m_bar.SetIndicators(indicators, 2);
+    m_bar.SetIndicators(indicators, 2);	
 
     CRect rect;
     GetClientRect(&rect);
@@ -509,7 +510,11 @@ BOOL CExt2MgrDlg::OnInitDialog()
             Ext2LoadCdromDrvLetters();
             Ext2LoadAllVolumeDrvLetters();
             Ext2LoadAllDiskPartitions();
-            Ext2MountingVolumes();
+            if (g_bAutoRemoveDeadLetters) {
+                Ext2AutoRemoveDeadLetters();
+            }
+            if (Ext2ProcessExt2Volumes()) {
+            }
         }
     } else {
         return FALSE;
@@ -520,15 +525,16 @@ BOOL CExt2MgrDlg::OnInitDialog()
     /* updating the volume list */
     Ext2RefreshVolumeList(&m_VolumeList);
 
-    /* updating the disk list */
+    /* updating the disk list */    
     Ext2RefreshDiskList(&m_DiskView);
 
-    if (IsVista()) {
+    if (TRUE || IsVistaOrAbove()) {
         CMenu* pMenu = AfxGetMainWnd()->GetMenu();
         CMenu* pSubFile = pMenu->GetSubMenu(0);
         if (pSubFile) {
             pSubFile->EnableMenuItem(ID_INSTALL_SERVICE, MF_BYCOMMAND|MF_GRAYED|MF_DISABLED);
             pSubFile->EnableMenuItem(ID_REMOVE_SERVICE, MF_BYCOMMAND|MF_GRAYED|MF_DISABLED);
+            pSubFile->EnableMenuItem(ID_ENABLE_AUTOSTART, MF_BYCOMMAND|MF_GRAYED|MF_DISABLED);
         }
     }
 
@@ -544,14 +550,14 @@ BOOL CExt2MgrDlg::OnInitDialog()
 
     /* query global parameters */
     Ext2QueryGlobalProperty(
-        &m_nStartmode,
-        (BOOLEAN *)&m_bReadonly,
-        (BOOLEAN *)&m_bExt3Writable,
-        (CHAR *)m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
-        (CHAR *)m_sPrefix.GetBuffer(HIDINGPAT_LEN),
-        (CHAR *)m_sSuffix.GetBuffer(HIDINGPAT_LEN),
-        (BOOLEAN *)&m_bAutoMount
-    );
+            &m_nStartmode,
+            (BOOLEAN *)&m_bReadonly,
+            (BOOLEAN *)&m_bExt3Writable,
+            (CHAR *)m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
+            (CHAR *)m_sPrefix.GetBuffer(HIDINGPAT_LEN),
+            (CHAR *)m_sSuffix.GetBuffer(HIDINGPAT_LEN),
+            (BOOLEAN *)&m_bAutoMount
+            );
     g_bAutoMount = m_bAutoMount;
     m_Codepage.ReleaseBuffer(-1);
     m_sPrefix.ReleaseBuffer(-1);
@@ -559,28 +565,28 @@ BOOL CExt2MgrDlg::OnInitDialog()
 
     RegisterDeviceInterface(DiskClassGuid, &m_hUsbNotify);
 
-    return TRUE;  // return TRUE  unless you set the focus to a control
+	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
 void CExt2MgrDlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
-    if ((nID & 0xFFF0) == IDM_ABOUTBOX)	{
-        CAboutDlg dlgAbout;
-        dlgAbout.DoModal();
-    } else if ((nID & 0xFFF0) ==  SC_MINIMIZE) {
-        m_Tray.ShowIcon();
-        ShowWindow(SW_HIDE);
-    } else if ((nID & 0xFFF0) ==  SC_CLOSE) {
+	if ((nID & 0xFFF0) == IDM_ABOUTBOX)	{
+		CAboutDlg dlgAbout;
+		dlgAbout.DoModal();
+	} else if ((nID & 0xFFF0) ==  SC_MINIMIZE) {
+		m_Tray.ShowIcon();
+		ShowWindow(SW_HIDE);
+	} else if ((nID & 0xFFF0) ==  SC_CLOSE) {
         SendMessage(WM_COMMAND, ID_EXIT, 0);
-    } else if ((nID & 0xFFF0) == IDM_CLOSE_SPLASH) {
+	} else if ((nID & 0xFFF0) == IDM_CLOSE_SPLASH) {
         if (m_splash) {
             m_splash->CloseSplash();
             delete m_splash;
             m_splash = NULL;
         }
-    } else {
-        CDialog::OnSysCommand(nID, lParam);
-    }
+	} else {
+		CDialog::OnSysCommand(nID, lParam);
+	}
 }
 
 BOOL CExt2MgrDlg::OnDeviceChange(UINT nEventType, DWORD dwData)
@@ -590,7 +596,8 @@ BOOL CExt2MgrDlg::OnDeviceChange(UINT nEventType, DWORD dwData)
     if (pdbch && pdbch->dbcc_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
 
         if (nEventType == DBT_DEVICEARRIVAL || DBT_DEVICEREMOVECOMPLETE) {
-            PostMessage(WM_COMMAND, ID_REFRESH, 0);
+            KillTimer('REFR');
+            SetTimer('REFR', 1000, NULL);
         }
 
         return TRUE;
@@ -598,31 +605,32 @@ BOOL CExt2MgrDlg::OnDeviceChange(UINT nEventType, DWORD dwData)
 
     switch (nEventType) {
 
-    case DBT_DEVICEARRIVAL:
+        case DBT_DEVICEARRIVAL:
 
-        if (lpdb->dbch_devicetype == DBT_DEVTYP_VOLUME) {
-            PDEV_BROADCAST_VOLUME lpdbv = (PDEV_BROADCAST_VOLUME)lpdb;
-            DriversChangeNotify(lpdbv->dbcv_unitmask, TRUE);
-        }
+            if (lpdb->dbch_devicetype == DBT_DEVTYP_VOLUME) {
+                PDEV_BROADCAST_VOLUME lpdbv = (PDEV_BROADCAST_VOLUME)lpdb;
+                DriversChangeNotify(lpdbv->dbcv_unitmask, TRUE);
+                Ext2AddLetterMask((ULONGLONG)(lpdbv->dbcv_unitmask));
+            }
 
-        break;
-    case DBT_DEVICEQUERYREMOVE:
-        break;
-    case DBT_DEVICEQUERYREMOVEFAILED:
-        break;
-    case DBT_DEVICEREMOVEPENDING:
-        break;
-    case DBT_DEVICEREMOVECOMPLETE:
-        if (lpdb->dbch_devicetype == DBT_DEVTYP_VOLUME) {
-            PDEV_BROADCAST_VOLUME lpdbv = (PDEV_BROADCAST_VOLUME)lpdb;
-            DriversChangeNotify(lpdbv->dbcv_unitmask, FALSE);
-        }
-        break;
-    case DBT_DEVICETYPESPECIFIC:
-        break;
-    case DBT_CONFIGCHANGED:
-        break;
-    default:
+            break;
+        case DBT_DEVICEQUERYREMOVE:
+            break;
+        case DBT_DEVICEQUERYREMOVEFAILED:
+            break;
+        case DBT_DEVICEREMOVEPENDING:
+            break;
+        case DBT_DEVICEREMOVECOMPLETE:
+            if (lpdb->dbch_devicetype == DBT_DEVTYP_VOLUME) {
+                PDEV_BROADCAST_VOLUME lpdbv = (PDEV_BROADCAST_VOLUME)lpdb;
+                DriversChangeNotify(lpdbv->dbcv_unitmask, FALSE);
+            }
+            break;
+        case DBT_DEVICETYPESPECIFIC:
+            break;
+        case DBT_CONFIGCHANGED:
+            break;
+        default:
         break;
     }
 
@@ -650,14 +658,14 @@ void CExt2MgrDlg::OnDestroy()
         m_hAccel = NULL;
     }
 
-    CDialog::OnDestroy();
+	CDialog::OnDestroy();
 }
 
 // If you add a minimize button to your dialog, you will need the code below
 //  to draw the icon.  For MFC applications using the document/view model,
 //  this is automatically done for you by the framework.
 
-void CExt2MgrDlg::OnPaint()
+void CExt2MgrDlg::OnPaint() 
 {
     CRect rect;
 
@@ -671,46 +679,46 @@ void CExt2MgrDlg::OnPaint()
 
     GetClientRect(&rect);
 
-    if (IsIconic())
-    {
-        CPaintDC dc(this); // device context for painting
+	if (IsIconic())
+	{
+		CPaintDC dc(this); // device context for painting
 
-        SendMessage(WM_ICONERASEBKGND, (WPARAM) dc.GetSafeHdc(), 0);
+		SendMessage(WM_ICONERASEBKGND, (WPARAM) dc.GetSafeHdc(), 0);
 
-        // Center icon in client rectangle
-        int cxIcon = GetSystemMetrics(SM_CXICON);
-        int cyIcon = GetSystemMetrics(SM_CYICON);
-        CRect rect;
-        GetClientRect(&rect);
-        int x = (rect.Width() - cxIcon + 1) / 2;
-        int y = (rect.Height() - cyIcon + 1) / 2;
+		// Center icon in client rectangle
+		int cxIcon = GetSystemMetrics(SM_CXICON);
+		int cyIcon = GetSystemMetrics(SM_CYICON);
+		CRect rect;
+		GetClientRect(&rect);
+		int x = (rect.Width() - cxIcon + 1) / 2;
+		int y = (rect.Height() - cyIcon + 1) / 2;
 
-        // Draw the icon
-        dc.DrawIcon(x, y, m_hIcon);
-    }
-    else
-    {
-        CDialog::OnPaint();
-    }
+		// Draw the icon
+		dc.DrawIcon(x, y, m_hIcon);
+	}
+	else
+	{
+		CDialog::OnPaint();
+	}
 }
 
 // The system calls this to obtain the cursor to display while the user drags
 //  the minimized window.
 HCURSOR CExt2MgrDlg::OnQueryDragIcon()
 {
-    return (HCURSOR) m_hIcon;
+	return (HCURSOR) m_hIcon;
 }
 
-void CExt2MgrDlg::OnSize(UINT nType, int cx, int cy)
+void CExt2MgrDlg::OnSize(UINT nType, int cx, int cy) 
 {
     int i = 0;
     int ctlId[] = {IDOK, IDCANCEL, ID_HELP, 0};
 
-    CDialog::OnSize(nType, cx, cy);
+	CDialog::OnSize(nType, cx, cy);
 
     return;
 
-
+	
     // create an instance of the CRect object
     CRect rect, cr;
 
@@ -735,25 +743,25 @@ void CExt2MgrDlg::OnSize(UINT nType, int cx, int cy)
 
 LRESULT CExt2MgrDlg::OnTrayNotification(WPARAM wParam,LPARAM lParam)
 {
-    switch (LOWORD(lParam))
-    {
-    case WM_LBUTTONUP:
+	switch(LOWORD(lParam))
+	{
+	case WM_LBUTTONUP:
         m_bHide = FALSE;
-        ShowWindow(SW_SHOW);
-        SendMessage(WM_SYSCOMMAND, SC_RESTORE);
-        break;
-    }
+		ShowWindow(SW_SHOW);
+		SendMessage(WM_SYSCOMMAND, SC_RESTORE);
+		break;
+	}
 
-    return m_Tray.OnTrayNotification(wParam,lParam);
+	return m_Tray.OnTrayNotification(wParam,lParam);
 }
 
-void CExt2MgrDlg::OnAbout()
+void CExt2MgrDlg::OnAbout() 
 {
-    // TODO: Add your command handler code here
+	// TODO: Add your command handler code here
     SendMessage(WM_SYSCOMMAND, IDM_ABOUTBOX);
 }
 
-void CExt2MgrDlg::OnExit()
+void CExt2MgrDlg::OnExit() 
 {
     if (TRUE) {
         /* AfxMessageBox("Are you sure to exit ? ",MB_YESNO,0) == IDYES */
@@ -761,19 +769,21 @@ void CExt2MgrDlg::OnExit()
     }
 }
 
-void CExt2MgrDlg::OnOK()
+void CExt2MgrDlg::OnOK() 
 {
 }
 
-void CExt2MgrDlg::OnCancel()
+void CExt2MgrDlg::OnCancel() 
 {
 }
 
-void CExt2MgrDlg::OnRefresh()
+void CExt2MgrDlg::OnRefresh() 
 {
     m_bHandleChange = FALSE;
     m_bFocusVolume = FALSE;
     m_bFocusDisk = FALSE;
+
+    Ext2AutoRemoveDeadLetters();
 
     /* cleanup all the disk/volume structures */
     Ext2CleanupDisks();
@@ -791,9 +801,10 @@ void CExt2MgrDlg::OnRefresh()
             Ext2LoadCdromDrvLetters();
             Ext2LoadAllVolumeDrvLetters();
             Ext2LoadAllDiskPartitions();
-            Ext2MountingVolumes();
             if (g_bAutoRemoveDeadLetters) {
                 Ext2AutoRemoveDeadLetters();
+            }
+            if (Ext2ProcessExt2Volumes()) {
             }
         }
     } else {
@@ -803,15 +814,15 @@ void CExt2MgrDlg::OnRefresh()
     /* updating the volume list */
     Ext2RefreshVolumeList(&m_VolumeList);
 
-    /* updating the disk list */
+    /* updating the disk list */    
     Ext2RefreshDiskList(&m_DiskView);
-
+	
     m_bHandleChange = TRUE;
 }
 
-void CExt2MgrDlg::OnService()
+void CExt2MgrDlg::OnService() 
 {
-    // TODO: Add your command handler code here
+	// TODO: Add your command handler code here
     CServiceManage  SrvDlg;
     if (!SrvDlg.m_bInited) {
         AfxMessageBox("Cannot query Ext2Fsd service !", MB_OK|MB_ICONSTOP);
@@ -820,14 +831,14 @@ void CExt2MgrDlg::OnService()
 
     /* query global parameters */
     Ext2QueryGlobalProperty(
-        &m_nStartmode,
-        (BOOLEAN *)&m_bReadonly,
-        (BOOLEAN *)&m_bExt3Writable,
-        (CHAR *)m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
-        (CHAR *)m_sPrefix.GetBuffer(HIDINGPAT_LEN),
-        (CHAR *)m_sSuffix.GetBuffer(HIDINGPAT_LEN),
-        (BOOLEAN *)&m_bAutoMount
-    );
+            &m_nStartmode,
+            (BOOLEAN *)&m_bReadonly,
+            (BOOLEAN *)&m_bExt3Writable,
+            (CHAR *)m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
+            (CHAR *)m_sPrefix.GetBuffer(HIDINGPAT_LEN),
+            (CHAR *)m_sSuffix.GetBuffer(HIDINGPAT_LEN),
+            (BOOLEAN *)&m_bAutoMount
+            );
     g_bAutoMount = m_bAutoMount;
     m_Codepage.ReleaseBuffer(-1);
     m_sPrefix.ReleaseBuffer(-1);
@@ -843,24 +854,24 @@ void CExt2MgrDlg::OnService()
     if (IDOK == SrvDlg.DoModal()) {
         /* query global parameters */
         Ext2QueryGlobalProperty(
-            &m_nStartmode,
-            (BOOLEAN *)&m_bReadonly,
-            (BOOLEAN *)&m_bExt3Writable,
-            (CHAR *)m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
-            (CHAR *)m_sPrefix.GetBuffer(HIDINGPAT_LEN),
-            (CHAR *)m_sSuffix.GetBuffer(HIDINGPAT_LEN),
-            (BOOLEAN *)&m_bAutoMount
-        );
+                &m_nStartmode,
+                (BOOLEAN *)&m_bReadonly,
+                (BOOLEAN *)&m_bExt3Writable,
+                (CHAR *)m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
+                (CHAR *)m_sPrefix.GetBuffer(HIDINGPAT_LEN),
+                (CHAR *)m_sSuffix.GetBuffer(HIDINGPAT_LEN),
+                (BOOLEAN *)&m_bAutoMount
+                );
         g_bAutoMount = m_bAutoMount;
     }
 }
 
 
-void CExt2MgrDlg::OnChangeProperty()
+void CExt2MgrDlg::OnChangeProperty() 
 {
     CExt2Attribute EA;
 
-    PEXT2_VOLUME_PROPERTY2 EVP = NULL;
+    PEXT2_VOLUME_PROPERTY3 EVP = NULL;
 
     PEXT2_VOLUME   volume = NULL;
     PEXT2_CDROM    cdrom = NULL;
@@ -922,19 +933,19 @@ void CExt2MgrDlg::OnChangeProperty()
 
         EA.m_MainDlg = (CWnd *)this;
         if (EA.DoModal() == IDOK) {
-            if (volume) {
-                UpdateVolume(volume);
-            } else if (cdrom) {
-                UpdateCdrom(cdrom);
-            }
+        }
+        if (volume) {
+            UpdateVolume(volume);
+        } else if (cdrom) {
+            UpdateCdrom(cdrom);
         }
     }
 }
 
-void CExt2MgrDlg::OnFormat()
+void CExt2MgrDlg::OnFormat() 
 {
     CString str;
-    // TODO: Add your command handler code here
+	// TODO: Add your command handler code here
     if (m_bFocusVolume) {
         str.Format("Formating volume item: %d", m_IndexVolume);
     }
@@ -948,33 +959,33 @@ void CExt2MgrDlg::OnFormat()
 
 void CExt2MgrDlg::OnWindowPosChanging(WINDOWPOS* lpwndpos)
 {
-    if (m_bHide)
+    if(m_bHide)
         lpwndpos->flags &= ~SWP_SHOWWINDOW;
 
     CDialog::OnWindowPosChanging(lpwndpos);
 }
 
-BOOL CExt2MgrDlg::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult)
+BOOL CExt2MgrDlg::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult) 
 {
-    // TODO: Add your specialized code here and/or call the base class
+	// TODO: Add your specialized code here and/or call the base class
 
-    LPNMHDR pNmhdr = (LPNMHDR)lParam;
+	LPNMHDR pNmhdr = (LPNMHDR)lParam;
 
-    return CDialog::OnNotify(wParam, lParam, pResult);
+	return CDialog::OnNotify(wParam, lParam, pResult);
 }
 
-void CExt2MgrDlg::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct)
+void CExt2MgrDlg::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct) 
 {
     if (nIDCtl == IDC_DISK_LIST) {
         m_DiskView.MeasureItem(lpMeasureItemStruct);
     } else {
-        CDialog::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
+	    CDialog::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
     }
 }
 
-void CExt2MgrDlg::OnDblclkDiskList(NMHDR* pNMHDR, LRESULT* pResult)
+void CExt2MgrDlg::OnDblclkDiskList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
-    // TODO: Add your control notification handler code here
+	// TODO: Add your control notification handler code here
     BOOLEAN IsExt2 = FALSE;
     m_bFocusVolume = FALSE;
     m_bFocusDisk = TRUE;
@@ -992,33 +1003,33 @@ void CExt2MgrDlg::OnDblclkDiskList(NMHDR* pNMHDR, LRESULT* pResult)
         }
     }
 
-    *pResult = 0;
+	*pResult = 0;
 }
 
-void CExt2MgrDlg::OnSetfocusDiskList(NMHDR* pNMHDR, LRESULT* pResult)
+void CExt2MgrDlg::OnSetfocusDiskList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
-    // TODO: Add your control notification handler code here
-    m_bFocusDisk = TRUE;
+	// TODO: Add your control notification handler code here
+	m_bFocusDisk = TRUE;
     m_bFocusVolume = FALSE;
     //  m_bar.SetPaneText(0, CString("Disk: Set Focus"));
 
     QuerySelectedItem(NULL);
-    *pResult = 0;
+	*pResult = 0;
 }
 
-void CExt2MgrDlg::OnKillfocusDiskList(NMHDR* pNMHDR, LRESULT* pResult)
+void CExt2MgrDlg::OnKillfocusDiskList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
-    // TODO: Add your control notification handler code here
+	// TODO: Add your control notification handler code here
     m_bFocusDisk = FALSE;
     // m_bar.SetPaneText(0, CString("Disk: Focus Lost"));
 
     QuerySelectedItem(NULL);
-    *pResult = 0;
+	*pResult = 0;
 }
 
-void CExt2MgrDlg::OnRclickDiskList(NMHDR* pNMHDR, LRESULT* pResult)
+void CExt2MgrDlg::OnRclickDiskList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
-    // TODO: Add your control notification handler code here
+	// TODO: Add your control notification handler code here
     RECT    rect;
     CString s;
 
@@ -1035,18 +1046,25 @@ void CExt2MgrDlg::OnRclickDiskList(NMHDR* pNMHDR, LRESULT* pResult)
     if (m_bFocusDisk) {
 
         if (m_type == EXT2_CDROM_DEVICE_MAGIC ||
-                m_type == EXT2_CDROM_VOLUME_MAGIC ) {
+            m_type == EXT2_CDROM_VOLUME_MAGIC ) {
 
             PEXT2_CDROM cdrom = (PEXT2_CDROM) m_sdev;
 
-            if (cdrom->bLoaded && !cdrom->bEjected &&
-                    (cdrom->EVP.bExt2 || cdrom->EVP.bExt3)) {
+            s.LoadString(IDS_DRV_QUICK_MOUNT);
+            if (0 == cdrom->DrvLetters)
+                m_Menu.AppendMenu(MF_STRING, ID_DRV_QUICK_MOUNT, (LPCTSTR)s);
+
+            s.LoadString(IDS_CHANGE_DRVLETTER);
+            m_Menu.AppendMenu(MF_STRING, ID_DRV_LETTER, (LPCTSTR)s);
+
+            m_Menu.AppendMenu(MF_SEPARATOR, 0, "");
+            if (cdrom->bLoaded && !cdrom->bEjected && 
+                (cdrom->EVP.bExt2 || cdrom->EVP.bExt3)) {
 
                 s.LoadString(IDS_EXT2_MANAGEMENT);
                 m_Menu.AppendMenu(MF_STRING, ID_CHANGE, (LPCTSTR)s);
             }
-            s.LoadString(IDS_CHANGE_DRVLETTER);
-            m_Menu.AppendMenu(MF_STRING, ID_DRV_LETTER, (LPCTSTR)s);
+
             m_Menu.AppendMenu(MF_SEPARATOR, 0, "");
 
             s.LoadString(IDS_COPY_ITEM_TO_CLIP);
@@ -1057,21 +1075,20 @@ void CExt2MgrDlg::OnRclickDiskList(NMHDR* pNMHDR, LRESULT* pResult)
 
             PEXT2_PARTITION part = (PEXT2_PARTITION) m_sdev;
             PEXT2_VOLUME volume = part->Volume;
-            BOOLEAN bAddSpace = FALSE;
+
+            if (volume && !volume->bDynamic) {
+                s.LoadString(IDS_DRV_QUICK_MOUNT);
+                if (0 == volume->DrvLetters)
+                    m_Menu.AppendMenu(MF_STRING, ID_DRV_QUICK_MOUNT, (LPCTSTR)s);
+
+                s.LoadString(IDS_CHANGE_DRVLETTER);
+                m_Menu.AppendMenu(MF_STRING, ID_DRV_LETTER, (LPCTSTR)s);
+                m_Menu.AppendMenu(MF_SEPARATOR, 0, "");
+            }
 
             if (volume && volume->bRecognized && (volume->EVP.bExt2 || volume->EVP.bExt3)) {
                 s.LoadString(IDS_EXT2_MANAGEMENT);
                 m_Menu.AppendMenu(MF_STRING, ID_CHANGE, (LPCTSTR)s);
-                bAddSpace = TRUE;
-            }
-
-            if (volume && !volume->bDynamic) {
-                s.LoadString(IDS_CHANGE_DRVLETTER);
-                m_Menu.AppendMenu(MF_STRING, ID_DRV_LETTER, (LPCTSTR)s);
-                bAddSpace = TRUE;
-            }
-
-            if (bAddSpace) {
                 m_Menu.AppendMenu(MF_SEPARATOR, 0, "");
             }
 
@@ -1116,26 +1133,26 @@ void CExt2MgrDlg::OnRclickDiskList(NMHDR* pNMHDR, LRESULT* pResult)
                            rect.left + m_DiskView.m_Point.x,
                            rect.top + m_DiskView.m_Point.y,
                            m_DiskView.GetSafeOwner(),
-                           NULL);
+                           NULL); 
 
-    *pResult = 0;
+	*pResult = 0;
 }
 
 
-void CExt2MgrDlg::OnClickDiskList(NMHDR* pNMHDR, LRESULT* pResult)
+void CExt2MgrDlg::OnClickDiskList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
-    // TODO: Add your control notification handler code here
+	// TODO: Add your control notification handler code here
     m_bFocusVolume = FALSE;
     m_bFocusDisk = TRUE;
     m_IndexDisk = m_DiskView.GetSelectionMark();
 
     QuerySelectedItem(NULL);
-    *pResult = 0;
+	*pResult = 0;
 }
 
-void CExt2MgrDlg::OnDblclkVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
+void CExt2MgrDlg::OnDblclkVolumeList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
-    // TODO: Add your control notification handler code here
+	// TODO: Add your control notification handler code here
     BOOLEAN bIsExt2 = FALSE;
 
     if (!m_bFsStarted) {
@@ -1152,29 +1169,29 @@ void CExt2MgrDlg::OnDblclkVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
             SendMessage(WM_COMMAND, ID_PROPERTY, 0);
         }
     }
-    *pResult = 0;
+	*pResult = 0;
 }
 
-void CExt2MgrDlg::OnSetfocusVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
+void CExt2MgrDlg::OnSetfocusVolumeList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
-    // TODO: Add your control notification handler code here
+	// TODO: Add your control notification handler code here
     //m_bar.SetPaneText(0, CString("Volume: Set Focus"));
     m_bFocusVolume = TRUE;
-    *pResult = 0;
+	*pResult = 0;
     QuerySelectedItem(NULL);
 }
 
-void CExt2MgrDlg::OnKillfocusVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
+void CExt2MgrDlg::OnKillfocusVolumeList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
     m_bFocusVolume = FALSE;
     //m_bar.SetPaneText(0, CString("Volume: Focus Lost"));
 
-    // TODO: Add your control notification handler code here
-    *pResult = 0;
+	// TODO: Add your control notification handler code here
+	*pResult = 0;
     QuerySelectedItem(NULL);
 }
 
-void CExt2MgrDlg::OnRclickVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
+void CExt2MgrDlg::OnRclickVolumeList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
     RECT    rect;
     CString s;
@@ -1195,14 +1212,19 @@ void CExt2MgrDlg::OnRclickVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
 
             PEXT2_VOLUME volume = (PEXT2_VOLUME) m_sdev;
 
-            if (volume->bRecognized && (volume->EVP.bExt2 || volume->EVP.bExt3)) {
-                s.LoadString(IDS_EXT2_MANAGEMENT);
-                m_Menu.AppendMenu(MF_STRING, ID_CHANGE, (LPCTSTR)s);
-            }
+            s.LoadString(IDS_DRV_QUICK_MOUNT);
+            if (0 == volume->DrvLetters)
+                m_Menu.AppendMenu(MF_STRING, ID_DRV_QUICK_MOUNT, (LPCTSTR)s);
 
             s.LoadString(IDS_CHANGE_DRVLETTER);
             m_Menu.AppendMenu(MF_STRING, ID_DRV_LETTER, (LPCTSTR)s);
             m_Menu.AppendMenu(MF_SEPARATOR, 0, "");
+
+            if (volume->bRecognized && (volume->EVP.bExt2 || volume->EVP.bExt3)) {
+                s.LoadString(IDS_EXT2_MANAGEMENT);
+                m_Menu.AppendMenu(MF_STRING, ID_CHANGE, (LPCTSTR)s);
+                m_Menu.AppendMenu(MF_SEPARATOR, 0, "");
+            }
 
             s.LoadString(IDS_FLUSH_BUFFER);
             m_Menu.AppendMenu(MF_STRING, ID_FLUSH_BUFFER, (LPCTSTR)s);
@@ -1216,14 +1238,21 @@ void CExt2MgrDlg::OnRclickVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
                    m_type == EXT2_CDROM_VOLUME_MAGIC ) {
 
             PEXT2_CDROM cdrom = (PEXT2_CDROM)m_sdev;
-            if (cdrom->bLoaded && !cdrom->bEjected &&
-                    (cdrom->EVP.bExt2 || cdrom->EVP.bExt3)) {
+
+            s.LoadString(IDS_DRV_QUICK_MOUNT);
+            if (0 == cdrom->DrvLetters)
+                m_Menu.AppendMenu(MF_STRING, ID_DRV_QUICK_MOUNT, (LPCTSTR)s);
+
+            s.LoadString(IDS_CHANGE_DRVLETTER);
+            m_Menu.AppendMenu(MF_STRING, ID_DRV_LETTER, (LPCTSTR)s);
+
+            if (cdrom->bLoaded && !cdrom->bEjected && 
+                (cdrom->EVP.bExt2 || cdrom->EVP.bExt3)) {
+                m_Menu.AppendMenu(MF_SEPARATOR, 0, "");
                 s.LoadString(IDS_EXT2_MANAGEMENT);
                 m_Menu.AppendMenu(MF_STRING, ID_CHANGE, (LPCTSTR)s);
             }
-            s.LoadString(IDS_CHANGE_DRVLETTER);
-            m_Menu.AppendMenu(MF_STRING, ID_DRV_LETTER, (LPCTSTR)s);
-        }
+       }
 
         m_Menu.AppendMenu(MF_SEPARATOR, 0, "");
         s.LoadString(IDS_COPY_ITEM_TO_CLIP);
@@ -1252,13 +1281,13 @@ void CExt2MgrDlg::OnRclickVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
     m_Menu.TrackPopupMenu(TPM_LEFTALIGN,
                           rect.left + m_VolumeList.m_Point.x ,
                           rect.top + m_VolumeList.m_Point.y,
-                          m_VolumeList.GetSafeOwner(), NULL);
-
-    *pResult = 0;
+                          m_VolumeList.GetSafeOwner(), NULL); 
+ 
+	*pResult = 0;
 }
 
 
-void CExt2MgrDlg::OnClickVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
+void CExt2MgrDlg::OnClickVolumeList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
     m_bFocusVolume = TRUE;
     m_IndexVolume = m_VolumeList.GetSelectionMark();;
@@ -1266,13 +1295,13 @@ void CExt2MgrDlg::OnClickVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
 
     QuerySelectedItem(NULL);
 
-    *pResult = 0;
+	*pResult = 0;
 }
 
 
-void CExt2MgrDlg::OnProperty()
+void CExt2MgrDlg::OnProperty() 
 {
-    PVOID sdev =  QuerySelectedItem(NULL);
+	PVOID sdev =  QuerySelectedItem(NULL);
     if (sdev) {
         CProperties PPD;
         PPD.m_bdisk = m_bFocusDisk;
@@ -1286,7 +1315,7 @@ VOID
 CExt2MgrDlg::DriversChangeNotify(
     ULONG           drvsMask,
     BOOLEAN         bArrival
-)
+    )
 {
     for (ULONG i=0; i < 26; i++) {
 
@@ -1302,7 +1331,7 @@ VOID
 CExt2MgrDlg::DriverLetterChangeNotify(
     CHAR            cLetter,
     BOOLEAN         bArrival
-)
+    )
 {
     PEXT2_LETTER drvLetter = NULL;
 
@@ -1321,7 +1350,7 @@ VOID
 CExt2MgrDlg::DriverChangeNotify(
     PEXT2_LETTER    drvLetter,
     BOOLEAN         bArrival
-)
+    )
 {
     ULONGLONG LetterMask = 0;
     ULONG     i;
@@ -1337,53 +1366,58 @@ CExt2MgrDlg::DriverChangeNotify(
         }
     }
 
-    if (!drvLetter->bUsed) {
-        return;
-    }
-
     if (drvLetter->Letter >= '0' && drvLetter->Letter <= '9') {
         LetterMask =  ((ULONGLONG) 1) << (drvLetter->Letter - '0' + 32);
     } else if (drvLetter->Letter >= 'A' && drvLetter->Letter <= 'Z') {
         LetterMask =  ((ULONGLONG) 1) << (drvLetter->Letter - 'A');
     }
 
-    if (NULL != drvLetter->Extent) {
+    if (drvLetter->bUsed) {
 
-        PEXT2_VOLUME  Volume = &gVols[0];
-        for (i=0; i < g_nVols && Volume != NULL; i++) {
-            if (Ext2CompareExtents(drvLetter->Extent, Volume->Extent)) {
-                if (bArrival) {
-                    Volume->DrvLetters |= LetterMask;
-                } else {
-                    Volume->DrvLetters &= ~LetterMask;
+        if (NULL != drvLetter->Extent) {
+
+            PEXT2_VOLUME  Volume = &gVols[0];
+            for (i=0; i < g_nVols && Volume != NULL; i++) {
+                if (Ext2CompareExtents(drvLetter->Extent, Volume->Extent)) {
+                    if (bArrival) {
+                        Volume->DrvLetters |= LetterMask;
+                    } else {
+                        Volume->DrvLetters &= ~LetterMask;
+                    }
+                    UpdateVolume(Volume);
+                    break;
                 }
-                UpdateVolume(Volume);
+                Volume = Volume->Next;
+            }
+        }
+
+        for (i=0; i < g_nCdroms; i++) {
+            PEXT2_CDROM  Cdrom = &gCdroms[i];
+            if (!_stricmp(drvLetters->SymLink, Cdrom->Name)) {
+                if (bArrival) {
+                    Cdrom->DrvLetters |= LetterMask;
+                } else {
+                    Cdrom->DrvLetters &= ~LetterMask;
+                }
+                UpdateCdrom(Cdrom);
                 break;
             }
-            Volume = Volume->Next;
-        }
-    }
-
-    for (i=0; i < g_nCdroms; i++) {
-        PEXT2_CDROM  Cdrom = &gCdroms[i];
-        if (!_stricmp(drvLetters->SymLink, Cdrom->Name)) {
-            if (bArrival) {
-                Cdrom->DrvLetters |= LetterMask;
-            } else {
-                Cdrom->DrvLetters &= ~LetterMask;
-            }
-            UpdateCdrom(Cdrom);
-            break;
         }
     }
 
     if (!bArrival) {
-        Ext2CleanDrvLetter(drvLetter);
-    }
 
+        Ext2SymLinkRemoval(drvLetter->Letter);
+        Ext2RemoveDosSymLink(drvLetter->Letter);
+
+        if (drvLetter->bUsed) {
+            Ext2DismountVolume(drvLetter->SymLink);
+            Ext2RemoveMountPoint(drvLetter, FALSE);
+        }
+    }
 }
 
-void CExt2MgrDlg::UpdateVolume(PEXT2_VOLUME volume)
+void CExt2MgrDlg::UpdateVolume(PEXT2_VOLUME volume) 
 {
     for (int i=0; i < m_VolumeList.GetItemCount(); i++) {
         PULONG data = (PULONG)m_VolumeList.GetItemData(i);
@@ -1391,26 +1425,26 @@ void CExt2MgrDlg::UpdateVolume(PEXT2_VOLUME volume)
             continue;
         }
         if (*data == EXT2_VOLUME_MAGIC &&
-                data == (PULONG)volume) {
+            data == (PULONG)volume) {
             Ext2RefreshVLVI(&m_VolumeList, volume, i);
         }
     }
 
-    for (i=0; i < m_DiskView.GetItemCount(); i++) {
+   for (i=0; i < m_DiskView.GetItemCount(); i++) {
         PEXT2_PARTITION part;
         part = (PEXT2_PARTITION)m_DiskView.GetItemData(i);
         if (!part) {
             continue;
         }
         if (part->Magic == EXT2_PART_MAGIC &&
-                part->Volume == volume) {
+            part->Volume == volume) {
             part->DrvLetters = volume->DrvLetters;
             Ext2RefreshDVPT(&m_DiskView, part, i);
         }
     }
 }
 
-void CExt2MgrDlg::UpdateCdrom(PEXT2_CDROM cdrom)
+void CExt2MgrDlg::UpdateCdrom(PEXT2_CDROM cdrom) 
 {
     for (int i=0; i < m_VolumeList.GetItemCount(); i++) {
         PULONG data = (PULONG)m_VolumeList.GetItemData(i);
@@ -1418,7 +1452,7 @@ void CExt2MgrDlg::UpdateCdrom(PEXT2_CDROM cdrom)
             continue;
         }
         if (*data == EXT2_CDROM_DEVICE_MAGIC &&
-                data == (PULONG)cdrom) {
+            data == (PULONG)cdrom) {
             Ext2RefreshVLCD(&m_VolumeList, cdrom, i);
         }
     }
@@ -1429,7 +1463,7 @@ void CExt2MgrDlg::UpdateCdrom(PEXT2_CDROM cdrom)
             continue;
         }
         if (*data == EXT2_CDROM_VOLUME_MAGIC &&
-                (PUCHAR)data == ((PUCHAR)cdrom + 4)) {
+            (PUCHAR)data == ((PUCHAR)cdrom + 4)) {
             Ext2RefreshDVCM(&m_DiskView, cdrom, i);
         }
     }
@@ -1452,15 +1486,15 @@ void CExt2MgrDlg::UpdatePartition(PEXT2_PARTITION part)
             continue;
         }
         if (*data == EXT2_PART_MAGIC &&
-                data == (PULONG)part) {
+            data == (PULONG)part) {
             Ext2RefreshDVPT(&m_DiskView, part, i);
         }
     }
-}
+} 
 
-void CExt2MgrDlg::OnDrvLetter()
+void CExt2MgrDlg::OnDrvLetter() 
 {
-    // TODO: Add your command handler code here
+	// TODO: Add your command handler code here
     CMountPoints    mntPoint;
     if (m_bFocusVolume) {
         if (m_type == EXT2_VOLUME_MAGIC) {
@@ -1470,7 +1504,7 @@ void CExt2MgrDlg::OnDrvLetter()
         }
     } else {
         if (m_type == EXT2_CDROM_DEVICE_MAGIC ||
-                m_type == EXT2_CDROM_VOLUME_MAGIC ) {
+            m_type == EXT2_CDROM_VOLUME_MAGIC ) {
             mntPoint.m_Cdrom = (PEXT2_CDROM) m_sdev;
         } else {
             mntPoint.m_Part = (PEXT2_PARTITION) m_sdev;
@@ -1498,26 +1532,72 @@ void CExt2MgrDlg::OnDrvLetter()
     */
 }
 
-
-void CExt2MgrDlg::OnDonate()
+void CExt2MgrDlg::OnDrvQuickMount() 
 {
-    // TODO: Add your command handler code here
-    Ext2VolumeArrivalNotify("\\Device\\WllVolumeZ");
+    CHAR    drv = 0;
 
+    if (m_bFocusVolume) {
+        if (m_type == EXT2_VOLUME_MAGIC) {
+            PEXT2_VOLUME v = (PEXT2_VOLUME)m_sdev;
+            if (0 == v->DrvLetters) {
+                drv = Ext2MountVolume(v->Name);
+                if (drv) {
+                    v->DrvLetters |= ((ULONGLONG) 1) << (drv - 'A'); 
+                    UpdateVolume(v);
+                }
+            }
+        } else {
+            PEXT2_CDROM c = (PEXT2_CDROM) m_sdev;
+            if (0 == c->DrvLetters) {
+                drv = Ext2MountVolume(c->Name);
+                if (drv) {
+                    c->DrvLetters |= ((ULONGLONG) 1) << (drv - 'A'); 
+                    UpdateCdrom(c);
+                }
+            }
+        }
+    } else {
+        if (m_type == EXT2_CDROM_DEVICE_MAGIC ||
+            m_type == EXT2_CDROM_VOLUME_MAGIC ) {
+            PEXT2_CDROM c = (PEXT2_CDROM) m_sdev;
+            if (0 == c->DrvLetters) {
+                drv = Ext2MountVolume(c->Name);
+                if (drv) {
+                    c->DrvLetters |= ((ULONGLONG) 1) << (drv - 'A'); 
+                    UpdateCdrom(c);
+                }
+            }
+        } else {
+            PEXT2_PARTITION p = (PEXT2_PARTITION) m_sdev;
+            if (0 == p->DrvLetters) {
+                drv = Ext2MountVolume(p->Name);
+                if (drv) {
+                    p->DrvLetters |= ((ULONGLONG) 1) << (drv - 'A'); 
+                    UpdatePartition(p);
+                }
+            }
+        }
+    }
+}
+
+
+void CExt2MgrDlg::OnDonate() 
+{
+	// TODO: Add your command handler code here
     CDonate Donate;
     Donate.DoModal();
 }
 
-void CExt2MgrDlg::OnCopy()
+void CExt2MgrDlg::OnCopy() 
 {
     CHAR Data[256];
     BOOLEAN rc = FALSE;
 
-    // TODO: Add your command handler code here
+	// TODO: Add your command handler code here
     if (m_bFocusVolume) {
-        rc = m_VolumeList.QuerySubItemText(m_IndexVolume, Data, 256);
+	    rc = m_VolumeList.QuerySubItemText(m_IndexVolume, Data, 256);
     } else if (m_bFocusDisk) {
-        rc = m_DiskView.QuerySubItemText(m_IndexDisk, Data, 256);
+	    rc = m_DiskView.QuerySubItemText(m_IndexDisk, Data, 256);
     }
 
     if (rc && OpenClipboard()) {
@@ -1533,15 +1613,15 @@ void CExt2MgrDlg::OnCopy()
                 memcpy(buffer, Data, strlen(Data) + 1);
                 GlobalUnlock(clipbuffer);
                 SetClipboardData(CF_TEXT,clipbuffer);
-            } else {
-                GlobalFree(clipbuffer);
-            }
+           } else {
+               GlobalFree(clipbuffer);
+           }
         }
         CloseClipboard();
     }
 }
 
-void CExt2MgrDlg::OnCopyAll()
+void CExt2MgrDlg::OnCopyAll() 
 {
     BOOLEAN rc = FALSE;
     CString s;
@@ -1560,17 +1640,17 @@ void CExt2MgrDlg::OnCopyAll()
                 memcpy(buffer, (LPCSTR)s, s.GetLength() + 1);
                 GlobalUnlock(clipbuffer);
                 SetClipboardData(CF_TEXT,clipbuffer);
-            } else {
-                GlobalFree(clipbuffer);
-            }
+           } else {
+               GlobalFree(clipbuffer);
+           }
         }
         CloseClipboard();
     }
 }
 
-void CExt2MgrDlg::OnTimer(UINT nIDEvent)
+void CExt2MgrDlg::OnTimer(UINT nIDEvent) 
 {
-    // TODO: Add your message handler code here and/or call default
+	// TODO: Add your message handler code here and/or call default
 
     if (nIDEvent == ID_INDICATOR_TIME) {
         CString s;
@@ -1579,9 +1659,13 @@ void CExt2MgrDlg::OnTimer(UINT nIDEvent)
         s.Format(" %3.3s", t1.Format("%B"));
         s += t1.Format(" %d,%Y %H:%M:%S");
         m_bar.SetPaneText(1, s);
+    } else if (nIDEvent == 'REFR') {
+        if (m_bHandleChange)
+            PostMessage(WM_COMMAND, ID_REFRESH, 0);
+        KillTimer('REFR');
     }
-
-    CDialog::OnTimer(nIDEvent);
+	
+	CDialog::OnTimer(nIDEvent);
 }
 
 PVOID CExt2MgrDlg::QuerySelectedItem(PBOOLEAN bIsExt2)
@@ -1616,8 +1700,8 @@ PVOID CExt2MgrDlg::QuerySelectedItem(PBOOLEAN bIsExt2)
 
     if (m_bFocusVolume) {
 
-        if (m_IndexVolume == -1 ||
-                m_IndexVolume >= m_VolumeList.GetItemCount()) {
+        if (m_IndexVolume == -1 || 
+            m_IndexVolume >= m_VolumeList.GetItemCount()) {
             goto errorout;
         }
 
@@ -1632,10 +1716,10 @@ PVOID CExt2MgrDlg::QuerySelectedItem(PBOOLEAN bIsExt2)
         m_type = Volume->Magic;
 
         if (Volume->Magic == EXT2_VOLUME_MAGIC) {
-            str.Format("VOLUME: %s %s %s",
-                       Ext2QueryVolumeLetterStrings(
-                           Volume->DrvLetters, NULL),
-                       Volume->FileSystem, Volume->Name);
+            str.Format("VOLUME: %s %s %s", 
+                    Ext2QueryVolumeLetterStrings(
+                                Volume->DrvLetters, NULL),
+                    Volume->FileSystem, Volume->Name);
             m_sdev = (PVOID) Volume;
 
             if (Volume->bRecognized && (Volume->EVP.bExt2 || Volume->EVP.bExt3)) {
@@ -1646,13 +1730,13 @@ PVOID CExt2MgrDlg::QuerySelectedItem(PBOOLEAN bIsExt2)
             pTools->EnableMenuItem(ID_PROPERTY, MF_BYCOMMAND|MF_ENABLED);
 
             if (bIsExt2 && Volume->bRecognized) {
-                *bIsExt2 = Volume->EVP.bExt2 || Volume->EVP.bExt3;
+                    *bIsExt2 = Volume->EVP.bExt2 || Volume->EVP.bExt3;
             }
 
         } else if (Cdrom->Magic[0] == EXT2_CDROM_DEVICE_MAGIC) {
             str.Format("CDROM %d: %s", Cdrom->OrderNo,
-                       Ext2QueryVolumeLetterStrings(
-                           Cdrom->DrvLetters, NULL));
+                            Ext2QueryVolumeLetterStrings(
+                                Cdrom->DrvLetters, NULL));
             if (Cdrom->bIsDVD) {
                 str += " DVD";
             }
@@ -1672,8 +1756,8 @@ PVOID CExt2MgrDlg::QuerySelectedItem(PBOOLEAN bIsExt2)
 
     if (m_bFocusDisk) {
 
-        if (m_IndexDisk == -1 ||
-                m_IndexDisk >= m_DiskView.GetItemCount()) {
+        if (m_IndexDisk == -1 || 
+            m_IndexDisk >= m_DiskView.GetItemCount()) {
             goto errorout;
         }
 
@@ -1712,11 +1796,11 @@ PVOID CExt2MgrDlg::QuerySelectedItem(PBOOLEAN bIsExt2)
                 }
             } else {
                 str.Format("DISK %d PARTITION %d: %s %s",
-                           Disk->OrderNo, Part->Number,
-                           Ext2QueryVolumeLetterStrings(
-                               Part->DrvLetters, NULL),
-                           Part->Volume->FileSystem
-                          );
+                            Disk->OrderNo, Part->Number,
+                            Ext2QueryVolumeLetterStrings(
+                                Part->DrvLetters, NULL),
+                            Part->Volume->FileSystem
+                            );
             }
             m_sdev = (PVOID) Part;
             if (Volume) {
@@ -1743,15 +1827,15 @@ PVOID CExt2MgrDlg::QuerySelectedItem(PBOOLEAN bIsExt2)
         } else if (Disk->Magic == EXT2_CDROM_VOLUME_MAGIC) {
             Cdrom = (PEXT2_CDROM)((PUCHAR)Disk - sizeof(ULONG));
             str.Format("CDROM %d: %s", Cdrom->OrderNo,
-                       Ext2QueryVolumeLetterStrings(
-                           Cdrom->DrvLetters, NULL));
+                            Ext2QueryVolumeLetterStrings(
+                                Cdrom->DrvLetters, NULL));
             if (Cdrom->bIsDVD) {
                 str += " DVD";
             }
             m_sdev = (PVOID) Cdrom;
             pTools->EnableMenuItem(ID_DRV_LETTER, MF_BYCOMMAND|MF_ENABLED);
             pTools->EnableMenuItem(ID_PROPERTY, MF_BYCOMMAND|MF_ENABLED);
-        } else if (Disk->Magic == EXT2_CDROM_DEVICE_MAGIC) {
+        } else if (Disk->Magic == EXT2_CDROM_DEVICE_MAGIC){
             Cdrom = (PEXT2_CDROM)Disk;
             str.Format("CDROM %d: %s", Cdrom->OrderNo, Cdrom->Name);
             pTools->EnableMenuItem(ID_DRV_LETTER, MF_BYCOMMAND|MF_ENABLED);
@@ -1766,10 +1850,10 @@ errorout:
 
     m_bar.SetPaneText(0, str);
 
-    return m_sdev;
+    return m_sdev;   
 }
 
-void CExt2MgrDlg::OnKeyupVolumeList()
+void CExt2MgrDlg::OnKeyupVolumeList() 
 {
     m_bFocusDisk = FALSE;
     m_bFocusVolume = TRUE;
@@ -1781,7 +1865,7 @@ void CExt2MgrDlg::OnKeyupVolumeList()
     }
 }
 
-void CExt2MgrDlg::OnKeyupDiskList()
+void CExt2MgrDlg::OnKeyupDiskList() 
 {
     int item = m_DiskView.GetSelectionMark();
 
@@ -1799,32 +1883,32 @@ void CExt2MgrDlg::OnKeyupDiskList()
     m_bFocusVolume = FALSE;
 }
 
-BOOL CExt2MgrDlg::PreTranslateMessage(MSG* pMsg)
+BOOL CExt2MgrDlg::PreTranslateMessage(MSG* pMsg) 
 {
-    // TODO: Add your specialized code here and/or call the base class
+	// TODO: Add your specialized code here and/or call the base class
 
     if (pMsg->message==WM_KEYDOWN) {
         if (pMsg->wParam == VK_ESCAPE) {
             pMsg->wParam = NULL;
-            PostMessage(WM_SYSCOMMAND, SC_MINIMIZE, 0);
+            PostMessage(WM_SYSCOMMAND, SC_MINIMIZE, 0);           
         } else if (pMsg->wParam == VK_RETURN) {
             pMsg->wParam = NULL;
-            PostMessage(WM_COMMAND, ID_PROPERTY, 0);
+            PostMessage(WM_COMMAND, ID_PROPERTY, 0);            
         }
-    }
+    } 
 
     if (pMsg->message==WM_SYSKEYDOWN) {
         if (pMsg->wParam == VK_RETURN) {
             pMsg->wParam = NULL;
-            PostMessage(WM_COMMAND, ID_CHANGE, 0);
+            PostMessage(WM_COMMAND, ID_CHANGE, 0);            
         }
     }
 
     if (m_hAccel != NULL) {
         if (TranslateAccelerator(m_hWnd, m_hAccel, pMsg)) {
-            return TRUE;
+            return TRUE; 
         }
-    }
+    }   
 
     if (pMsg->message == WM_KEYUP) {
 
@@ -1837,21 +1921,21 @@ BOOL CExt2MgrDlg::PreTranslateMessage(MSG* pMsg)
         }
     }
 
-    return CDialog::PreTranslateMessage(pMsg);
+	return CDialog::PreTranslateMessage(pMsg);
 }
 
-void CExt2MgrDlg::OnShowMain()
+void CExt2MgrDlg::OnShowMain() 
 {
     // TODO: Add your command handler code here
     m_bHide = FALSE;
-    ShowWindow(SW_SHOW);
+    ShowWindow(SW_SHOW);	
 }
 
 LRESULT CExt2MgrDlg::OnTerminate(WPARAM wParam,LPARAM lParam)
 {
-    if (lParam == 0x1234) {
+	if (lParam == 0x1234) {
         EndDialog(0);
-    }
+	}
 
     return TRUE;
 }
@@ -1859,24 +1943,24 @@ LRESULT CExt2MgrDlg::OnTerminate(WPARAM wParam,LPARAM lParam)
 LRESULT CExt2MgrDlg::OnMountPointNotify(WPARAM wParam,LPARAM lParam)
 {
     if (wParam == 'DA') {
-        DriverLetterChangeNotify((CHAR)lParam, TRUE);
-    } else if (wParam == 'DR') {
-        DriverLetterChangeNotify((CHAR)lParam, FALSE);
+       DriverLetterChangeNotify((CHAR)lParam, TRUE);
+    } else if (wParam == 'DR'){
+       DriverLetterChangeNotify((CHAR)lParam, FALSE);
     }
 
     return TRUE;
 }
 
-void CExt2MgrDlg::OnHelp()
+void CExt2MgrDlg::OnHelp() 
 {
-    // TODO: Add your command handler code here
+	// TODO: Add your command handler code here
     CHAR	szFullPathName	[MAX_PATH];
     CHAR	szDrive			[MAX_PATH];
     CHAR	szDir			[MAX_PATH];
 
     GetModuleFileName(NULL, szFullPathName, MAX_PATH);
-    _splitpath(szFullPathName, szDrive, szDir, NULL, NULL);
-    sprintf(szFullPathName, "%s%sDocuments\\FAQ.txt", szDrive, szDir);
+	_splitpath(szFullPathName, szDrive, szDir, NULL, NULL); 
+	sprintf(szFullPathName, "%s%sDocuments\\FAQ.txt", szDrive, szDir);
 
     ShellExecute(this->GetSafeHwnd(), "open", szFullPathName, NULL, NULL, SW_SHOW);
 }
@@ -1884,25 +1968,25 @@ void CExt2MgrDlg::OnHelp()
 void CExt2MgrDlg::OnInstallService()
 {
     Ext2SetManagerAsService(TRUE);
-}
+} 
 
 void CExt2MgrDlg::OnRemoveService()
 {
     Ext2SetManagerAsService(FALSE);
-}
+} 
 
 void CExt2MgrDlg::OnEnableAutorun()
 {
     Ext2SetAppAutorun(TRUE);
     Ext2SetManagerAsService(FALSE);
-}
+} 
 
 void CExt2MgrDlg::OnDisableAutorun()
 {
     Ext2SetAppAutorun(FALSE);
-}
+} 
 
-void CExt2MgrDlg::OnPerfStat()
+void CExt2MgrDlg::OnPerfStat() 
 {
     if (!m_PerfDlg) {
         m_PerfDlg = new CPerfStatDlg;
@@ -1917,7 +2001,7 @@ void CExt2MgrDlg::OnPerfStat()
     }
 }
 
-void CExt2MgrDlg::OnPerfStop()
+void CExt2MgrDlg::OnPerfStop() 
 {
     if (m_PerfDlg) {
         Sleep(100);
@@ -1931,7 +2015,7 @@ void
 CExt2MgrDlg::RegisterDeviceInterface(
     GUID            InterfaceClassGuid,
     PHDEVNOTIFY     hDevNotify
-)
+    )
 {
     DEV_BROADCAST_DEVICEINTERFACE NotificationFilter;
 
@@ -1939,17 +2023,17 @@ CExt2MgrDlg::RegisterDeviceInterface(
     NotificationFilter.dbcc_size =
         sizeof(DEV_BROADCAST_DEVICEINTERFACE);
     NotificationFilter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
-    NotificationFilter.dbcc_classguid = InterfaceClassGuid;
+    NotificationFilter.dbcc_classguid = InterfaceClassGuid; 
 
     *hDevNotify = RegisterDeviceNotification(
-                      m_hWnd,
-                      &NotificationFilter,
-                      DEVICE_NOTIFY_WINDOW_HANDLE
-                  );
+        m_hWnd,
+        &NotificationFilter,
+        DEVICE_NOTIFY_WINDOW_HANDLE
+    );
 }
 
 
-void CExt2MgrDlg::OnFlush()
+void CExt2MgrDlg::OnFlush() 
 {
     PEXT2_VOLUME   volume = NULL;
     PEXT2_PARTITION part = NULL;
@@ -1967,10 +2051,10 @@ void CExt2MgrDlg::OnFlush()
 
     if (volume) {
         Ext2FlushVolume(volume->Name);
-    }
+    } 
 }
 
-void CExt2MgrDlg::OnPartType()
+void CExt2MgrDlg::OnPartType() 
 {
     CPartitionType  PartType;
     PEXT2_VOLUME   volume = NULL;
@@ -1995,11 +2079,11 @@ void CExt2MgrDlg::OnPartType()
         strcpy(devPath, volume->Name);
     } else if (part) {
         sprintf(devPath, "\\Device\\Harddisk%u\\Partition%u",
-                part->Disk->OrderNo, part->Number);
+                    part->Disk->OrderNo, part->Number);
     }
 
-    if (part && part->Entry &&
-            part->Entry->PartitionStyle == PARTITION_STYLE_MBR) {
+    if (part && part->Entry && 
+        part->Entry->PartitionStyle == PARTITION_STYLE_MBR) {
         PartType.m_Part = part;
         PartType.m_sDevice = devPath;
         PartType.DoModal();
@@ -2015,9 +2099,9 @@ void CExt2MgrDlg::OnPartType()
             }
         }
     }
-}
+}   
 
-void CExt2MgrDlg::OnRemoveDeadLetter()
+void CExt2MgrDlg::OnRemoveDeadLetter() 
 {
     CDelDeadLetter DelDeadLetter;
     DelDeadLetter.DoModal();

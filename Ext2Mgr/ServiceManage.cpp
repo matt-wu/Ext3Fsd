@@ -16,17 +16,17 @@ static char THIS_FILE[] = __FILE__;
 
 
 CServiceManage::CServiceManage(CWnd* pParent /*=NULL*/)
-        : CDialog(CServiceManage::IDD, pParent)
+	: CDialog(CServiceManage::IDD, pParent)
 {
-    //{{AFX_DATA_INIT(CServiceManage)
-    m_Codepage = _T("");
-    m_bExt3Writable = FALSE;
-    m_bReadonly = FALSE;
-    m_srvStatus = _T("");
-    m_sPrefix = _T("");
-    m_sSuffix = _T("");
-    m_bAutoMount = FALSE;
-    //}}AFX_DATA_INIT
+	//{{AFX_DATA_INIT(CServiceManage)
+	m_Codepage = _T("");
+	m_bExt3Writable = FALSE;
+	m_bReadonly = FALSE;
+	m_srvStatus = _T("");
+	m_sPrefix = _T("");
+	m_sSuffix = _T("");
+	m_bAutoMount = FALSE;
+	//}}AFX_DATA_INIT
 
     m_nStartmode = 0;
 
@@ -44,35 +44,35 @@ CServiceManage::CServiceManage(CWnd* pParent /*=NULL*/)
 
 void CServiceManage::DoDataExchange(CDataExchange* pDX)
 {
-    CDialog::DoDataExchange(pDX);
-    //{{AFX_DATA_MAP(CServiceManage)
-    DDX_CBString(pDX, IDC_COMBO_CODEPAGE, m_Codepage);
-    DDX_Check(pDX, IDC_EXT3_WRITABLE, m_bExt3Writable);
-    DDX_Check(pDX, IDC_READ_ONLY, m_bReadonly);
-    DDX_Text(pDX, IDC_SERVICE_STATUS, m_srvStatus);
-    DDX_Text(pDX, IDC_GLOBAL_PREFIX, m_sPrefix);
-    DDV_MaxChars(pDX, m_sPrefix, 31);
-    DDX_Text(pDX, IDC_GLOBAL_SUFFIX, m_sSuffix);
-    DDV_MaxChars(pDX, m_sSuffix, 31);
-    DDX_Check(pDX, IDC_EXT3_AUTOMOUNT, m_bAutoMount);
-    //}}AFX_DATA_MAP
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CServiceManage)
+	DDX_CBString(pDX, IDC_COMBO_CODEPAGE, m_Codepage);
+	DDX_Check(pDX, IDC_EXT3_WRITABLE, m_bExt3Writable);
+	DDX_Check(pDX, IDC_READ_ONLY, m_bReadonly);
+	DDX_Text(pDX, IDC_SERVICE_STATUS, m_srvStatus);
+	DDX_Text(pDX, IDC_GLOBAL_PREFIX, m_sPrefix);
+	DDV_MaxChars(pDX, m_sPrefix, 31);
+	DDX_Text(pDX, IDC_GLOBAL_SUFFIX, m_sSuffix);
+	DDV_MaxChars(pDX, m_sSuffix, 31);
+	DDX_Check(pDX, IDC_EXT3_AUTOMOUNT, m_bAutoMount);
+	//}}AFX_DATA_MAP
 }
 
 
 BEGIN_MESSAGE_MAP(CServiceManage, CDialog)
-    //{{AFX_MSG_MAP(CServiceManage)
-    ON_BN_CLICKED(IDC_READ_ONLY, OnReadOnly)
-    ON_BN_CLICKED(IDC_EXT3_WRITABLE, OnExt3Writable)
-    ON_BN_CLICKED(IDC_START_SERVICE, OnStartService)
-    //}}AFX_MSG_MAP
+	//{{AFX_MSG_MAP(CServiceManage)
+	ON_BN_CLICKED(IDC_READ_ONLY, OnReadOnly)
+	ON_BN_CLICKED(IDC_EXT3_WRITABLE, OnExt3Writable)
+	ON_BN_CLICKED(IDC_START_SERVICE, OnStartService)
+	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
 // CServiceManage message handlers
 
-void CServiceManage::OnReadOnly()
+void CServiceManage::OnReadOnly() 
 {
-    // TODO: Add your control notification handler code here
+	// TODO: Add your control notification handler code here
     UpdateData(TRUE);
 
     if (m_bReadonly) {
@@ -83,27 +83,27 @@ void CServiceManage::OnReadOnly()
     UpdateData(FALSE);
 }
 
-void CServiceManage::OnExt3Writable()
+void CServiceManage::OnExt3Writable() 
 {
-    // TODO: Add your control notification handler code here
-
+	// TODO: Add your control notification handler code here
+	
 }
 
-void CServiceManage::OnCancel()
+void CServiceManage::OnCancel() 
 {
-    // TODO: Add extra cleanup here
-
-    CDialog::OnCancel();
+	// TODO: Add extra cleanup here
+	
+	CDialog::OnCancel();
 }
 
-void CServiceManage::OnOK()
+void CServiceManage::OnOK() 
 {
     BOOLEAN rc;
 
-    // TODO: Add extra validation here
+	// TODO: Add extra validation here
     UpdateData(TRUE);
 
-    CComboBox   *cbStartup = (CComboBox *)GetDlgItem(IDC_COMBO_STARTUP);
+	CComboBox   *cbStartup = (CComboBox *)GetDlgItem(IDC_COMBO_STARTUP);
     if (cbStartup) {
         m_nStartmode = cbStartup->GetCurSel();
     } else {
@@ -135,32 +135,32 @@ void CServiceManage::OnOK()
     }
 
     rc = Ext2SetGlobalProperty(
-             m_nStartmode,
-             m_bReadonly,
-             m_bExt3Writable,
-             m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
-             m_sPrefix.GetBuffer(HIDINGPAT_LEN),
-             m_sSuffix.GetBuffer(HIDINGPAT_LEN),
-             m_bAutoMount
-         );
+            m_nStartmode,
+            m_bReadonly,
+            m_bExt3Writable,
+            m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
+            m_sPrefix.GetBuffer(HIDINGPAT_LEN),
+            m_sSuffix.GetBuffer(HIDINGPAT_LEN),
+            m_bAutoMount
+            );
 
     if (rc) {
-        /*
-                AfxMessageBox("Ext2 service settings updated successfully !",
-                              MB_OK | MB_ICONINFORMATION);
-        */
-        CDialog::OnOK();
+/*
+        AfxMessageBox("Ext2 service settings updated successfully !",
+                      MB_OK | MB_ICONINFORMATION);
+*/
+      	CDialog::OnOK();
     } else {
         AfxMessageBox("Failed to save the service settings !",
                       MB_OK | MB_ICONWARNING);
     }
 }
 
-BOOL CServiceManage::OnInitDialog()
+BOOL CServiceManage::OnInitDialog() 
 {
-    CDialog::OnInitDialog();
+	CDialog::OnInitDialog();
 
-    CComboBox   *cbStartup = (CComboBox *)GetDlgItem(IDC_COMBO_STARTUP);
+	CComboBox   *cbStartup = (CComboBox *)GetDlgItem(IDC_COMBO_STARTUP);
     if (cbStartup) {
         cbStartup->ResetContent();
         cbStartup->AddString(_T("SERVICE_BOOT_START"));
@@ -196,22 +196,22 @@ BOOL CServiceManage::OnInitDialog()
 
     SET_WIN(IDC_EXT3_WRITABLE, !m_bReadonly);
     SET_WIN(IDC_START_SERVICE, !m_bStarted);
-
+	
     UpdateData(FALSE);
 
-    return TRUE;  // return TRUE unless you set the focus to a control
-    // EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;  // return TRUE unless you set the focus to a control
+	              // EXCEPTION: OCX Property Pages should return FALSE
 }
 
-void CServiceManage::OnStartService()
+void CServiceManage::OnStartService() 
 {
-    // TODO: Add your control notification handler code here
+	// TODO: Add your control notification handler code here
 
-    m_bStarted = Ext2StartService();
+    m_bStarted = Ext2StartExt2Fsd();
 
     if (m_bStarted) {
         m_srvStatus = _T("Ext2Fsd was just started.");
-        GetParent()->SendMessage(WM_COMMAND, ID_REFRESH, 0);
+        GetParent()->SetTimer('REFR', 1000, NULL);
     } else {
         m_srvStatus = _T("Ext2Fsd could NOT be started.");
     }

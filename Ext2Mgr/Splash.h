@@ -20,7 +20,7 @@ public:
     //  Desc   Default constructor
     //  =======================================================================
     CSplash();
-
+    
     //  =======================================================================
     //  Func   CSplash
     //  Desc   Constructor
@@ -38,22 +38,22 @@ public:
     //  =======================================================================
     //  Func   ShowSplash
     //  Desc   Launches the non-modal splash screen
-    //  Ret    void
+    //  Ret    void 
     //  =======================================================================
     void ShowSplash();
 
     //  =======================================================================
     //  Func   DoLoop
-    //  Desc   Launched the splash screen as a modal window. Not completely
+    //  Desc   Launched the splash screen as a modal window. Not completely 
     //         implemented.
-    //  Ret    int
+    //  Ret    int 
     //  =======================================================================
     int DoLoop();
 
     //  =======================================================================
     //  Func   CloseSplash
     //  Desc   Closes the splash screen started with ShowSplash
-    //  Ret    int
+    //  Ret    int 
     //  =======================================================================
     int CloseSplash();
 
@@ -71,7 +71,7 @@ public:
     //  Func   SetTransparentColor
     //  Desc   This is used to make one of the color transparent
     //  Ret    1 if succesfull
-    //  Arg    The colors RGB value. Not required if the color is specified
+    //  Arg    The colors RGB value. Not required if the color is specified 
     //         using the constructor
     //  =======================================================================
     bool SetTransparentColor(COLORREF col);
