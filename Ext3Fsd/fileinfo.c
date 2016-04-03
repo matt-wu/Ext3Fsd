@@ -554,13 +554,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             VcbMainResourceAcquired = TRUE;
         }
 
-        if (IsVcbReadOnly(Vcb)) {
-            if (FileInformationClass != FilePositionInformation) {
-                Status = STATUS_MEDIA_WRITE_PROTECTED;
-                __leave;
-            }
-        }
-
         if (FlagOn(Vcb->Flags, VCB_VOLUME_LOCKED)) {
             Status = STATUS_ACCESS_DENIED;
             __leave;
@@ -594,6 +587,17 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
         } else {
             Mcb = Fcb->Mcb;
+        }
+
+        if (FileInformationClass != FilePositionInformation) {
+            if (IsVcbReadOnly(Vcb)) {
+                Status = STATUS_MEDIA_WRITE_PROTECTED;
+                __leave;
+            }
+            if (!Ext2CheckFileAccess(Vcb, Mcb, Ext2FileCanWrite)) {
+                Status = STATUS_ACCESS_DENIED;
+                __leave;
+            }
         }
 
         if ( !IsDirectory(Fcb) && !FlagOn(Fcb->Flags, FCB_PAGE_FILE) &&

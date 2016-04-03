@@ -1980,7 +1980,7 @@ errorout:
 VOID
 Ext2ParseRegistryVolumeParams(
     IN  PUNICODE_STRING         Params,
-    OUT PEXT2_VOLUME_PROPERTY2  Property
+    OUT PEXT2_VOLUME_PROPERTY3  Property
 )
 {
     WCHAR       Codepage[CODEPAGE_MAXLEN];
@@ -1988,11 +1988,15 @@ Ext2ParseRegistryVolumeParams(
     WCHAR       Suffix[HIDINGPAT_LEN];
     USHORT      MountPoint[4];
     UCHAR       DrvLetter[4];
+    WCHAR       wUID[8], wGID[8], wEUID[8], wEGID[8];
+    CHAR        sUID[8], sGID[8], sEUID[8], sEGID[8];
 
     BOOLEAN     bWriteSupport = FALSE,
                 bCheckBitmap = FALSE,
                 bCodeName = FALSE,
                 bMountPoint = FALSE;
+    BOOLEAN     bUID = 0, bGID = 0, bEUID = 0, bEGID = 0;
+
     struct {
         PWCHAR   Name;      /* parameters name */
         PBOOLEAN bExist;    /* is it contained in params */
@@ -2018,6 +2022,11 @@ Ext2ParseRegistryVolumeParams(
         {MOUNT_POINT, &bMountPoint, 4,
          &MountPoint[0], &DrvLetter[0]},
 
+        {UID,  &bUID,  8, &wUID[0],  &sUID[0],},
+        {GID,  &bGID,  8, &wGID[0],  &sGID[0]},
+        {EUID, &bEUID, 8, &wEUID[0], &sEUID[0]},
+        {EGID, &bEGID, 8, &wEGID[0], &sEGID[0]},
+
         /* end */
         {NULL, NULL, 0, NULL}
     };
@@ -2030,9 +2039,9 @@ Ext2ParseRegistryVolumeParams(
     RtlZeroMemory(MountPoint, sizeof(USHORT) * 4);
     RtlZeroMemory(DrvLetter, sizeof(CHAR) * 4);
 
-    RtlZeroMemory(Property, sizeof(EXT2_VOLUME_PROPERTY2));
+    RtlZeroMemory(Property, sizeof(EXT2_VOLUME_PROPERTY3));
     Property->Magic = EXT2_VOLUME_PROPERTY_MAGIC;
-    Property->Command = APP_CMD_SET_PROPERTY2;
+    Property->Command = APP_CMD_SET_PROPERTY3;
 
     for (i=0; ParamPattern[i].Name != NULL; i++) {
 
@@ -2088,6 +2097,22 @@ Ext2ParseRegistryVolumeParams(
         Property->DrvLetter = DrvLetter[0];
         Property->DrvLetter |= 0x80;
     }
+
+    if (bUID && bGID) {
+        SetFlag(Property->Flags2, EXT2_VPROP3_USERIDS);
+        sUID[7] = sGID[7] = sEUID[7] = sEGID[7] = 0;
+        Property->uid = (USHORT)atoi(sUID);
+        Property->gid = (USHORT)atoi(sGID);
+        if (bEUID) {
+            Property->euid = (USHORT)atoi(sEUID);
+            Property->egid = (USHORT)atoi(sEGID);
+            Property->EIDS = TRUE;
+        } else {
+            Property->EIDS = FALSE;
+        }
+    } else {
+        ClearFlag(Property->Flags2, EXT2_VPROP3_USERIDS);
+    }
 }
 
 NTSTATUS
@@ -2100,7 +2125,7 @@ Ext2PerformRegistryVolumeParams(IN PEXT2_VCB Vcb)
     if (NT_SUCCESS(Status)) {
 
         /* set Vcb settings from registery */
-        EXT2_VOLUME_PROPERTY2  Property;
+        EXT2_VOLUME_PROPERTY3  Property;
         Ext2ParseRegistryVolumeParams(&VolumeParams, &Property);
         Ext2ProcessVolumeProperty(Vcb, &Property, sizeof(Property));
 

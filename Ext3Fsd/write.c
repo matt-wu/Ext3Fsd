@@ -934,6 +934,11 @@ Ext2WriteFile(IN PEXT2_IRP_CONTEXT IrpContext)
 
         } else {
 
+            if (!Ext2CheckFileAccess(Vcb, Fcb->Mcb, Ext2FileCanWrite)) {
+                Status = STATUS_ACCESS_DENIED;
+                __leave;
+            }
+
             if (IsDirectory(Fcb)) {
                 __leave;
             }

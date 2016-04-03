@@ -41,7 +41,7 @@
 
 /* STRUCTS & CONSTS******************************************************/
 
-#define EXT2FSD_VERSION                 "0.63"
+#define EXT2FSD_VERSION                 "0.64"
 
 
 /* WDK DEFINITIONS ******************************************************/
@@ -124,6 +124,10 @@ typedef struct ext3_dir_entry_2 EXT2_DIR_ENTRY2, *PEXT2_DIR_ENTRY2;
 #define HIDING_SUFFIX       L"HidingSuffix"
 #define AUTO_MOUNT          L"AutoMount"
 #define MOUNT_POINT         L"MountPoint"
+#define UID                 L"uid"
+#define GID                 L"gid"
+#define EUID                L"euid"
+#define EGID                L"egid"
 
 #define DOS_DEVICE_NAME L"\\DosDevices\\Ext2Fsd"
 
@@ -1424,21 +1428,21 @@ Ext2FreePool(
 NTSTATUS
 Ext2ProcessGlobalProperty(
     IN  PDEVICE_OBJECT  DeviceObject,
-    IN  PEXT2_VOLUME_PROPERTY2 Property,
+    IN  PEXT2_VOLUME_PROPERTY3 Property,
     IN  ULONG Length
 );
 
 NTSTATUS
 Ext2ProcessVolumeProperty(
     IN  PEXT2_VCB              Vcb,
-    IN  PEXT2_VOLUME_PROPERTY2 Property,
+    IN  PEXT2_VOLUME_PROPERTY3 Property,
     IN  ULONG Length
 );
 
 NTSTATUS
 Ext2ProcessUserProperty(
     IN PEXT2_IRP_CONTEXT        IrpContext,
-    IN PEXT2_VOLUME_PROPERTY2   Property,
+    IN PEXT2_VOLUME_PROPERTY3   Property,
     IN ULONG                    Length
 );
 
