@@ -113,6 +113,9 @@ Ext2RegistryQueryCallback(
     ULONG  i = 0;
     BYTE   *s, *t;
 
+    if (NULL == ValueName || NULL == ValueData)
+        return STATUS_SUCCESS;
+
     if (ValueType == REG_DWORD && wcslen(ValueName) == wcslen(WRITING_SUPPORT) &&
         _wcsnicmp(ValueName, WRITING_SUPPORT, wcslen(WRITING_SUPPORT)) == 0) {
 
@@ -195,7 +198,7 @@ Ext2QueryGlobalParameters(IN PUNICODE_STRING RegistryPath)
      */
     QueryTable[i].Flags = 0;
     QueryTable[0].Name = WRITING_SUPPORT;
-    QueryTable[i].DefaultType = REG_DWORD;
+    QueryTable[i].DefaultType = REG_NONE;
     QueryTable[i].DefaultLength = 0;
     QueryTable[i].DefaultData = NULL;
     QueryTable[i].EntryContext = NULL;
@@ -207,7 +210,7 @@ Ext2QueryGlobalParameters(IN PUNICODE_STRING RegistryPath)
      */
     QueryTable[i].Flags = 0;
     QueryTable[i].Name = CHECKING_BITMAP;
-    QueryTable[i].DefaultType = REG_DWORD;
+    QueryTable[i].DefaultType = REG_NONE;
     QueryTable[i].DefaultLength = 0;
     QueryTable[i].DefaultData = NULL;
     QueryTable[i].EntryContext = NULL;
@@ -219,7 +222,7 @@ Ext2QueryGlobalParameters(IN PUNICODE_STRING RegistryPath)
      */
     QueryTable[i].Flags = 0;
     QueryTable[i].Name = EXT3_FORCEWRITING;
-    QueryTable[i].DefaultType = REG_DWORD;
+    QueryTable[i].DefaultType = REG_NONE;
     QueryTable[i].DefaultLength = 0;
     QueryTable[i].DefaultData = NULL;
     QueryTable[i].EntryContext = NULL;
@@ -231,7 +234,7 @@ Ext2QueryGlobalParameters(IN PUNICODE_STRING RegistryPath)
      */
     QueryTable[i].Flags = 0;
     QueryTable[i].Name = AUTO_MOUNT;
-    QueryTable[i].DefaultType = REG_DWORD;
+    QueryTable[i].DefaultType = REG_NONE;
     QueryTable[i].DefaultLength = 0;
     QueryTable[i].DefaultData = NULL;
     QueryTable[i].EntryContext = NULL;
@@ -243,7 +246,7 @@ Ext2QueryGlobalParameters(IN PUNICODE_STRING RegistryPath)
      */
     QueryTable[i].Flags = 0;
     QueryTable[i].Name = CODEPAGE_NAME;
-    QueryTable[i].DefaultType = REG_SZ;
+    QueryTable[i].DefaultType = REG_NONE;
     QueryTable[i].DefaultLength = 0;
     QueryTable[i].DefaultData = NULL;
     QueryTable[i].EntryContext = NULL;
@@ -255,7 +258,7 @@ Ext2QueryGlobalParameters(IN PUNICODE_STRING RegistryPath)
      */
     QueryTable[i].Flags = 0;
     QueryTable[i].Name = HIDING_PREFIX;
-    QueryTable[i].DefaultType = REG_SZ;
+    QueryTable[i].DefaultType = REG_NONE;
     QueryTable[i].DefaultLength = 0;
     QueryTable[i].DefaultData = NULL;
     QueryTable[i].EntryContext = NULL;
@@ -268,7 +271,7 @@ Ext2QueryGlobalParameters(IN PUNICODE_STRING RegistryPath)
      */
     QueryTable[i].Flags = 0;
     QueryTable[i].Name = HIDING_SUFFIX;
-    QueryTable[i].DefaultType = REG_SZ;
+    QueryTable[i].DefaultType = REG_NONE;
     QueryTable[i].DefaultLength = 0;
     QueryTable[i].DefaultData = NULL;
     QueryTable[i].EntryContext = NULL;
