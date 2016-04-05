@@ -734,7 +734,8 @@ char *BusTypeString(STORAGE_BUS_TYPE BusType);
 
 BOOLEAN IsWindows2000();
 BOOLEAN IsVistaOrAbove();
-BOOLEAN IsWin10TH2OrAbove();
+
+BOOLEAN CanDoLocalMount();
 
 #define EXT2_DESIRED_ACCESS (GENERIC_READ)
 

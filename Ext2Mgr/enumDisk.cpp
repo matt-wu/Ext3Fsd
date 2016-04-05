@@ -409,10 +409,9 @@ BOOLEAN IsVistaOrAbove()
     return FALSE;
 }
 
-BOOLEAN IsWin10TH2OrAbove()
+BOOLEAN CanDoLocalMount()
 {
-    return TRUE;
-    // return IsWindows10OrGreater();
+    return !IsWindowsVistaOrGreater();
 }
 
 BOOLEAN
@@ -729,7 +728,6 @@ Ext2IsDeviceValid(CHAR *Device)
 {
     HANDLE  handle = NULL;
     NT::NTSTATUS status;
-    NT::IO_STATUS_BLOCK iosb;
 
     status = Ext2Open(Device, &handle, EXT2_DESIRED_ACCESS);
     if (!NT_SUCCESS(status)) {
@@ -1047,7 +1045,6 @@ PEXT2_LETTER Ext2GetFirstUnusedDrvLetter()
 {
     PEXT2_LETTER    drvLetter = NULL;
     CHAR            devPath[] = "C:";
-    UINT            drvType;
     int             i;
 
     for (i = 5; i < 24; i++) {
