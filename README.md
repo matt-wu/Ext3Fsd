@@ -13,6 +13,15 @@ Development Website
     http://www.ext2fsd.com
 
 
+Active Developers
+-----------------
+
+    Matt Wu : http://github.com/matt-wu
+              http://blog.dynox.cn
+
+    KaHo Ng : http://github.com/ngkaho1234
+
+
 Supported Features by Ext3Fsd
 -----------------------------
 
