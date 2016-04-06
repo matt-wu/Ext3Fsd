@@ -49,7 +49,7 @@ END_MESSAGE_MAP()
 
 BOOL CPerfStatDlg::OnInitDialog() 
 {
-    DWORD   dwStyle = 0;
+    LONG_PTR dwStyle = 0;
     int     i;
     CString s;
 
@@ -64,10 +64,10 @@ BOOL CPerfStatDlg::OnInitDialog()
     }
 
     /* initialize the memory list */
-    dwStyle=GetWindowLong(m_MemList->GetSafeHwnd(), GWL_STYLE);
+    dwStyle=GetWindowLongPtr(m_MemList->GetSafeHwnd(), GWL_STYLE);
 	dwStyle&=~LVS_TYPEMASK;
 	dwStyle|= (LVS_REPORT | LVS_AUTOARRANGE);
-	SetWindowLong(m_MemList->GetSafeHwnd(),GWL_STYLE,dwStyle);
+	SetWindowLongPtr(m_MemList->GetSafeHwnd(),GWL_STYLE,dwStyle);
 	m_MemList->SetExtendedStyle(LVS_EX_GRIDLINES);
     ListView_SetExtendedListViewStyleEx ( 
         m_MemList->GetSafeHwnd(), 
@@ -94,10 +94,10 @@ BOOL CPerfStatDlg::OnInitDialog()
     } 
 
     /* initialize the irp list */
-    dwStyle=GetWindowLong(m_IrpList->GetSafeHwnd(), GWL_STYLE);
+    dwStyle=GetWindowLongPtr(m_IrpList->GetSafeHwnd(), GWL_STYLE);
 	dwStyle&=~LVS_TYPEMASK;
 	dwStyle|= (LVS_REPORT | LVS_AUTOARRANGE);
-	SetWindowLong(m_IrpList->GetSafeHwnd(),GWL_STYLE,dwStyle);
+	SetWindowLongPtr(m_IrpList->GetSafeHwnd(),GWL_STYLE,dwStyle);
 	m_IrpList->SetExtendedStyle(LVS_EX_GRIDLINES);
     ListView_SetExtendedListViewStyleEx ( 
         m_IrpList->GetSafeHwnd(), 

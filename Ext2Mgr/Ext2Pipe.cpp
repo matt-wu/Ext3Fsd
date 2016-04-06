@@ -1,8 +1,8 @@
 
 #include "stdafx.h"
 #include <dbt.h>
-#include <tlhelp32.h>
 #include <tchar.h>
+#include < tlhelp32.h>
 #include "..\Ext2Srv\Ext2Pipe.h"
 
 
@@ -203,7 +203,7 @@ BOOL Ext2DefineDosDevicePipe(DWORD flags,  CHAR *dos,  CHAR *symlink)
         p->cmd = CMD_REMOVE_DRV;
         q = (PREQ_REMOVE_DRV)&p->data[0];
         q->pid = GetCurrentProcessId();
-        q->drive = toupper(dos[0]);
+        q->drive = (UCHAR)toupper(dos[0]);
         q->flags = flags;
         strcpy(&q->name[0], symlink);
         p->len += strlen(symlink) + 1;
@@ -232,7 +232,7 @@ BOOL Ext2DefineDosDevicePipe(DWORD flags,  CHAR *dos,  CHAR *symlink)
         p->cmd = CMD_DEFINE_DRV;
         q = (PREQ_DEFINE_DRV)&p->data[0];
         q->pid = GetCurrentProcessId();
-        q->drive = toupper(dos[0]);
+        q->drive = (UCHAR)toupper(dos[0]);
         q->flags = flags;
         strcpy(&q->name[0], symlink);
         p->len += strlen(symlink) + 1;
@@ -263,9 +263,9 @@ errorout:
 BOOL Ext2DefineDosDeviceLocal(DWORD flags,  CHAR *dos,  CHAR *symlink)
 {
     CHAR dosPath[] = "A:\0";
-    BOOLEAN rc;
+    BOOL rc;
 
-    dosPath[0] = toupper(dos[0]);
+    dosPath[0] = (CHAR)toupper(dos[0]);
     rc = DefineDosDevice(flags, dosPath, symlink);
     if (rc) {
         if (flags & DDD_REMOVE_DEFINITION) {
@@ -305,7 +305,7 @@ DWORD Ext2QueryDrivePipe(CHAR drive, CHAR *symlink)
     p->len = sizeof(PIPE_REQ) + sizeof(REQ_QUERY_DRV);
     p->cmd = CMD_QUERY_DRV;
     q = (PREQ_QUERY_DRV)&p->data[0];
-    q->drive = toupper(drive);
+    q->drive = (UCHAR)toupper(drive);
     rc = Ext2PipeControl(&p, &len);
     if ( !rc) {
         printf("pipe communication failed.\n");
@@ -823,10 +823,10 @@ errorout:
     return rc;
 }
 
-BOOLEAN Ext2StartPipeSrv()
+BOOL Ext2StartPipeSrv()
 {
     HMODULE hAdvapi32;
-    BOOLEAN rc = FALSE;
+    BOOL rc = FALSE;
 
     if (CanDoLocalMount()) {
         return TRUE;

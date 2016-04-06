@@ -98,7 +98,7 @@ void CServiceManage::OnCancel()
 
 void CServiceManage::OnOK() 
 {
-    BOOLEAN rc;
+    BOOL rc;
 
 	// TODO: Add extra validation here
     UpdateData(TRUE);
@@ -136,12 +136,12 @@ void CServiceManage::OnOK()
 
     rc = Ext2SetGlobalProperty(
             m_nStartmode,
-            m_bReadonly,
-            m_bExt3Writable,
+            (BOOLEAN)m_bReadonly,
+            (BOOLEAN)m_bExt3Writable,
             m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
             m_sPrefix.GetBuffer(HIDINGPAT_LEN),
             m_sSuffix.GetBuffer(HIDINGPAT_LEN),
-            m_bAutoMount
+            (BOOLEAN)m_bAutoMount
             );
 
     if (rc) {
@@ -179,7 +179,7 @@ BOOL CServiceManage::OnInitDialog()
             cbCodepage->AddString(gCodepages[i]);
             if (!m_Codepage.IsEmpty()) {
                 CHAR *buffer = m_Codepage.GetBuffer(CODEPAGE_MAXLEN);
-                if (stricmp(buffer, gCodepages[i]) == 0) {
+                if (_stricmp(buffer, gCodepages[i]) == 0) {
                     j = i;
                 }
             }

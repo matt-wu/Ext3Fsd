@@ -33,16 +33,16 @@ public:
     PEXT2_VOLUME    m_Volume;
     PEXT2_PARTITION m_Part;
     CString         m_Letter;
-    BOOLEAN         m_bUpdated;
-    BOOLEAN         m_bMgrNoted;
+    BOOL         m_bUpdated;
+    BOOL         m_bMgrNoted;
 
     CWnd *          m_MainDlg;
 
-BOOLEAN
+BOOL
 RemoveMountPoint(CHAR drvChar);
 
-BOOLEAN
-AddMountPoint(CHAR drvChar, BOOLEAN bRegistry, BOOLEAN bMountMgr);
+BOOL
+AddMountPoint(CHAR drvChar, BOOL bRegistry, BOOL bMountMgr);
 
 // Overrides
 	// ClassWizard generated virtual function overrides

@@ -189,7 +189,7 @@ int CSplash::DoLoop()
         DispatchMessage  (&msg) ;
     }
 
-    return msg.wParam ;
+    return (int)msg.wParam ;
 
 }
 
@@ -276,7 +276,7 @@ bool CSplash::MakeTransparent()
     if(m_hwnd && g_pSetLayeredWindowAttributes && m_colTrans )
     {
         //  set layered style for the window
-        SetWindowLong(m_hwnd, GWL_EXSTYLE, GetWindowLong(m_hwnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+        SetWindowLongPtr(m_hwnd, GWL_EXSTYLE, GetWindowLongPtr(m_hwnd, GWL_EXSTYLE) | WS_EX_LAYERED);
         //  call it with 0 alpha for the given color
         g_pSetLayeredWindowAttributes(m_hwnd, m_colTrans, 0, LWA_COLORKEY);
     }    

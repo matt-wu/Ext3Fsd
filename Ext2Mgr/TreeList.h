@@ -20,11 +20,11 @@ public:
 public:
 
     /* Focus set or lost */
-    BOOLEAN     m_bFocus;
+    BOOL     m_bFocus;
 
     /* single item selection */
     CRect       m_SelectionRect;
-    BOOLEAN     m_SelectionFlag;
+    BOOL     m_SelectionFlag;
     CPoint      m_Point;
 	int		    m_Rows;
 	int         m_Columns;

@@ -123,7 +123,7 @@ void CMyHyperLink::PreSubclassWindow()
 
 	//Enable the Static to send the Window Messages To its parent
 	DWORD dwStyle = GetStyle();
-	SetWindowLong(GetSafeHwnd() ,GWL_STYLE ,dwStyle | SS_NOTIFY);
+	SetWindowLongPtr(GetSafeHwnd() ,GWL_STYLE ,dwStyle | SS_NOTIFY);
 
 	char szCurretText[MAX_PATH];
 	GetWindowText(szCurretText, MAX_PATH);

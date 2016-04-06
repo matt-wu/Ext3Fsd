@@ -364,13 +364,13 @@ DEFINE_GUID(GUID_CLASS_USB_DEVICE, 0xA5DCBF10L, 0x6530, 0x11D2, 0x90, 0x1F, 0x00
 
 BOOL CExt2MgrDlg::OnInitDialog()
 {
-    CString str;
-    DWORD   dwStyle = 0;
+    CString    str;
+    LONG_PTR   dwStyle = 0;
 
 	CDialog::OnInitDialog();
 
     /* set windows identifier */
-    SetWindowLong(this->GetSafeHwnd(), DWL_USER, EXT2_DIALOG_MAGIC);
+    SetWindowLongPtr(this->GetSafeHwnd(), DWLP_USER, EXT2_DIALOG_MAGIC);
 
 	/* minimize the dialog during startup */
     if (m_bHide) {
@@ -403,10 +403,10 @@ BOOL CExt2MgrDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);        // Set small icon
 	
     /* initialize the disk view */
-    dwStyle=GetWindowLong(m_DiskView.GetSafeHwnd(),GWL_STYLE);
+    dwStyle=GetWindowLongPtr(m_DiskView.GetSafeHwnd(),GWL_STYLE);
 	dwStyle&=~LVS_TYPEMASK;
 	dwStyle|=(LVS_REPORT | LVS_OWNERDRAWFIXED);
-	SetWindowLong(m_DiskView.GetSafeHwnd(),GWL_STYLE,dwStyle);
+	SetWindowLongPtr(m_DiskView.GetSafeHwnd(),GWL_STYLE,dwStyle);
 
     m_DiskView.InsertColumn(0, (LPCSTR)"", LVCFMT_CENTER, 80);
     str.LoadString(IDS_LISTITEM_TYPE);
@@ -428,10 +428,10 @@ BOOL CExt2MgrDlg::OnInitDialog()
     m_DiskView.InsertColumn(6, (LPCSTR)str, LVCFMT_LEFT, 120);
 
     /* initialize volume list */
-    dwStyle=GetWindowLong(m_VolumeList.GetSafeHwnd(),GWL_STYLE);
+    dwStyle=GetWindowLongPtr(m_VolumeList.GetSafeHwnd(),GWL_STYLE);
 	dwStyle&=~LVS_TYPEMASK;
 	dwStyle|= (LVS_REPORT | LVS_AUTOARRANGE);
-	SetWindowLong(m_VolumeList.GetSafeHwnd(),GWL_STYLE,dwStyle);
+	SetWindowLongPtr(m_VolumeList.GetSafeHwnd(),GWL_STYLE,dwStyle);
 	m_VolumeList.SetExtendedStyle(LVS_EX_GRIDLINES);
 
     m_VolumeList.InsertColumn(0, NULL, LVCFMT_CENTER, 20);
@@ -551,12 +551,12 @@ BOOL CExt2MgrDlg::OnInitDialog()
     /* query global parameters */
     Ext2QueryGlobalProperty(
             &m_nStartmode,
-            (BOOLEAN *)&m_bReadonly,
-            (BOOLEAN *)&m_bExt3Writable,
+            (BOOL *)&m_bReadonly,
+            (BOOL *)&m_bExt3Writable,
             (CHAR *)m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
             (CHAR *)m_sPrefix.GetBuffer(HIDINGPAT_LEN),
             (CHAR *)m_sSuffix.GetBuffer(HIDINGPAT_LEN),
-            (BOOLEAN *)&m_bAutoMount
+            (BOOL *)&m_bAutoMount
             );
     g_bAutoMount = m_bAutoMount;
     m_Codepage.ReleaseBuffer(-1);
@@ -832,12 +832,12 @@ void CExt2MgrDlg::OnService()
     /* query global parameters */
     Ext2QueryGlobalProperty(
             &m_nStartmode,
-            (BOOLEAN *)&m_bReadonly,
-            (BOOLEAN *)&m_bExt3Writable,
+            (BOOL *)&m_bReadonly,
+            (BOOL *)&m_bExt3Writable,
             (CHAR *)m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
             (CHAR *)m_sPrefix.GetBuffer(HIDINGPAT_LEN),
             (CHAR *)m_sSuffix.GetBuffer(HIDINGPAT_LEN),
-            (BOOLEAN *)&m_bAutoMount
+            (BOOL *)&m_bAutoMount
             );
     g_bAutoMount = m_bAutoMount;
     m_Codepage.ReleaseBuffer(-1);
@@ -855,12 +855,12 @@ void CExt2MgrDlg::OnService()
         /* query global parameters */
         Ext2QueryGlobalProperty(
                 &m_nStartmode,
-                (BOOLEAN *)&m_bReadonly,
-                (BOOLEAN *)&m_bExt3Writable,
+                (BOOL *)&m_bReadonly,
+                (BOOL *)&m_bExt3Writable,
                 (CHAR *)m_Codepage.GetBuffer(CODEPAGE_MAXLEN),
                 (CHAR *)m_sPrefix.GetBuffer(HIDINGPAT_LEN),
                 (CHAR *)m_sSuffix.GetBuffer(HIDINGPAT_LEN),
-                (BOOLEAN *)&m_bAutoMount
+                (BOOL *)&m_bAutoMount
                 );
         g_bAutoMount = m_bAutoMount;
     }
@@ -986,7 +986,7 @@ void CExt2MgrDlg::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStr
 void CExt2MgrDlg::OnDblclkDiskList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
 	// TODO: Add your control notification handler code here
-    BOOLEAN IsExt2 = FALSE;
+    BOOL IsExt2 = FALSE;
     m_bFocusVolume = FALSE;
     m_bFocusDisk = TRUE;
     m_IndexDisk = m_DiskView.GetSelectionMark();
@@ -1153,7 +1153,7 @@ void CExt2MgrDlg::OnClickDiskList(NMHDR* pNMHDR, LRESULT* pResult)
 void CExt2MgrDlg::OnDblclkVolumeList(NMHDR* pNMHDR, LRESULT* pResult) 
 {
 	// TODO: Add your control notification handler code here
-    BOOLEAN bIsExt2 = FALSE;
+    BOOL bIsExt2 = FALSE;
 
     if (!m_bFsStarted) {
         m_bFsStarted = Ext2IsServiceStarted();
@@ -1314,7 +1314,7 @@ void CExt2MgrDlg::OnProperty()
 VOID
 CExt2MgrDlg::DriversChangeNotify(
     ULONG           drvsMask,
-    BOOLEAN         bArrival
+    BOOL         bArrival
     )
 {
     for (ULONG i=0; i < 26; i++) {
@@ -1330,7 +1330,7 @@ CExt2MgrDlg::DriversChangeNotify(
 VOID
 CExt2MgrDlg::DriverLetterChangeNotify(
     CHAR            cLetter,
-    BOOLEAN         bArrival
+    BOOL         bArrival
     )
 {
     PEXT2_LETTER drvLetter = NULL;
@@ -1349,7 +1349,7 @@ CExt2MgrDlg::DriverLetterChangeNotify(
 VOID
 CExt2MgrDlg::DriverChangeNotify(
     PEXT2_LETTER    drvLetter,
-    BOOLEAN         bArrival
+    BOOL         bArrival
     )
 {
     ULONGLONG LetterMask = 0;
@@ -1419,7 +1419,7 @@ CExt2MgrDlg::DriverChangeNotify(
 
 void CExt2MgrDlg::UpdateVolume(PEXT2_VOLUME volume) 
 {
-    for (int i=0; i < m_VolumeList.GetItemCount(); i++) {
+    for (int i = 0; i < m_VolumeList.GetItemCount(); i++) {
         PULONG data = (PULONG)m_VolumeList.GetItemData(i);
         if (!data) {
             continue;
@@ -1430,7 +1430,7 @@ void CExt2MgrDlg::UpdateVolume(PEXT2_VOLUME volume)
         }
     }
 
-   for (i=0; i < m_DiskView.GetItemCount(); i++) {
+   for (int i = 0; i < m_DiskView.GetItemCount(); i++) {
         PEXT2_PARTITION part;
         part = (PEXT2_PARTITION)m_DiskView.GetItemData(i);
         if (!part) {
@@ -1446,7 +1446,7 @@ void CExt2MgrDlg::UpdateVolume(PEXT2_VOLUME volume)
 
 void CExt2MgrDlg::UpdateCdrom(PEXT2_CDROM cdrom) 
 {
-    for (int i=0; i < m_VolumeList.GetItemCount(); i++) {
+    for (int i = 0; i < m_VolumeList.GetItemCount(); i++) {
         PULONG data = (PULONG)m_VolumeList.GetItemData(i);
         if (!data) {
             continue;
@@ -1457,7 +1457,7 @@ void CExt2MgrDlg::UpdateCdrom(PEXT2_CDROM cdrom)
         }
     }
 
-    for (i=0; i < m_DiskView.GetItemCount(); i++) {
+    for (int i = 0; i < m_DiskView.GetItemCount(); i++) {
         PULONG data = (PULONG)m_DiskView.GetItemData(i);
         if (!data) {
             continue;
@@ -1479,7 +1479,7 @@ void CExt2MgrDlg::UpdatePartition(PEXT2_PARTITION part)
         return;
     }
 
-    for (i=0; i < m_DiskView.GetItemCount(); i++) {
+    for (i = 0; i < m_DiskView.GetItemCount(); i++) {
 
         PULONG data = (PULONG)m_DiskView.GetItemData(i);
         if (!data) {
@@ -1591,7 +1591,7 @@ void CExt2MgrDlg::OnDonate()
 void CExt2MgrDlg::OnCopy() 
 {
     CHAR Data[256];
-    BOOLEAN rc = FALSE;
+    BOOL rc = FALSE;
 
 	// TODO: Add your command handler code here
     if (m_bFocusVolume) {
@@ -1623,7 +1623,7 @@ void CExt2MgrDlg::OnCopy()
 
 void CExt2MgrDlg::OnCopyAll() 
 {
-    BOOLEAN rc = FALSE;
+    BOOL rc = FALSE;
     CString s;
 
     s = Ext2SysInformation();
@@ -1668,7 +1668,7 @@ void CExt2MgrDlg::OnTimer(UINT nIDEvent)
 	CDialog::OnTimer(nIDEvent);
 }
 
-PVOID CExt2MgrDlg::QuerySelectedItem(PBOOLEAN bIsExt2)
+PVOID CExt2MgrDlg::QuerySelectedItem(PBOOL bIsExt2)
 {
     CString str = "Ready";
     PVOID   List = NULL;
@@ -1776,7 +1776,7 @@ PVOID CExt2MgrDlg::QuerySelectedItem(PBOOLEAN bIsExt2)
             m_sdev = (PVOID) Disk;
             pTools->EnableMenuItem(ID_PROPERTY, MF_BYCOMMAND|MF_ENABLED);
         } else if (Disk->Magic == EXT2_PART_MAGIC) {
-            BOOLEAN     bDynamic = FALSE;
+            BOOL     bDynamic = FALSE;
             Part = (PEXT2_PARTITION) Disk;
             Disk = Part->Disk;
             Volume = Part->Volume;

@@ -28,8 +28,8 @@ public:
 	BOOL	m_bAutoMount;
 	//}}AFX_DATA
     ULONG   m_nStartmode;
-    BOOLEAN m_bInited;
-    BOOLEAN m_bStarted;
+    BOOL    m_bInited;
+    BOOL    m_bStarted;
 
 // Overrides
 	// ClassWizard generated virtual function overrides

@@ -19,7 +19,7 @@ class CProperties : public CDialog
 public:
 	CProperties(CWnd* pParent = NULL);   // standard constructor
 
-    BOOLEAN m_bdisk;
+    BOOL m_bdisk;
     ULONG   m_type;
     PVOID   m_sdev;
 

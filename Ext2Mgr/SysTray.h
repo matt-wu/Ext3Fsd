@@ -43,7 +43,7 @@ public:
     BOOL Visible() { return !m_bHidden; }
 
     //Create the tray icon
-    Create(CWnd* pWnd, UINT uCallbackMessage, LPCTSTR szTip, HICON icon, UINT uID);
+    int Create(CWnd* pWnd, UINT uCallbackMessage, LPCTSTR szTip, HICON icon, UINT uID);
 
     //Change or retrieve the Tooltip text
     BOOL    SetTooltipText(LPCTSTR pszTooltipText);

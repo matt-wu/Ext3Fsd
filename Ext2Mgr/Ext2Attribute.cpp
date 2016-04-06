@@ -116,7 +116,7 @@ BOOL CExt2Attribute::OnInitDialog()
 
         m_autoDrv = m_EVP->DrvLetter & 0x7F;
         if (m_autoDrv >= 'a' && m_autoDrv <= 'z')
-            m_autoDrv = toupper(m_autoDrv);
+            m_autoDrv = (CHAR)toupper(m_autoDrv);
         else if (m_autoDrv >= 'A' && m_autoDrv <= 'Z') {
         } else {
             m_autoDrv = 0;
@@ -195,7 +195,7 @@ void CExt2Attribute::OnCancel()
 	CDialog::OnCancel();
 }
 
-BOOLEAN IsStringAllDigits(CString s)
+BOOL IsStringAllDigits(CString s)
 {
     for (int i = 0; i < s.GetLength(); i++) {
         if (!isdigit(s.GetAt(i)))
@@ -212,8 +212,8 @@ void CExt2Attribute::OnOK()
     HANDLE  Handle = NULL;
 	CHAR    DrvLetter = 0;
     CString str;
-    BOOLEAN rc = FALSE;
-    BOOLEAN dc = FALSE;
+    BOOL rc = FALSE;
+    BOOL dc = FALSE;
 
     UpdateData(TRUE);
 
@@ -245,7 +245,7 @@ void CExt2Attribute::OnOK()
     m_EVP->Command = APP_CMD_SET_PROPERTY3;
     m_EVP->Flags = 0;
     m_EVP->Flags2 = 0;
-    m_EVP->bReadonly = m_bReadonly;
+    m_EVP->bReadonly = (BOOLEAN)m_bReadonly;
     memset(m_EVP->Codepage, 0, CODEPAGE_MAXLEN);
     strcpy((CHAR *)m_EVP->Codepage, m_Codepage.GetBuffer(CODEPAGE_MAXLEN));
 
@@ -304,12 +304,12 @@ void CExt2Attribute::OnOK()
         if (IsStringAllDigits(m_sUID) &&
             IsStringAllDigits(m_sGID)) {
             m_EVP->Flags2 |= EXT2_VPROP3_USERIDS;
-            m_EVP->uid = atoi(m_sUID.GetBuffer(8));
-            m_EVP->gid = atoi(m_sGID.GetBuffer(8));
+            m_EVP->uid = (USHORT)atoi(m_sUID.GetBuffer(8));
+            m_EVP->gid = (USHORT)atoi(m_sGID.GetBuffer(8));
             if (!m_sEUID.IsEmpty() &&
                 IsStringAllDigits(m_sEUID)) {
                 m_EVP->EIDS = TRUE;
-                m_EVP->euid = atoi(m_sEUID.GetBuffer(8));
+                m_EVP->euid = (USHORT)atoi(m_sEUID.GetBuffer(8));
             }
         }
     }

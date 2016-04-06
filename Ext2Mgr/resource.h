@@ -5,7 +5,9 @@
 #define MANIFEST_RESOURCE_ID            1
 #define ID_RELOAD_DL                    3
 #define IDM_ABOUTBOX                    0x0010
+#ifndef RT_MANIFEST
 #define RT_MANIFEST                     24
+#endif
 #define IDM_CLOSE_SPLASH                0x0020
 #define IDD_ABOUTBOX                    100
 #define IDS_ABOUTBOX                    101

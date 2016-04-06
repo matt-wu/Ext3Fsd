@@ -1,13 +1,136 @@
-#define WIN32_NO_STATUS
 #include <windows.h>
-#undef  WIN32_NO_STATUS
 
 namespace NT {
     extern "C" {
 
-#pragma warning(disable: 4005)  // macro redefinition
-#include <ntddk.h>
-#pragma warning(default: 4005)
+/* PAGE_SIZE for X86/X64 */
+#define PAGE_SIZE 0x1000
+#define PAGE_SHIFT 12L
+
+/* Definitions for NTDDK STATUS */
+typedef LONG    NTSTATUS;
+typedef ULONG   DEVICE_TYPE;
+
+#define NT_SUCCESS(Status) (((NT::NTSTATUS)(Status)) >= 0)
+
+/* Common status codes */
+
+#define STATUS_SUCCESS                   ((NT::NTSTATUS)0x00000000L)
+#define STATUS_BUFFER_OVERFLOW           ((NT::NTSTATUS)0x80000005L)
+#define STATUS_UNSUCCESSFUL              ((NT::NTSTATUS)0xC0000001L)
+#define STATUS_NO_MEDIA_IN_DEVICE        ((NT::NTSTATUS)0xC0000013L)
+#define STATUS_ACCESS_DENIED             ((NT::NTSTATUS)0xC0000022L)
+#define STATUS_BUFFER_TOO_SMALL          ((NT::NTSTATUS)0xC0000023L)
+#define STATUS_INSUFFICIENT_RESOURCES    ((NT::NTSTATUS)0xC000009AL)
+
+
+typedef struct _IO_STATUS_BLOCK {
+    union {
+        NTSTATUS Status;
+        PVOID Pointer;
+    } DUMMYUNIONNAME;
+
+    ULONG_PTR Information;
+} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
+
+
+/* Definitios of kernel I/O IRPs */
+
+#define IRP_MJ_CREATE                   0x00
+#define IRP_MJ_CREATE_NAMED_PIPE        0x01
+#define IRP_MJ_CLOSE                    0x02
+#define IRP_MJ_READ                     0x03
+#define IRP_MJ_WRITE                    0x04
+#define IRP_MJ_QUERY_INFORMATION        0x05
+#define IRP_MJ_SET_INFORMATION          0x06
+#define IRP_MJ_QUERY_EA                 0x07
+#define IRP_MJ_SET_EA                   0x08
+#define IRP_MJ_FLUSH_BUFFERS            0x09
+#define IRP_MJ_QUERY_VOLUME_INFORMATION 0x0a
+#define IRP_MJ_SET_VOLUME_INFORMATION   0x0b
+#define IRP_MJ_DIRECTORY_CONTROL        0x0c
+#define IRP_MJ_FILE_SYSTEM_CONTROL      0x0d
+#define IRP_MJ_DEVICE_CONTROL           0x0e
+#define IRP_MJ_INTERNAL_DEVICE_CONTROL  0x0f
+#define IRP_MJ_SHUTDOWN                 0x10
+#define IRP_MJ_LOCK_CONTROL             0x11
+#define IRP_MJ_CLEANUP                  0x12
+#define IRP_MJ_CREATE_MAILSLOT          0x13
+#define IRP_MJ_QUERY_SECURITY           0x14
+#define IRP_MJ_SET_SECURITY             0x15
+#define IRP_MJ_POWER                    0x16
+#define IRP_MJ_SYSTEM_CONTROL           0x17
+#define IRP_MJ_DEVICE_CHANGE            0x18
+#define IRP_MJ_QUERY_QUOTA              0x19
+#define IRP_MJ_SET_QUOTA                0x1a
+#define IRP_MJ_PNP                      0x1b
+#define IRP_MJ_PNP_POWER                IRP_MJ_PNP      // Obsolete....
+#define IRP_MJ_MAXIMUM_FUNCTION         0x1b
+
+
+/*
+ * strings
+ */
+
+typedef struct _STRING {
+    __maybevalid USHORT Length;
+    __maybevalid USHORT MaximumLength;
+#ifdef MIDL_PASS
+    [size_is(MaximumLength), length_is(Length) ]
+#endif // MIDL_PASS
+    __field_bcount_part_opt(MaximumLength, Length) PCHAR Buffer;
+} STRING;
+typedef STRING *PSTRING;
+typedef STRING ANSI_STRING;
+typedef PSTRING PANSI_STRING;
+
+typedef STRING OEM_STRING;
+typedef PSTRING POEM_STRING;
+typedef CONST STRING* PCOEM_STRING;
+
+typedef struct _CSTRING {
+    USHORT Length;
+    USHORT MaximumLength;
+    CONST char *Buffer;
+} CSTRING;
+typedef CSTRING *PCSTRING;
+#define ANSI_NULL ((CHAR)0)     // winnt
+
+typedef STRING CANSI_STRING;
+typedef PSTRING PCANSI_STRING;
+
+typedef struct _UNICODE_STRING {
+    USHORT Length;
+    USHORT MaximumLength;
+#ifdef MIDL_PASS
+    [size_is(MaximumLength / 2), length_is((Length) / 2) ] USHORT * Buffer;
+#else // MIDL_PASS
+    __field_bcount_part(MaximumLength, Length) PWCH   Buffer;
+#endif // MIDL_PASS
+} UNICODE_STRING;
+typedef UNICODE_STRING *PUNICODE_STRING;
+typedef const UNICODE_STRING *PCUNICODE_STRING;
+#define UNICODE_NULL ((WCHAR)0) // winnt
+
+typedef enum _FSINFOCLASS {
+    FileFsVolumeInformation       = 1,
+    FileFsLabelInformation,      // 2
+    FileFsSizeInformation,       // 3
+    FileFsDeviceInformation,     // 4
+    FileFsAttributeInformation,  // 5
+    FileFsControlInformation,    // 6
+    FileFsFullSizeInformation,   // 7
+    FileFsObjectIdInformation,   // 8
+    FileFsDriverPathInformation, // 9
+    FileFsVolumeFlagsInformation,// 10
+    FileFsMaximumInformation
+} FS_INFORMATION_CLASS, *PFS_INFORMATION_CLASS;
+
+
+typedef struct _FILE_FS_DEVICE_INFORMATION {
+    DEVICE_TYPE DeviceType;
+    ULONG Characteristics;
+} FILE_FS_DEVICE_INFORMATION, *PFILE_FS_DEVICE_INFORMATION;
 
 typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemBasicInformation,              // 0        Y        N
@@ -210,6 +333,56 @@ typedef enum {
     StateUnknown
 } THREAD_STATE;
 
+typedef struct _CLIENT_ID {
+    HANDLE UniqueProcess;
+    HANDLE UniqueThread;
+} CLIENT_ID;
+typedef CLIENT_ID *PCLIENT_ID;
+
+/* Thread priority */
+typedef LONG KPRIORITY;
+
+typedef enum _KWAIT_REASON {
+    Executive,
+    FreePage,
+    PageIn,
+    PoolAllocation,
+    DelayExecution,
+    Suspended,
+    UserRequest,
+    WrExecutive,
+    WrFreePage,
+    WrPageIn,
+    WrPoolAllocation,
+    WrDelayExecution,
+    WrSuspended,
+    WrUserRequest,
+    WrEventPair,
+    WrQueue,
+    WrLpcReceive,
+    WrLpcReply,
+    WrVirtualMemory,
+    WrPageOut,
+    WrRendezvous,
+    WrKeyedEvent,
+    WrTerminated,
+    WrProcessInSwap,
+    WrCpuRateControl,
+    WrCalloutStack,
+    WrKernel,
+    WrResource,
+    WrPushLock,
+    WrMutex,
+    WrQuantumEnd,
+    WrDispatchInt,
+    WrPreempted,
+    WrYieldExecution,
+    WrFastMutex,
+    WrGuardedMutex,
+    WrRundown,
+    MaximumWaitReason
+} KWAIT_REASON;
+
 typedef struct _SYSTEM_THREADS {
     LARGE_INTEGER KernelTime;
     LARGE_INTEGER UserTime;
@@ -223,6 +396,39 @@ typedef struct _SYSTEM_THREADS {
     THREAD_STATE State;
     KWAIT_REASON WaitReason;
 } SYSTEM_THREADS, *PSYSTEM_THREADS;
+
+typedef struct _VM_COUNTERS {
+    SIZE_T PeakVirtualSize;
+    SIZE_T VirtualSize;
+    ULONG PageFaultCount;
+    SIZE_T PeakWorkingSetSize;
+    SIZE_T WorkingSetSize;
+    SIZE_T QuotaPeakPagedPoolUsage;
+    SIZE_T QuotaPagedPoolUsage;
+    SIZE_T QuotaPeakNonPagedPoolUsage;
+    SIZE_T QuotaNonPagedPoolUsage;
+    SIZE_T PagefileUsage;
+    SIZE_T PeakPagefileUsage;
+} VM_COUNTERS;
+typedef VM_COUNTERS *PVM_COUNTERS;
+
+typedef struct _VM_COUNTERS_EX {
+    SIZE_T PeakVirtualSize;
+    SIZE_T VirtualSize;
+    ULONG PageFaultCount;
+    SIZE_T PeakWorkingSetSize;
+    SIZE_T WorkingSetSize;
+    SIZE_T QuotaPeakPagedPoolUsage;
+    SIZE_T QuotaPagedPoolUsage;
+    SIZE_T QuotaPeakNonPagedPoolUsage;
+    SIZE_T QuotaNonPagedPoolUsage;
+    SIZE_T PagefileUsage;
+    SIZE_T PeakPagefileUsage;
+    SIZE_T PrivateUsage;
+} VM_COUNTERS_EX;
+
+typedef VM_COUNTERS_EX *PVM_COUNTERS_EX;
+#define MAX_HW_COUNTERS 16
 
 typedef struct _SYSTEM_PROCESSES { // Information Class 5
     ULONG NextEntryDelta;
@@ -238,7 +444,7 @@ typedef struct _SYSTEM_PROCESSES { // Information Class 5
     ULONG HandleCount;
     ULONG Reserved2[2];
     VM_COUNTERS VmCounters;
-    IO_COUNTERSEX IoCounters;  // Windows 2000 only
+    IO_COUNTERS IoCounters;
     SYSTEM_THREADS Threads[1];
 } SYSTEM_PROCESSES, *PSYSTEM_PROCESSES;
 
@@ -303,6 +509,34 @@ typedef struct _SYSTEM_HANDLE_INFORMATION { // Information Class 16
     PVOID Object;
     ACCESS_MASK GrantedAccess;
 } SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
+
+//
+// Pool Allocation routines (in pool.c)
+//
+
+typedef enum _POOL_TYPE {
+    NonPagedPool,
+    PagedPool,
+    NonPagedPoolMustSucceed,
+    DontUseThisType,
+    NonPagedPoolCacheAligned,
+    PagedPoolCacheAligned,
+    NonPagedPoolCacheAlignedMustS,
+    MaxPoolType,
+
+    //
+    // Note these per session types are carefully chosen so that the appropriate
+    // masking still applies as well as MaxPoolType above.
+    //
+
+    NonPagedPoolSession = 32,
+    PagedPoolSession = NonPagedPoolSession + 1,
+    NonPagedPoolMustSucceedSession = PagedPoolSession + 1,
+    DontUseThisTypeSession = NonPagedPoolMustSucceedSession + 1,
+    NonPagedPoolCacheAlignedSession = DontUseThisTypeSession + 1,
+    PagedPoolCacheAlignedSession = NonPagedPoolCacheAlignedSession + 1,
+    NonPagedPoolCacheAlignedMustSSession = PagedPoolCacheAlignedSession + 1,
+} POOL_TYPE;
 
 typedef struct _SYSTEM_OBJECT_TYPE_INFORMATION { // Information Class 17
     ULONG NextEntryOffset;
@@ -430,12 +664,12 @@ typedef struct _SYSTEM_UNLOAD_IMAGE { // Information Class 27
 typedef struct _SYSTEM_QUERY_TIME_ADJUSTMENT { // Information Class 28
     ULONG TimeAdjustment;
     ULONG MaximumIncrement;
-    BOOLEAN TimeSynchronization;
+    BOOL TimeSynchronization;
 } SYSTEM_QUERY_TIME_ADJUSTMENT, *PSYSTEM_QUERY_TIME_ADJUSTMENT;
 
 typedef struct _SYSTEM_SET_TIME_ADJUSTMENT { // Information Class 28
     ULONG TimeAdjustment;
-    BOOLEAN TimeSynchronization;
+    BOOL TimeSynchronization;
 } SYSTEM_SET_TIME_ADJUSTMENT, *PSYSTEM_SET_TIME_ADJUSTMENT;
 
 typedef struct _SYSTEM_CRASH_DUMP_INFORMATION { // Information Class 32
@@ -456,8 +690,8 @@ typedef struct _SYSTEM_CRASH_STATE_INFORMATION { // Information Class 34
 } SYSTEM_CRASH_STATE_INFORMATION, *PSYSTEM_CRASH_STATE_INFORMATION;
 
 typedef struct _SYSTEM_KERNEL_DEBUGGER_INFORMATION { // Information Class 35
-    BOOLEAN DebuggerEnabled;
-    BOOLEAN DebuggerNotPresent;
+    BOOL DebuggerEnabled;
+    BOOL DebuggerNotPresent;
 } SYSTEM_KERNEL_DEBUGGER_INFORMATION, *PSYSTEM_KERNEL_DEBUGGER_INFORMATION;
 
 typedef struct _SYSTEM_CONTEXT_SWITCH_INFORMATION { // Information Class 36
@@ -518,7 +752,7 @@ typedef struct _SYSTEM_RANGE_START_INFORMATION { // Information Class 50
 } SYSTEM_RANGE_START_INFORMATION, *PSYSTEM_RANGE_START_INFORMATION;
 
 typedef struct _SYSTEM_POOL_BLOCK {
-    BOOLEAN Allocated;
+    BOOL Allocated;
     USHORT Unknown;
     ULONG Size;
     CHAR Tag[4];
@@ -653,7 +887,7 @@ typedef struct _OBJECT_TYPE_INFORMATION { // Information Class 2
     GENERIC_MAPPING GenericMapping;
     ULONG ValidAccess;
     UCHAR Unknown;
-    BOOLEAN MaintainHandleDatabase;
+    BOOL MaintainHandleDatabase;
     UCHAR Reserved3[2];
     POOL_TYPE PoolType;
     ULONG PagedPoolUsage;
@@ -666,9 +900,142 @@ typedef struct _OBJECT_ALL_TYPES_INFORMATION { // Information Class 3
 } OBJECT_ALL_TYPES_INFORMATION, *POBJECT_ALL_TYPES_INFORMATION;
 
 typedef struct _OBJECT_HANDLE_ATTRIBUTE_INFORMATION { // Information Class 4
-    BOOLEAN Inherit;
-    BOOLEAN ProtectFromClose;
+    BOOL Inherit;
+    BOOL ProtectFromClose;
 } OBJECT_HANDLE_ATTRIBUTE_INFORMATION, *POBJECT_HANDLE_ATTRIBUTE_INFORMATION;
+
+typedef struct _OBJECT_ATTRIBUTES64 {
+    ULONG Length;
+    ULONG64 RootDirectory;
+    ULONG64 ObjectName;
+    ULONG Attributes;
+    ULONG64 SecurityDescriptor;
+    ULONG64 SecurityQualityOfService;
+} OBJECT_ATTRIBUTES64;
+typedef OBJECT_ATTRIBUTES64 *POBJECT_ATTRIBUTES64;
+typedef CONST OBJECT_ATTRIBUTES64 *PCOBJECT_ATTRIBUTES64;
+
+typedef struct _OBJECT_ATTRIBUTES32 {
+    ULONG Length;
+    ULONG RootDirectory;
+    ULONG ObjectName;
+    ULONG Attributes;
+    ULONG SecurityDescriptor;
+    ULONG SecurityQualityOfService;
+} OBJECT_ATTRIBUTES32;
+typedef OBJECT_ATTRIBUTES32 *POBJECT_ATTRIBUTES32;
+typedef CONST OBJECT_ATTRIBUTES32 *PCOBJECT_ATTRIBUTES32;
+
+typedef struct _OBJECT_ATTRIBUTES {
+    ULONG Length;
+    HANDLE RootDirectory;
+    PUNICODE_STRING ObjectName;
+    ULONG Attributes;
+    PVOID SecurityDescriptor;        // Points to type SECURITY_DESCRIPTOR
+    PVOID SecurityQualityOfService;  // Points to type SECURITY_QUALITY_OF_SERVICE
+} OBJECT_ATTRIBUTES;
+typedef OBJECT_ATTRIBUTES *POBJECT_ATTRIBUTES;
+
+
+typedef enum _PROCESSINFOCLASS {
+    ProcessBasicInformation,
+    ProcessQuotaLimits,
+    ProcessIoCounters,
+    ProcessVmCounters,
+    ProcessTimes,
+    ProcessBasePriority,
+    ProcessRaisePriority,
+    ProcessDebugPort,
+    ProcessExceptionPort,
+    ProcessAccessToken,
+    ProcessLdtInformation,
+    ProcessLdtSize,
+    ProcessDefaultHardErrorMode,
+    ProcessIoPortHandlers,          // Note: this is kernel mode only
+    ProcessPooledUsageAndLimits,
+    ProcessWorkingSetWatch,
+    ProcessUserModeIOPL,
+    ProcessEnableAlignmentFaultFixup,
+    ProcessPriorityClass,
+    ProcessWx86Information,
+    ProcessHandleCount,
+    ProcessAffinityMask,
+    ProcessPriorityBoost,
+    ProcessDeviceMap,
+    ProcessSessionInformation,
+    ProcessForegroundInformation,
+    ProcessWow64Information,
+    ProcessImageFileName,
+    ProcessLUIDDeviceMapsEnabled,
+    ProcessBreakOnTermination,
+    ProcessDebugObjectHandle,
+    ProcessDebugFlags,
+    ProcessHandleTracing,
+    ProcessIoPriority,
+    ProcessExecuteFlags,
+    ProcessTlsInformation,
+    ProcessCookie,
+    ProcessImageInformation,
+    ProcessCycleTime,
+    ProcessPagePriority,
+    ProcessInstrumentationCallback,
+    ProcessThreadStackAllocation,
+    ProcessWorkingSetWatchEx,
+    ProcessImageFileNameWin32,
+    ProcessImageFileMapping,
+    ProcessAffinityUpdateMode,
+    ProcessMemoryAllocationMode,
+    ProcessGroupInformation,
+    ProcessTokenVirtualizationEnabled,
+    ProcessConsoleHostProcess,
+    ProcessWindowInformation,
+    MaxProcessInfoClass             // MaxProcessInfoClass should always be the last enum
+} PROCESSINFOCLASS;
+
+//
+// Thread Information Classes
+//
+
+typedef enum _THREADINFOCLASS {
+    ThreadBasicInformation,
+    ThreadTimes,
+    ThreadPriority,
+    ThreadBasePriority,
+    ThreadAffinityMask,
+    ThreadImpersonationToken,
+    ThreadDescriptorTableEntry,
+    ThreadEnableAlignmentFaultFixup,
+    ThreadEventPair_Reusable,
+    ThreadQuerySetWin32StartAddress,
+    ThreadZeroTlsCell,
+    ThreadPerformanceCount,
+    ThreadAmILastThread,
+    ThreadIdealProcessor,
+    ThreadPriorityBoost,
+    ThreadSetTlsArrayAddress,   // Obsolete
+    ThreadIsIoPending,
+    ThreadHideFromDebugger,
+    ThreadBreakOnTermination,
+    ThreadSwitchLegacyState,
+    ThreadIsTerminated,
+    ThreadLastSystemCall,
+    ThreadIoPriority,
+    ThreadCycleTime,
+    ThreadPagePriority,
+    ThreadActualBasePriority,
+    ThreadTebInformation,
+    ThreadCSwitchMon,          // Obsolete
+    ThreadCSwitchPmu,
+    ThreadWow64Context,
+    ThreadGroupInformation,
+    ThreadUmsInformation,      // UMS
+    ThreadCounterProfiling,
+    ThreadIdealProcessorEx,
+    MaxThreadInfoClass
+} THREADINFOCLASS;
+
+#define THREAD_CSWITCH_PMU_DISABLE  FALSE
+#define THREAD_CSWITCH_PMU_ENABLE   TRUE
 
 NTSYSAPI
 NTSTATUS
@@ -742,8 +1109,8 @@ ZwQueryDirectoryObject(
     IN HANDLE DirectoryHandle,
     OUT PVOID Buffer,
     IN ULONG BufferLength,
-    IN BOOLEAN ReturnSingleEntry,
-    IN BOOLEAN RestartScan,
+    IN BOOL ReturnSingleEntry,
+    IN BOOL RestartScan,
     IN OUT PULONG Context,
     OUT PULONG ReturnLength OPTIONAL
     );
@@ -1017,7 +1384,7 @@ typedef struct _SECTION_IMAGE_INFORMATION { // Information Class 1
     ULONG Unknown2;
     ULONG Characteristics;
     USHORT ImageNumber;
-    BOOLEAN Executable;
+    BOOL Executable;
     UCHAR Unknown3;
     ULONG Unknown4[3];
 } SECTION_IMAGE_INFORMATION, *PSECTION_IMAGE_INFORMATION;
@@ -1082,7 +1449,7 @@ ZwCreateThread(
     OUT PCLIENT_ID ClientId,
     IN PCONTEXT ThreadContext,
     IN PUSER_STACK UserStack,
-    IN BOOLEAN CreateSuspended
+    IN BOOL CreateSuspended
     );
 
 NTSYSAPI
@@ -1165,6 +1532,15 @@ ZwSetContextThread(
     IN PCONTEXT Context
     );
 
+typedef
+VOID
+(KNORMAL_ROUTINE) (
+    IN PVOID NormalContext,
+    IN PVOID SystemArgument1,
+    IN PVOID SystemArgument2
+    );
+typedef KNORMAL_ROUTINE *PKNORMAL_ROUTINE;
+
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -1229,7 +1605,7 @@ ZwCreateProcess(
     IN ACCESS_MASK DesiredAccess,
     IN POBJECT_ATTRIBUTES ObjectAttributes,
     IN HANDLE InheritFromProcessHandle,
-    IN BOOLEAN InheritHandles,
+    IN BOOL InheritHandles,
     IN HANDLE SectionHandle OPTIONAL,
     IN HANDLE DebugPort OPTIONAL,
     IN HANDLE ExceptionPort OPTIONAL
@@ -1275,7 +1651,7 @@ ZwSetInformationProcess(
     );
 
 typedef struct _PROCESS_PRIORITY_CLASS { // Information Class 18
-    BOOLEAN Foreground;
+    BOOL Foreground;
     UCHAR PriorityClass;
 } PROCESS_PRIORITY_CLASS, *PPROCESS_PRIORITY_CLASS;
 
@@ -1400,7 +1776,7 @@ PDEBUG_BUFFER
 NTAPI
 RtlCreateQueryDebugBuffer(
     IN ULONG Size,
-    IN BOOLEAN EventPair
+    IN BOOL EventPair
     );
 
 NTSTATUS
@@ -1506,7 +1882,7 @@ NTAPI
 ZwOpenThreadToken(
     IN HANDLE ThreadHandle,
     IN ACCESS_MASK DesiredAccess,
-    IN BOOLEAN OpenAsSelf,
+    IN BOOL OpenAsSelf,
     OUT PHANDLE TokenHandle
     );
 
@@ -1517,7 +1893,7 @@ ZwDuplicateToken(
     IN HANDLE ExistingTokenHandle,
     IN ACCESS_MASK DesiredAccess,
     IN POBJECT_ATTRIBUTES ObjectAttributes,
-    IN BOOLEAN EffectiveOnly,
+    IN BOOL EffectiveOnly,
     IN TOKEN_TYPE TokenType,
     OUT PHANDLE NewTokenHandle
     );
@@ -1539,7 +1915,7 @@ NTSTATUS
 NTAPI
 ZwAdjustPrivilegesToken(
     IN HANDLE TokenHandle,
-    IN BOOLEAN DisableAllPrivileges,
+    IN BOOL DisableAllPrivileges,
     IN PTOKEN_PRIVILEGES NewState,
     IN ULONG BufferLength,
     OUT PTOKEN_PRIVILEGES PreviousState OPTIONAL,
@@ -1551,7 +1927,7 @@ NTSTATUS
 NTAPI
 ZwAdjustGroupsToken(
     IN HANDLE TokenHandle,
-    IN BOOLEAN ResetToDefault,
+    IN BOOL ResetToDefault,
     IN PTOKEN_GROUPS NewState,
     IN ULONG BufferLength,
     OUT PTOKEN_GROUPS PreviousState OPTIONAL,
@@ -1584,7 +1960,7 @@ NTSTATUS
 NTAPI
 ZwWaitForSingleObject(
     IN HANDLE Handle,
-    IN BOOLEAN Alertable,
+    IN BOOL Alertable,
     IN PLARGE_INTEGER Timeout OPTIONAL
     );
 
@@ -1594,9 +1970,14 @@ NTAPI
 ZwSignalAndWaitForSingleObject(
     IN HANDLE HandleToSignal,
     IN HANDLE HandleToWait,
-    IN BOOLEAN Alertable,
+    IN BOOL Alertable,
     IN PLARGE_INTEGER Timeout OPTIONAL
     );
+
+typedef enum _WAIT_TYPE {
+    WaitAll,
+    WaitAny
+} WAIT_TYPE;
 
 NTSYSAPI
 NTSTATUS
@@ -1605,7 +1986,7 @@ ZwWaitForMultipleObjects(
     IN ULONG HandleCount,
     IN PHANDLE Handles,
     IN WAIT_TYPE WaitType,
-    IN BOOLEAN Alertable,
+    IN BOOL Alertable,
     IN PLARGE_INTEGER Timeout OPTIONAL
     );
 
@@ -1635,7 +2016,7 @@ NTSTATUS
 NTAPI
 ZwCancelTimer(
     IN HANDLE TimerHandle,
-    OUT PBOOLEAN PreviousState OPTIONAL
+    OUT PBOOL PreviousState OPTIONAL
     );
 
 NTSYSAPI
@@ -1646,9 +2027,9 @@ ZwSetTimer(
     IN PLARGE_INTEGER DueTime,
     IN PTIMER_APC_ROUTINE TimerApcRoutine OPTIONAL,
     IN PVOID TimerContext,
-    IN BOOLEAN Resume,
+    IN BOOL Resume,
     IN LONG Period,
-    OUT PBOOLEAN PreviousState OPTIONAL
+    OUT PBOOL PreviousState OPTIONAL
     );
 
 */
@@ -1670,8 +2051,13 @@ ZwQueryTimer(
 
 typedef struct _TIMER_BASIC_INFORMATION {
     LARGE_INTEGER TimeRemaining;
-    BOOLEAN SignalState;
+    BOOL SignalState;
 } TIMER_BASIC_INFORMATION, *PTIMER_BASIC_INFORMATION;
+
+typedef enum _EVENT_TYPE {
+    NotificationEvent,
+    SynchronizationEvent
+} EVENT_TYPE;
 
 NTSYSAPI
 NTSTATUS
@@ -1681,7 +2067,7 @@ ZwCreateEvent(
     IN ACCESS_MASK DesiredAccess,
     IN POBJECT_ATTRIBUTES ObjectAttributes,
     IN EVENT_TYPE EventType,
-    IN BOOLEAN InitialState
+    IN BOOL InitialState
     );
 
 NTSYSAPI
@@ -1800,7 +2186,7 @@ ZwCreateMutant(
     OUT PHANDLE MutantHandle,
     IN ACCESS_MASK DesiredAccess,
     IN POBJECT_ATTRIBUTES ObjectAttributes,
-    IN BOOLEAN InitialOwner
+    IN BOOL InitialOwner
     );
 
 NTSYSAPI
@@ -1837,8 +2223,8 @@ ZwQueryMutant(
 
 typedef struct _MUTANT_BASIC_INFORMATION {
     LONG SignalState;
-    BOOLEAN Owned;
-    BOOLEAN Abandoned;
+    BOOL Owned;
+    BOOL Abandoned;
 } MUTANT_BASIC_INFORMATION, *PMUTANT_BASIC_INFORMATION;
 
 NTSYSAPI
@@ -1989,7 +2375,7 @@ NTSTATUS
 NTAPI
 ZwSetTimerResolution(
     IN ULONG RequestedResolution,
-    IN BOOLEAN Set,
+    IN BOOL Set,
     OUT PULONG ActualResolution
     );
 
@@ -2006,7 +2392,7 @@ NTSYSAPI
 NTSTATUS
 NTAPI
 ZwDelayExecution(
-    IN BOOLEAN Alertable,
+    IN BOOL Alertable,
     IN PLARGE_INTEGER Interval
     );
 
@@ -2023,6 +2409,34 @@ NTAPI
 ZwGetTickCount(
     VOID
     );
+
+typedef enum _KPROFILE_SOURCE {
+    ProfileTime,
+    ProfileAlignmentFixup,
+    ProfileTotalIssues,
+    ProfilePipelineDry,
+    ProfileLoadInstructions,
+    ProfilePipelineFrozen,
+    ProfileBranchInstructions,
+    ProfileTotalNonissues,
+    ProfileDcacheMisses,
+    ProfileIcacheMisses,
+    ProfileCacheMisses,
+    ProfileBranchMispredictions,
+    ProfileStoreInstructions,
+    ProfileFpInstructions,
+    ProfileIntegerInstructions,
+    Profile2Issue,
+    Profile3Issue,
+    Profile4Issue,
+    ProfileSpecialInstructions,
+    ProfileTotalCycles,
+    ProfileIcacheIssues,
+    ProfileDcacheAccesses,
+    ProfileMemoryBarrierCycles,
+    ProfileLoadLinkedIssues,
+    ProfileMaximum
+} KPROFILE_SOURCE;
 
 NTSYSAPI
 NTSTATUS
@@ -2175,7 +2589,7 @@ ZwAcceptConnectPort(
     OUT PHANDLE PortHandle,
     IN ULONG PortIdentifier,
     IN PPORT_MESSAGE Message,
-    IN BOOLEAN Accept,
+    IN BOOL Accept,
     IN OUT PPORT_SECTION_WRITE WriteSection OPTIONAL,
     IN OUT PPORT_SECTION_READ ReadSection OPTIONAL
     );
@@ -2291,6 +2705,228 @@ ZwImpersonateClientOfPort(
     IN PPORT_MESSAGE Message
     );
 
+#define FILE_ANY_ACCESS                 0
+#define FILE_SPECIAL_ACCESS    (FILE_ANY_ACCESS)
+#define FILE_READ_ACCESS          ( 0x0001 )    // file & pipe
+#define FILE_WRITE_ACCESS         ( 0x0002 )    // file & pipe
+
+
+
+//
+// Define access rights to files and directories
+//
+
+//
+// The FILE_READ_DATA and FILE_WRITE_DATA constants are also defined in
+// devioctl.h as FILE_READ_ACCESS and FILE_WRITE_ACCESS. The values for these
+// constants *MUST* always be in sync.
+// The values are redefined in devioctl.h because they must be available to
+// both DOS and NT.
+//
+
+#define FILE_READ_DATA            ( 0x0001 )    // file & pipe
+#define FILE_LIST_DIRECTORY       ( 0x0001 )    // directory
+
+#define FILE_WRITE_DATA           ( 0x0002 )    // file & pipe
+#define FILE_ADD_FILE             ( 0x0002 )    // directory
+
+#define FILE_APPEND_DATA          ( 0x0004 )    // file
+#define FILE_ADD_SUBDIRECTORY     ( 0x0004 )    // directory
+#define FILE_CREATE_PIPE_INSTANCE ( 0x0004 )    // named pipe
+
+
+#define FILE_READ_EA              ( 0x0008 )    // file & directory
+
+#define FILE_WRITE_EA             ( 0x0010 )    // file & directory
+
+#define FILE_EXECUTE              ( 0x0020 )    // file
+#define FILE_TRAVERSE             ( 0x0020 )    // directory
+
+#define FILE_DELETE_CHILD         ( 0x0040 )    // directory
+
+#define FILE_READ_ATTRIBUTES      ( 0x0080 )    // all
+
+#define FILE_WRITE_ATTRIBUTES     ( 0x0100 )    // all
+
+#define FILE_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0x1FF)
+
+#define FILE_GENERIC_READ         (STANDARD_RIGHTS_READ     |\
+                                   FILE_READ_DATA           |\
+                                   FILE_READ_ATTRIBUTES     |\
+                                   FILE_READ_EA             |\
+                                   SYNCHRONIZE)
+
+
+#define FILE_GENERIC_WRITE        (STANDARD_RIGHTS_WRITE    |\
+                                   FILE_WRITE_DATA          |\
+                                   FILE_WRITE_ATTRIBUTES    |\
+                                   FILE_WRITE_EA            |\
+                                   FILE_APPEND_DATA         |\
+                                   SYNCHRONIZE)
+
+
+#define FILE_GENERIC_EXECUTE      (STANDARD_RIGHTS_EXECUTE  |\
+                                   FILE_READ_ATTRIBUTES     |\
+                                   FILE_EXECUTE             |\
+                                   SYNCHRONIZE)
+
+
+
+
+//
+// Define share access rights to files and directories
+//
+
+#define FILE_SHARE_READ                 0x00000001  
+#define FILE_SHARE_WRITE                0x00000002  
+#define FILE_SHARE_DELETE               0x00000004  
+#define FILE_SHARE_VALID_FLAGS          0x00000007
+
+//
+// Define the file attributes values
+//
+// Note:  0x00000008 is reserved for use for the old DOS VOLID (volume ID)
+//        and is therefore not considered valid in NT.
+//
+// Note:  Note also that the order of these flags is set to allow both the
+//        FAT and the Pinball File Systems to directly set the attributes
+//        flags in attributes words without having to pick each flag out
+//        individually.  The order of these flags should not be changed!
+//
+
+#define FILE_ATTRIBUTE_READONLY             0x00000001  
+#define FILE_ATTRIBUTE_HIDDEN               0x00000002  
+#define FILE_ATTRIBUTE_SYSTEM               0x00000004  
+//OLD DOS VOLID                             0x00000008
+
+#define FILE_ATTRIBUTE_DIRECTORY            0x00000010  
+#define FILE_ATTRIBUTE_ARCHIVE              0x00000020  
+#define FILE_ATTRIBUTE_DEVICE               0x00000040  
+#define FILE_ATTRIBUTE_NORMAL               0x00000080  
+
+#define FILE_ATTRIBUTE_TEMPORARY            0x00000100  
+#define FILE_ATTRIBUTE_SPARSE_FILE          0x00000200  
+#define FILE_ATTRIBUTE_REPARSE_POINT        0x00000400  
+#define FILE_ATTRIBUTE_COMPRESSED           0x00000800  
+
+#define FILE_ATTRIBUTE_OFFLINE              0x00001000  
+#define FILE_ATTRIBUTE_NOT_CONTENT_INDEXED  0x00002000  
+#define FILE_ATTRIBUTE_ENCRYPTED            0x00004000  
+
+#define FILE_ATTRIBUTE_VIRTUAL              0x00010000  
+
+#define FILE_ATTRIBUTE_VALID_FLAGS          0x00007fb7
+#define FILE_ATTRIBUTE_VALID_SET_FLAGS      0x000031a7
+
+//
+// Define the create disposition values
+//
+
+#define FILE_SUPERSEDE                  0x00000000
+#define FILE_OPEN                       0x00000001
+#define FILE_CREATE                     0x00000002
+#define FILE_OPEN_IF                    0x00000003
+#define FILE_OVERWRITE                  0x00000004
+#define FILE_OVERWRITE_IF               0x00000005
+#define FILE_MAXIMUM_DISPOSITION        0x00000005
+
+//
+// Define the create/open option flags
+//
+
+#define FILE_DIRECTORY_FILE                     0x00000001
+#define FILE_WRITE_THROUGH                      0x00000002
+#define FILE_SEQUENTIAL_ONLY                    0x00000004
+#define FILE_NO_INTERMEDIATE_BUFFERING          0x00000008
+
+#define FILE_SYNCHRONOUS_IO_ALERT               0x00000010
+#define FILE_SYNCHRONOUS_IO_NONALERT            0x00000020
+#define FILE_NON_DIRECTORY_FILE                 0x00000040
+#define FILE_CREATE_TREE_CONNECTION             0x00000080
+
+#define FILE_COMPLETE_IF_OPLOCKED               0x00000100
+#define FILE_NO_EA_KNOWLEDGE                    0x00000200
+#define FILE_OPEN_REMOTE_INSTANCE               0x00000400
+#define FILE_RANDOM_ACCESS                      0x00000800
+
+#define FILE_DELETE_ON_CLOSE                    0x00001000
+#define FILE_OPEN_BY_FILE_ID                    0x00002000
+#define FILE_OPEN_FOR_BACKUP_INTENT             0x00004000
+#define FILE_NO_COMPRESSION                     0x00008000
+
+#if (NTDDI_VERSION >= NTDDI_WIN7)
+#define FILE_OPEN_REQUIRING_OPLOCK              0x00010000
+#define FILE_DISALLOW_EXCLUSIVE                 0x00020000
+#endif /* NTDDI_VERSION >= NTDDI_WIN7 */
+
+#define FILE_RESERVE_OPFILTER                   0x00100000
+#define FILE_OPEN_REPARSE_POINT                 0x00200000
+#define FILE_OPEN_NO_RECALL                     0x00400000
+#define FILE_OPEN_FOR_FREE_SPACE_QUERY          0x00800000
+
+
+#define FILE_VALID_OPTION_FLAGS                 0x00ffffff
+#define FILE_VALID_PIPE_OPTION_FLAGS            0x00000032
+#define FILE_VALID_MAILSLOT_OPTION_FLAGS        0x00000032
+#define FILE_VALID_SET_FLAGS                    0x00000036
+
+//
+// Define the I/O status information return values for NtCreateFile/NtOpenFile
+//
+
+#define FILE_SUPERSEDED                 0x00000000
+#define FILE_OPENED                     0x00000001
+#define FILE_CREATED                    0x00000002
+#define FILE_OVERWRITTEN                0x00000003
+#define FILE_EXISTS                     0x00000004
+#define FILE_DOES_NOT_EXIST             0x00000005
+
+//
+// Define special ByteOffset parameters for read and write operations
+//
+
+#define FILE_WRITE_TO_END_OF_FILE       0xffffffff
+#define FILE_USE_FILE_POINTER_POSITION  0xfffffffe
+
+//
+// Define alignment requirement values
+//
+
+#define FILE_BYTE_ALIGNMENT             0x00000000
+#define FILE_WORD_ALIGNMENT             0x00000001
+#define FILE_LONG_ALIGNMENT             0x00000003
+#define FILE_QUAD_ALIGNMENT             0x00000007
+#define FILE_OCTA_ALIGNMENT             0x0000000f
+#define FILE_32_BYTE_ALIGNMENT          0x0000001f
+#define FILE_64_BYTE_ALIGNMENT          0x0000003f
+#define FILE_128_BYTE_ALIGNMENT         0x0000007f
+#define FILE_256_BYTE_ALIGNMENT         0x000000ff
+#define FILE_512_BYTE_ALIGNMENT         0x000001ff
+
+//
+// Define the maximum length of a filename string
+//
+
+#define MAXIMUM_FILENAME_LENGTH         256
+
+//
+// Define the various device characteristics flags
+//
+
+#define FILE_REMOVABLE_MEDIA                    0x00000001
+#define FILE_READ_ONLY_DEVICE                   0x00000002
+#define FILE_FLOPPY_DISKETTE                    0x00000004
+#define FILE_WRITE_ONCE_MEDIA                   0x00000008
+#define FILE_REMOTE_DEVICE                      0x00000010
+#define FILE_DEVICE_IS_MOUNTED                  0x00000020
+#define FILE_VIRTUAL_VOLUME                     0x00000040
+#define FILE_AUTOGENERATED_DEVICE_NAME          0x00000080
+#define FILE_DEVICE_SECURE_OPEN                 0x00000100
+#define FILE_CHARACTERISTIC_PNP_DEVICE          0x00000800
+#define FILE_CHARACTERISTIC_TS_DEVICE           0x00001000
+#define FILE_CHARACTERISTIC_WEBDAV_DEVICE       0x00002000
+
+
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -2341,6 +2977,14 @@ NTAPI
 ZwCancelIoFile(
     IN HANDLE FileHandle,
     OUT PIO_STATUS_BLOCK IoStatusBlock
+    );
+
+typedef
+VOID
+(NTAPI *PIO_APC_ROUTINE) (
+    __in PVOID ApcContext,
+    __in PIO_STATUS_BLOCK IoStatusBlock,
+    __in ULONG Reserved
     );
 
 NTSYSAPI
@@ -2415,8 +3059,8 @@ ZwLockFile(
     IN PULARGE_INTEGER LockOffset,
     IN PULARGE_INTEGER LockLength,
     IN ULONG Key,
-    IN BOOLEAN FailImmediately,
-    IN BOOLEAN ExclusiveLock
+    IN BOOL FailImmediately,
+    IN BOOL ExclusiveLock
     );
 
 NTSYSAPI
@@ -2474,14 +3118,54 @@ ZwNotifyChangeDirectoryFile(
     OUT PFILE_NOTIFY_INFORMATION Buffer,
     IN ULONG BufferLength,
     IN ULONG NotifyFilter,
-    IN BOOLEAN WatchSubtree
+    IN BOOL WatchSubtree
     );
+
+typedef struct _FILE_BASIC_INFORMATION {
+    LARGE_INTEGER CreationTime;
+    LARGE_INTEGER LastAccessTime;
+    LARGE_INTEGER LastWriteTime;
+    LARGE_INTEGER ChangeTime;
+    ULONG FileAttributes;
+} FILE_BASIC_INFORMATION, *PFILE_BASIC_INFORMATION;
+
+typedef struct _FILE_STANDARD_INFORMATION {
+    LARGE_INTEGER AllocationSize;
+    LARGE_INTEGER EndOfFile;
+    ULONG NumberOfLinks;
+    BOOL DeletePending;
+    BOOL Directory;
+} FILE_STANDARD_INFORMATION, *PFILE_STANDARD_INFORMATION;
+
+
+typedef struct _FILE_POSITION_INFORMATION {
+    LARGE_INTEGER CurrentByteOffset;
+} FILE_POSITION_INFORMATION, *PFILE_POSITION_INFORMATION;
+
+
+typedef struct _FILE_NETWORK_OPEN_INFORMATION {
+    LARGE_INTEGER CreationTime;
+    LARGE_INTEGER LastAccessTime;
+    LARGE_INTEGER LastWriteTime;
+    LARGE_INTEGER ChangeTime;
+    LARGE_INTEGER AllocationSize;
+    LARGE_INTEGER EndOfFile;
+    ULONG FileAttributes;
+} FILE_NETWORK_OPEN_INFORMATION, *PFILE_NETWORK_OPEN_INFORMATION;
 
 typedef struct _FILE_GET_EA_INFORMATION {
     ULONG NextEntryOffset;
     UCHAR EaNameLength;
     CHAR EaName[1];
 } FILE_GET_EA_INFORMATION, *PFILE_GET_EA_INFORMATION;
+
+typedef struct _FILE_FULL_EA_INFORMATION {
+    ULONG NextEntryOffset;
+    UCHAR Flags;
+    UCHAR EaNameLength;
+    USHORT EaValueLength;
+    CHAR EaName[1];
+} FILE_FULL_EA_INFORMATION, *PFILE_FULL_EA_INFORMATION;
 
 NTSYSAPI
 NTSTATUS
@@ -2491,11 +3175,11 @@ ZwQueryEaFile(
     OUT PIO_STATUS_BLOCK IoStatusBlock,
     OUT PFILE_FULL_EA_INFORMATION Buffer,
     IN ULONG BufferLength,
-    IN BOOLEAN ReturnSingleEntry,
+    IN BOOL ReturnSingleEntry,
     IN PFILE_GET_EA_INFORMATION EaList OPTIONAL,
     IN ULONG EaListLength,
     IN PULONG EaIndex OPTIONAL,
-    IN BOOLEAN RestartScan
+    IN BOOL RestartScan
     );
 
 NTSYSAPI
@@ -2519,9 +3203,9 @@ ZwCreateNamedPipeFile(
     IN ULONG ShareAccess,
     IN ULONG CreateDisposition,
     IN ULONG CreateOptions,
-    IN BOOLEAN TypeMessage,
-    IN BOOLEAN ReadmodeMessage,
-    IN BOOLEAN Nonblocking,
+    IN BOOL TypeMessage,
+    IN BOOL ReadmodeMessage,
+    IN BOOL Nonblocking,
     IN ULONG MaxInstances,
     IN ULONG InBufferSize,
     IN ULONG OutBufferSize,
@@ -2635,11 +3319,11 @@ ZwQueryQuotaInformationFile(
     OUT PIO_STATUS_BLOCK IoStatusBlock,
     OUT PFILE_USER_QUOTA_INFORMATION Buffer,
     IN ULONG BufferLength,
-    IN BOOLEAN ReturnSingleEntry,
+    IN BOOL ReturnSingleEntry,
     IN PFILE_QUOTA_LIST_INFORMATION QuotaList OPTIONAL,
     IN ULONG QuotaListLength,
     IN PSID ResumeSid OPTIONAL,
-    IN BOOLEAN RestartScan
+    IN BOOL RestartScan
     );
 
 NTSYSAPI
@@ -2667,6 +3351,65 @@ ZwQueryFullAttributesFile(
     IN POBJECT_ATTRIBUTES ObjectAttributes,
     OUT PFILE_NETWORK_OPEN_INFORMATION FileInformation
     );
+
+typedef enum _FILE_INFORMATION_CLASS {
+    FileDirectoryInformation         = 1,
+    FileFullDirectoryInformation,   // 2
+    FileBothDirectoryInformation,   // 3
+    FileBasicInformation,           // 4
+    FileStandardInformation,        // 5
+    FileInternalInformation,        // 6
+    FileEaInformation,              // 7
+    FileAccessInformation,          // 8
+    FileNameInformation,            // 9
+    FileRenameInformation,          // 10
+    FileLinkInformation,            // 11
+    FileNamesInformation,           // 12
+    FileDispositionInformation,     // 13
+    FilePositionInformation,        // 14
+    FileFullEaInformation,          // 15
+    FileModeInformation,            // 16
+    FileAlignmentInformation,       // 17
+    FileAllInformation,             // 18
+    FileAllocationInformation,      // 19
+    FileEndOfFileInformation,       // 20
+    FileAlternateNameInformation,   // 21
+    FileStreamInformation,          // 22
+    FilePipeInformation,            // 23
+    FilePipeLocalInformation,       // 24
+    FilePipeRemoteInformation,      // 25
+    FileMailslotQueryInformation,   // 26
+    FileMailslotSetInformation,     // 27
+    FileCompressionInformation,     // 28
+    FileObjectIdInformation,        // 29
+    FileCompletionInformation,      // 30
+    FileMoveClusterInformation,     // 31
+    FileQuotaInformation,           // 32
+    FileReparsePointInformation,    // 33
+    FileNetworkOpenInformation,     // 34
+    FileAttributeTagInformation,    // 35
+    FileTrackingInformation,        // 36
+    FileIdBothDirectoryInformation, // 37
+    FileIdFullDirectoryInformation, // 38
+    FileValidDataLengthInformation, // 39
+    FileShortNameInformation,       // 40
+    FileIoCompletionNotificationInformation, // 41
+    FileIoStatusBlockRangeInformation,       // 42
+    FileIoPriorityHintInformation,           // 43
+    FileSfioReserveInformation,              // 44
+    FileSfioVolumeInformation,               // 45
+    FileHardLinkInformation,                 // 46
+    FileProcessIdsUsingFileInformation,      // 47
+    FileNormalizedNameInformation,           // 48
+    FileNetworkPhysicalNameInformation,      // 49
+    FileIdGlobalTxDirectoryInformation,      // 50
+    FileIsRemoteDeviceInformation,           // 51
+    FileAttributeCacheInformation,           // 52
+    FileNumaNodeInformation,                 // 53
+    FileStandardLinkInformation,             // 54
+    FileRemoteProtocolInformation,           // 55
+    FileMaximumInformation
+} FILE_INFORMATION_CLASS, *PFILE_INFORMATION_CLASS;
 
 NTSYSAPI
 NTSTATUS
@@ -2702,9 +3445,9 @@ ZwQueryDirectoryFile(
     OUT PVOID FileInformation,
     IN ULONG FileInformationLength,
     IN FILE_INFORMATION_CLASS FileInformationClass,
-    IN BOOLEAN ReturnSingleEntry,
+    IN BOOL ReturnSingleEntry,
     IN PUNICODE_STRING FileName OPTIONAL,
-    IN BOOLEAN RestartScan
+    IN BOOL RestartScan
     );
 
 typedef struct _FILE_DIRECTORY_INFORMATION { // Information Class 1
@@ -2765,18 +3508,14 @@ typedef struct _FILE_ACCESS_INFORMATION { // Information Class 8
     ACCESS_MASK GrantedAccess;
 } FILE_ACCESS_INFORMATION, *PFILE_ACCESS_INFORMATION;
 
-#ifndef FILE_DEVICE_SECURE_OPEN
-
 typedef struct _FILE_NAME_INFORMATION { // Information Classes 9 and 21
     ULONG FileNameLength;
     WCHAR FileName[1];
 } FILE_NAME_INFORMATION, *PFILE_NAME_INFORMATION,
   FILE_ALTERNATE_NAME_INFORMATION, *PFILE_ALTERNATE_NAME_INFORMATION;
 
-#endif
-
 typedef struct _FILE_LINK_RENAME_INFORMATION { // Info Classes 10 and 11
-    BOOLEAN ReplaceIfExists;
+    BOOL ReplaceIfExists;
     HANDLE RootDirectory;
     ULONG FileNameLength;
     WCHAR FileName[1];
@@ -2793,6 +3532,10 @@ typedef struct _FILE_NAMES_INFORMATION { // Information Class 12
 typedef struct _FILE_MODE_INFORMATION { // Information Class 16
     ULONG Mode;
 } FILE_MODE_INFORMATION, *PFILE_MODE_INFORMATION;
+
+typedef struct _FILE_ALIGNMENT_INFORMATION {
+    ULONG AlignmentRequirement;
+} FILE_ALIGNMENT_INFORMATION, *PFILE_ALIGNMENT_INFORMATION;
 
 typedef struct _FILE_ALL_INFORMATION { // Information Class 18
     FILE_BASIC_INFORMATION BasicInformation;
@@ -2960,6 +3703,23 @@ ZwReplaceKey(
     IN POBJECT_ATTRIBUTES OldFileObjectAttributes
     );
 
+typedef struct _KEY_SET_VIRTUALIZATION_INFORMATION {
+    ULONG   VirtualTarget           : 1; // Tells if the key is a virtual target key. 
+    ULONG   VirtualStore	        : 1; // Tells if the key is a virtual store key.
+    ULONG   VirtualSource           : 1; // Tells if the key has been virtualized at least one (virtual hint)
+    ULONG   Reserved                : 29;   
+} KEY_SET_VIRTUALIZATION_INFORMATION, *PKEY_SET_VIRTUALIZATION_INFORMATION;
+
+typedef enum _KEY_SET_INFORMATION_CLASS {
+    KeyWriteTimeInformation,
+    KeyWow64FlagsInformation,
+    KeyControlFlagsInformation,
+    KeySetVirtualizationInformation,
+    KeySetDebugInformation,
+    KeySetHandleTagsInformation,
+    MaxKeySetInfoClass  // MaxKeySetInfoClass should always be the last enum
+} KEY_SET_INFORMATION_CLASS;
+
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -2969,6 +3729,18 @@ ZwSetInformationKey(
     IN PVOID KeyInformation,
     IN ULONG KeyInformationLength
     );
+
+typedef enum _KEY_INFORMATION_CLASS {
+    KeyBasicInformation,
+    KeyNodeInformation,
+    KeyFullInformation,
+    KeyNameInformation,
+    KeyCachedInformation,
+    KeyFlagsInformation,
+    KeyVirtualizationInformation,
+    KeyHandleTagsInformation,
+    MaxKeyInfoClass  // MaxKeyInfoClass should always be the last enum
+} KEY_INFORMATION_CLASS;
 
 NTSYSAPI
 NTSTATUS
@@ -3003,10 +3775,10 @@ ZwNotifyChangeKey(
     IN PVOID ApcContext OPTIONAL,
     OUT PIO_STATUS_BLOCK IoStatusBlock,
     IN ULONG NotifyFilter,
-    IN BOOLEAN WatchSubtree,
+    IN BOOL WatchSubtree,
     IN PVOID Buffer,
     IN ULONG BufferLength,
-    IN BOOLEAN Asynchronous
+    IN BOOL Asynchronous
     );
 
 NTSYSAPI
@@ -3021,10 +3793,10 @@ ZwNotifyChangeMultipleKeys (
     IN PVOID ApcContext OPTIONAL,
     OUT PIO_STATUS_BLOCK IoStatusBlock,
     IN ULONG NotifyFilter,
-    IN BOOLEAN WatchSubtree,
+    IN BOOL WatchSubtree,
     IN PVOID Buffer,
     IN ULONG BufferLength,
-    IN BOOLEAN Asynchronous
+    IN BOOL Asynchronous
     );
 
 NTSYSAPI
@@ -3046,6 +3818,15 @@ ZwSetValueKey(
     IN PVOID Data,
     IN ULONG DataSize
     );
+
+typedef enum _KEY_VALUE_INFORMATION_CLASS {
+    KeyValueBasicInformation,
+    KeyValueFullInformation,
+    KeyValuePartialInformation,
+    KeyValueFullInformationAlign64,
+    KeyValuePartialInformationAlign64,
+    MaxKeyValueInfoClass  // MaxKeyValueInfoClass should always be the last enum
+} KEY_VALUE_INFORMATION_CLASS;
 
 NTSYSAPI
 NTSTATUS
@@ -3071,6 +3852,13 @@ ZwEnumerateValueKey(
     OUT PULONG ResultLength
     );
 
+typedef struct _KEY_VALUE_ENTRY {
+    PUNICODE_STRING ValueName;
+    ULONG           DataLength;
+    ULONG           DataOffset;
+    ULONG           Type;
+} KEY_VALUE_ENTRY, *PKEY_VALUE_ENTRY;
+
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -3089,7 +3877,7 @@ NTAPI
 ZwPrivilegeCheck(
     IN HANDLE TokenHandle,
     IN PPRIVILEGE_SET RequiredPrivileges,
-    OUT PBOOLEAN Result
+    OUT PBOOL Result
     );
 
 NTSYSAPI
@@ -3101,7 +3889,7 @@ ZwPrivilegeObjectAuditAlarm(
     IN HANDLE TokenHandle,
     IN ACCESS_MASK DesiredAccess,
     IN PPRIVILEGE_SET Privileges,
-    IN BOOLEAN AccessGranted
+    IN BOOL AccessGranted
     );
 
 NTSYSAPI
@@ -3112,7 +3900,7 @@ ZwPrivilegedServiceAuditAlarm(
     IN PUNICODE_STRING ServiceName,
     IN HANDLE TokenHandle,
     IN PPRIVILEGE_SET Privileges,
-    IN BOOLEAN AccessGranted
+    IN BOOL AccessGranted
     );
 
 NTSYSAPI
@@ -3126,7 +3914,7 @@ ZwAccessCheck(
     IN PPRIVILEGE_SET PrivilegeSet,
     IN PULONG PrivilegeSetLength,
     OUT PACCESS_MASK GrantedAccess,
-    OUT PBOOLEAN AccessStatus
+    OUT PBOOL AccessStatus
     );
 
 NTSYSAPI
@@ -3140,10 +3928,10 @@ ZwAccessCheckAndAuditAlarm(
     IN PSECURITY_DESCRIPTOR SecurityDescriptor,
     IN ACCESS_MASK DesiredAccess,
     IN PGENERIC_MAPPING GenericMapping,
-    IN BOOLEAN ObjectCreation,
+    IN BOOL ObjectCreation,
     OUT PACCESS_MASK GrantedAccess,
-    OUT PBOOLEAN AccessStatus,
-    OUT PBOOLEAN GenerateOnClose
+    OUT PBOOL AccessStatus,
+    OUT PBOOL GenerateOnClose
     );
 
 NTSYSAPI
@@ -3179,10 +3967,10 @@ ZwAccessCheckByTypeAndAuditAlarm(
     IN POBJECT_TYPE_LIST ObjectTypeList,
     IN ULONG ObjectTypeListLength,
     IN PGENERIC_MAPPING GenericMapping,
-    IN BOOLEAN ObjectCreation,
+    IN BOOL ObjectCreation,
     OUT PACCESS_MASK GrantedAccess,
     OUT PULONG AccessStatus,
-    OUT PBOOLEAN GenerateOnClose
+    OUT PBOOL GenerateOnClose
     );
 
 NTSYSAPI
@@ -3218,7 +4006,7 @@ ZwAccessCheckByTypeResultListAndAuditAlarm(
     IN POBJECT_TYPE_LIST ObjectTypeList,
     IN ULONG ObjectTypeListLength,
     IN PGENERIC_MAPPING GenericMapping,
-    IN BOOLEAN ObjectCreation,
+    IN BOOL ObjectCreation,
     OUT PACCESS_MASK GrantedAccessList,
     OUT PULONG AccessStatusList,
     OUT PULONG GenerateOnClose
@@ -3241,7 +4029,7 @@ ZwAccessCheckByTypeResultListAndAuditAlarmByHandle(
     IN POBJECT_TYPE_LIST ObjectTypeList,
     IN ULONG ObjectTypeListLength,
     IN PGENERIC_MAPPING GenericMapping,
-    IN BOOLEAN ObjectCreation, 
+    IN BOOL ObjectCreation, 
     OUT PACCESS_MASK GrantedAccessList,
     OUT PULONG AccessStatusList,
     OUT PULONG GenerateOnClose
@@ -3260,9 +4048,9 @@ ZwOpenObjectAuditAlarm(
     IN ACCESS_MASK DesiredAccess,
     IN ACCESS_MASK GrantedAccess,
     IN PPRIVILEGE_SET Privileges OPTIONAL,
-    IN BOOLEAN ObjectCreation,
-    IN BOOLEAN AccessGranted,
-    OUT PBOOLEAN GenerateOnClose
+    IN BOOL ObjectCreation,
+    IN BOOL AccessGranted,
+    OUT PBOOL GenerateOnClose
     );
 
 NTSYSAPI
@@ -3271,7 +4059,7 @@ NTAPI
 ZwCloseObjectAuditAlarm(
     IN PUNICODE_STRING SubsystemName,
     IN PVOID HandleId,
-    IN BOOLEAN GenerateOnClose
+    IN BOOL GenerateOnClose
     );
 
 NTSYSAPI
@@ -3280,7 +4068,7 @@ NTAPI
 ZwDeleteObjectAuditAlarm(
     IN PUNICODE_STRING SubsystemName,
     IN PVOID HandleId,
-    IN BOOLEAN GenerateOnClose
+    IN BOOL GenerateOnClose
     );
 
 NTSYSAPI
@@ -3305,7 +4093,7 @@ ZwCancelDeviceWakeupRequest(
     );
 
 NTSYSAPI
-BOOLEAN
+BOOL
 NTAPI
 ZwIsSystemResumeAutomatic(
     VOID
@@ -3345,7 +4133,7 @@ ZwInitiatePowerAction(
     IN POWER_ACTION SystemAction,
     IN SYSTEM_POWER_STATE MinSystemState,
     IN ULONG Flags,
-    IN BOOLEAN Asynchronous
+    IN BOOL Asynchronous
     );
 
 NTSYSAPI
@@ -3375,7 +4163,7 @@ NTAPI
 ZwRaiseException(
     IN PEXCEPTION_RECORD ExceptionRecord,
     IN PCONTEXT Context,
-    IN BOOLEAN SearchFrames
+    IN BOOL SearchFrames
     );
 
 NTSYSAPI
@@ -3383,7 +4171,7 @@ NTSTATUS
 NTAPI
 ZwContinue(
     IN PCONTEXT Context,
-    IN BOOLEAN TestAlert
+    IN BOOL TestAlert
     );
 
 NTSYSAPI
@@ -3454,7 +4242,7 @@ NTSYSAPI
 NTSTATUS
 NTAPI
 ZwQueryDefaultLocale(
-    IN BOOLEAN ThreadOrSystem,
+    IN BOOL ThreadOrSystem,
     OUT PLCID Locale
     );
 
@@ -3462,7 +4250,7 @@ NTSYSAPI
 NTSTATUS
 NTAPI
 ZwSetDefaultLocale(
-    IN BOOLEAN ThreadOrSystem,
+    IN BOOL ThreadOrSystem,
     IN LCID Locale
     );
 
@@ -3620,6 +4408,32 @@ ZwVdmControl(
     IN PVOID ControlData
     );
 
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlAnsiStringToUnicodeString(
+    PUNICODE_STRING DestinationString,
+    PCANSI_STRING SourceString,
+    BOOL AllocateDestinationString
+    );
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlUnicodeStringToAnsiString(
+    PANSI_STRING DestinationString,
+    PUNICODE_STRING SourceString,
+    BOOL AllocateDestinationString
+    );
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlUnicodeStringToOemString(
+    POEM_STRING DestinationString,
+    PUNICODE_STRING SourceString,
+    BOOL AllocateDestinationString
+    );
+
     }
 }
-using NT::NTSTATUS;

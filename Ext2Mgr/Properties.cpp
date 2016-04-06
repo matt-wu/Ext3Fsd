@@ -91,7 +91,7 @@ void CProperties::ResetPartGroup()
 void CProperties::OnSdevChangeMp() 
 {
     CMountPoints    mntPoint;
-    BOOLEAN         bInited = FALSE;
+    BOOL         bInited = FALSE;
 
     if (m_cdrom) {
         ASSERT(!bInited);
@@ -588,7 +588,7 @@ void CProperties::SetCdrom(PEXT2_CDROM cdrom)
 
             if (cdrom->EVP.bExt2) {
                 s = "EXT";
-                s += ('2' + cdrom->EVP.bExt3);
+                s += (CHAR)('2' + cdrom->EVP.bExt3);
                 SET_WIN(IDC_SDEV_EXT2_INFO, TRUE);
             } else {
                 s = "CDFS";
@@ -628,12 +628,12 @@ BOOL CProperties::OnInitDialog()
 
 	CDialog::OnInitDialog();
 
-    for (ULONG i=0; i < g_nDisks; i++) {
+    for (ULONG i = 0; i < g_nDisks; i++) {
         str.Format("DISK %u", i);
         cbDiskBox->AddString(str.GetBuffer(str.GetLength()));
     }
 
-    for (i=0; i < g_nCdroms; i++) {
+    for (ULONG i = 0; i < g_nCdroms; i++) {
         str.Format("CDROM %u", i);
         cbDiskBox->AddString(str.GetBuffer(str.GetLength()));
     }
@@ -703,7 +703,7 @@ BOOL CProperties::OnInitDialog()
 LRESULT CProperties::OnGroupBoxUpdated(WPARAM wParam,LPARAM lParam)
 {
     ULONG     i;
-    BOOLEAN bChanged = FALSE;
+    BOOL bChanged = FALSE;
 
     if (wParam == 'GB') {
 	    if (lParam == 'DVLU') {

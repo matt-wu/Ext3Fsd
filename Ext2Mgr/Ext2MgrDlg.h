@@ -8,7 +8,6 @@
 #pragma once
 #endif // _MSC_VER > 1000
 
-
 #include "SysTray.h"
 #include "Toolbar.h"
 #include "splash.h"
@@ -89,11 +88,11 @@ public:
 public:
 
     /* routines */
-    PVOID QuerySelectedItem(PBOOLEAN bIsExt2);
-    VOID  DriversChangeNotify(ULONG, BOOLEAN);
-    VOID  DriverLetterChangeNotify(CHAR, BOOLEAN);
+    PVOID QuerySelectedItem(PBOOL bIsExt2);
+    VOID  DriversChangeNotify(ULONG, BOOL);
+    VOID  DriverLetterChangeNotify(CHAR, BOOL);
 
-    VOID  DriverChangeNotify(PEXT2_LETTER, BOOLEAN);
+    VOID  DriverChangeNotify(PEXT2_LETTER, BOOL);
 
     VOID  UpdateVolume(PEXT2_VOLUME volume);
     VOID  UpdateCdrom(PEXT2_CDROM cdrom) ;
@@ -113,10 +112,10 @@ public:
     CSplash  *  m_splash;
     CMenu       m_Menu;
 
-    BOOLEAN     m_bHide;
-    BOOLEAN     m_bQuiet;
-    BOOLEAN     m_bService;
-    BOOLEAN     m_bStat;
+    BOOL     m_bHide;
+    BOOL     m_bQuiet;
+    BOOL     m_bService;
+    BOOL     m_bStat;
 
     CPerfStatDlg * m_PerfDlg;
 
@@ -129,10 +128,10 @@ protected:
     CStatusBar   m_bar;
     CImageList   m_ImageList;
 
-    BOOLEAN      m_bFsStarted;
-    BOOLEAN      m_bHandleChange;
-    BOOLEAN      m_bFocusVolume;
-    BOOLEAN      m_bFocusDisk;
+    BOOL      m_bFsStarted;
+    BOOL      m_bHandleChange;
+    BOOL      m_bFocusVolume;
+    BOOL      m_bFocusDisk;
     LONG         m_IndexVolume;
     LONG         m_IndexDisk;
 

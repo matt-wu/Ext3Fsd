@@ -51,7 +51,7 @@ extern CHAR *PerfStatStrings[];
 BOOL Ext2DefineDosDevice(DWORD flags,  CHAR *dos,  CHAR *symlink);
 DWORD Ext2QueryDrive(CHAR drive, CHAR *symlink);
 
-BOOLEAN Ext2StartPipeSrv();
+BOOL Ext2StartPipeSrv();
 VOID Ext2StopPipeSrv();
 
 //{{AFX_INSERT_LOCATION}}

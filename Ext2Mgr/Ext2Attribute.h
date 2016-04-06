@@ -19,7 +19,7 @@ public:
     CWnd *  m_MainDlg;
     PEXT2_VOLUME_PROPERTY3 m_EVP;
     CString m_DevName;
-    BOOLEAN m_bCdrom;
+    BOOL m_bCdrom;
     CHAR    m_autoDrv;
     CHAR    m_fixDrv;
 

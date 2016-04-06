@@ -56,7 +56,7 @@ void WINAPI ManagerServiceCtrl(DWORD ctrlcode);
 #endif
 
 
-BOOLEAN
+BOOL
 ManagerReportStatus(
         SERVICE_STATUS_HANDLE Handle,
         SERVICE_STATUS* Status,
@@ -124,10 +124,10 @@ void WINAPI ManagerCtrlService(DWORD ctrlcode)
         NO_ERROR, 0);
 }
 
-VOID
+VOID __cdecl
 ManagerStartMain(VOID * arg)
 {
-    BOOLEAN isService = (BOOLEAN) arg;
+    BOOL isService = (BOOL) arg;
     CExt2MgrDlg* dlg = (CExt2MgrDlg*)theApp.m_pMainWnd;
 
     if (dlg) {
@@ -161,7 +161,7 @@ ManagerStartMain(VOID * arg)
     }
 }
 
-void WINAPI
+void NTAPI
 ManagerServiceEntry(DWORD argc, char**argv)
 {
 	// register the service control handler
@@ -219,32 +219,21 @@ BOOL CExt2MgrApp::InitInstance()
 {
 	AfxEnableControlContainer();
 
-	// Standard initialization
-	// If you are not using these features and wish to reduce the size
-	//  of your final executable, you should remove from the following
-	//  the specific initialization routines you do not need.
-
-#ifdef _AFXDLL
-	Enable3dControls();			// Call this when using MFC in a shared DLL
-#else
-	Enable3dControlsStatic();	// Call this when linking to MFC statically
-#endif
-
     HWND hWnd = ::FindWindow(NULL, "Ext2 Volume Manager");
     if (hWnd) {
-        if (::GetWindowLong(hWnd, DWL_USER) == EXT2_DIALOG_MAGIC) {
+        if (::GetWindowLongPtr(hWnd, DWLP_USER) == EXT2_DIALOG_MAGIC) {
             ::ShowWindow(hWnd, SW_SHOW);
             ::SetForegroundWindow(hWnd);
             return FALSE;
         }
     }
 
-    BOOLEAN bHide = FALSE;
-    BOOLEAN bQuiet = FALSE;
-    BOOLEAN bService = FALSE;
-    BOOLEAN bInstall = FALSE;
-    BOOLEAN bRemove = FALSE;
-    BOOLEAN bStat = FALSE;
+    BOOL bHide = FALSE;
+    BOOL bQuiet = FALSE;
+    BOOL bService = FALSE;
+    BOOL bInstall = FALSE;
+    BOOL bRemove = FALSE;
+    BOOL bStat = FALSE;
 
     char * cmds = GetCommandLine();
     int i = (int)strlen(cmds);

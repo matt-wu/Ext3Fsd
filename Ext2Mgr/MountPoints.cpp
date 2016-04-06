@@ -69,18 +69,18 @@ void CMountPoints::OnClickDrvLetterList(NMHDR* pNMHDR, LRESULT* pResult)
     }
 }
 
-BOOLEAN
+BOOL
 CMountPoints::AddMountPoint(
     CHAR    drvChar,
-    BOOLEAN bRegistry,
-    BOOLEAN bMountMgr
+    BOOL bRegistry,
+    BOOL bMountMgr
     )
 {
     CHAR            devPath[MAX_PATH];
     PEXT2_LETTER    drvLetter = NULL;
     ULONGLONG       letterMask = 0;
-    BOOLEAN         rc = TRUE;
-    BOOLEAN         bMount = FALSE;
+    BOOL         rc = TRUE;
+    BOOL         bMount = FALSE;
 
     PEXT2_VOLUME_PROPERTY3   EVP = NULL;
 
@@ -341,7 +341,7 @@ void CMountPoints::OnChangeMountpoint()
     OnOK();
 }
 
-BOOLEAN
+BOOL
 CMountPoints::RemoveMountPoint(CHAR drvChar)
 {
     PEXT2_LETTER    drvLetter = NULL;
