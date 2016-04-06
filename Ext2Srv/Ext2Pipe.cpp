@@ -251,7 +251,8 @@ BOOLEAN Ext2DefineDrive(PPIPE_REQ *pr, ULONG len)
     q = (PREQ_DEFINE_DRV)&p->data[0];
 
     dosPath[0] = q->drive;
-    rc = q->result = DefineDosDeviceA(q->flags, dosPath, &q->name[0]);
+    q->result = (UCHAR)DefineDosDeviceA(q->flags, dosPath, &q->name[0]);
+    rc = (BOOLEAN) q->result;
 
 errorout:
 
@@ -290,7 +291,8 @@ BOOLEAN Ext2RemoveDrive(PPIPE_REQ *pr, ULONG len)
     q = (PREQ_REMOVE_DRV)&p->data[0];
 
     dosPath[0] = q->drive;
-    rc = q->result = DefineDosDeviceA(q->flags, dosPath, &q->name[0]);
+    q->result = (UCHAR)DefineDosDeviceA(q->flags, dosPath, &q->name[0]);
+    rc = (BOOLEAN)q->result;
 
 errorout:
 

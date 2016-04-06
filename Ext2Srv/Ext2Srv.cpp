@@ -262,7 +262,7 @@ void WINAPI
 Ext2ServiceEntry(DWORD argc, char**argv)
 {
 	// register the service control handler
-    ServiceHandle = RegisterServiceCtrlHandlerEx(L"Ext2Srv", Ext2CtrlService, NULL);
+    ServiceHandle = RegisterServiceCtrlHandlerEx(_T("Ext2Srv"), Ext2CtrlService, NULL);
     if (ServiceHandle == 0) {
 		return;
     }
@@ -288,7 +288,7 @@ Ext2StartService(VOID *arg)
 {
     SERVICE_TABLE_ENTRY Ext2SeriveTable[] =
     {
-      {L"Ext2Srv", (LPSERVICE_MAIN_FUNCTION)Ext2ServiceEntry},
+      {_T("Ext2Srv"), (LPSERVICE_MAIN_FUNCTION)Ext2ServiceEntry},
       {NULL, NULL}
     };
 
@@ -307,7 +307,7 @@ Ext2SetupService(BOOL bInstall)
 
     // get the filename of this executable
     if (GetModuleFileName(NULL, Target, SERVICE_CMD_LENGTH - 20) == 0) {
-        MessageBox(NULL, L"Ext2Srv: Unable to install as service", NULL,
+        MessageBox(NULL, _T("Ext2Srv: Unable to install as service"), NULL,
                    MB_OK | MB_ICONERROR);
         return FALSE;
     }
@@ -315,7 +315,7 @@ Ext2SetupService(BOOL bInstall)
     // open Service Control Manager
     hManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
     if (hManager == NULL) {
-        MessageBox(NULL, L"Ext2Srv: cannot open Service Control Manager",
+        MessageBox(NULL, _T("Ext2Srv: cannot open Service Control Manager"),
                    NULL, MB_OK | MB_ICONERROR);
         return FALSE;
     }
@@ -325,8 +325,8 @@ Ext2SetupService(BOOL bInstall)
         // now create service entry for Ext2Mgr
         hService = CreateService(
                 hManager,                   // SCManager database
-                L"Ext2Srv",                 // name of service
-                L"Ext2Fsd Service Manager", // name to display
+                _T("Ext2Srv"),                 // name of service
+                _T("Ext2Fsd Service Manager"), // name to display
                 SERVICE_ALL_ACCESS,	        // desired access
                 SERVICE_WIN32_OWN_PROCESS | // service type
                 SERVICE_INTERACTIVE_PROCESS,
@@ -343,10 +343,10 @@ Ext2SetupService(BOOL bInstall)
 
             DWORD error = GetLastError();
             if (error == ERROR_SERVICE_EXISTS) {
-                MessageBox(NULL, L"Ext2Srv is already registered.", NULL,
+                MessageBox(NULL, _T("Ext2Srv is already registered."), NULL,
                            MB_OK | MB_ICONERROR);
             } else {
-                MessageBox(NULL, L"Ext2Srv couldn't be registered.", NULL,
+                MessageBox(NULL, _T("Ext2Srv couldn't be registered."), NULL,
                            MB_OK | MB_ICONERROR);
             }
         } else {
@@ -354,16 +354,16 @@ Ext2SetupService(BOOL bInstall)
             CloseServiceHandle(hService);
 
 			// got Ext2Mgr installed as a service
-            MessageBox(NULL, L"Ext2Srv service was successfully registered. \n\n"
-				L"You can modify the default settings and start/stop it from Control Panel.\n"
-				L"The service will automatically run the next time when system is restarted.\n",
+            MessageBox(NULL, _T("Ext2Srv service was successfully registered. \n\n"
+				"You can modify the default settings and start/stop it from Control Panel.\n"
+				"The service will automatically run the next time when system is restarted.\n"),
                 NULL, MB_OK | MB_ICONINFORMATION);
         }
 
     } else {
 
         /* open the service of Pipe Event Engine */
-        hService = OpenService(hManager, L"Ext2Srv", SERVICE_ALL_ACCESS);
+        hService = OpenService(hManager, _T("Ext2Srv"), SERVICE_ALL_ACCESS);
 
         if (hService != NULL) {
 
@@ -381,22 +381,22 @@ Ext2SetupService(BOOL bInstall)
                 }
 
                 if (status.dwCurrentState != SERVICE_STOPPED) {
-                    MessageBox(NULL, L"Ext2Srv: service couldn't be stopped !",
+                    MessageBox(NULL, _T("Ext2Srv: service couldn't be stopped !"),
                                NULL, MB_OK | MB_ICONERROR);
                 }
             }
 
             // remove the service from the SCM
             if (DeleteService(hService)) {
-                MessageBox(NULL, L"Ext2Srv: service has been unregistered.",
+                MessageBox(NULL, _T("Ext2Srv: service has been unregistered."),
                            NULL, MB_OK | MB_ICONINFORMATION);
             } else {
                 DWORD error = GetLastError();
                 if (error == ERROR_SERVICE_MARKED_FOR_DELETE) {
-                    MessageBox(NULL, L"Ext2Srv: service is already unregistered",
+                    MessageBox(NULL, _T("Ext2Srv: service is already unregistered"),
                                NULL, MB_OK | MB_ICONEXCLAMATION);
                 } else {
-                    MessageBox(NULL, L"Ext2Srv: service could not be unregistered",
+                    MessageBox(NULL, _T("Ext2Srv: service could not be unregistered"),
                                NULL, MB_OK | MB_ICONERROR);
                 }
             }
@@ -524,7 +524,7 @@ void Ext2Log(DWORD ll, char *fn, int ln, char *format, ... )
 }
 
 
-INT _tmain(INT argc, TCHAR *argv[])
+INT __cdecl _tmain(INT argc, TCHAR *argv[])
 {
     DWORD   rc = 0;
     BOOL    console = FALSE;

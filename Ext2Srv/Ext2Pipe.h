@@ -8,6 +8,7 @@
 #define REQ_BODY_SIZE   (4096)
 
 #pragma pack(1)
+#pragma warning(disable: 4200)
 
 typedef struct _PIPE_REQ {
 
@@ -42,6 +43,7 @@ typedef struct _REQ_DEFINE_DRV {
 } REQ_DEFINE_DRV, *PREQ_DEFINE_DRV,
   REQ_REMOVE_DRV, *PREQ_REMOVE_DRV;
 
+#pragma warning(default: 4200)
 #pragma pack()
 
 #endif // EXT2_SRV_PIPE_H
