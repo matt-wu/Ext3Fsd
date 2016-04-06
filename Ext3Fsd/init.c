@@ -697,6 +697,7 @@ DriverEntry (
     Ext2Global->CacheManagerNoOpCallbacks.ReleaseFromReadAhead = Ext2NoOpRelease;
 
 
+#ifndef _WIN2K_TARGET_
     //
     // Initialize FS Filter callbacks
     //
@@ -706,6 +707,7 @@ DriverEntry (
     Ext2Global->FilterCallbacks.PreAcquireForSectionSynchronization = Ext2PreAcquireForCreateSection;
     FsRtlRegisterFileSystemFilterCallbacks(DriverObject,  &Ext2Global->FilterCallbacks );
 
+#endif
 
     //
     // Initialize the global data
