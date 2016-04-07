@@ -2711,6 +2711,9 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
             FlushBeforePurge = FALSE;
         }
 
+        /* discard buffer_headers for group_desc */
+        Ext2DropGroup(Vcb);
+
         FcbListEntry= NULL;
         InitializeListHead(&FcbList);
 

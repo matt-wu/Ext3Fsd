@@ -127,6 +127,27 @@ Ext2RefreshSuper (
     return TRUE;
 }
 
+VOID
+Ext2PutGroup(IN PEXT2_VCB Vcb)
+{
+    struct ext3_sb_info *sbi = &Vcb->sbi;
+    unsigned long i;
+
+
+    if (NULL == Vcb->sbi.s_gd) {
+        return;
+    }
+
+    for (i = 0; i < Vcb->sbi.s_gdb_count; i++) {
+        if (Vcb->sbi.s_gd[i].bh)
+            fini_bh(&sbi->s_gd[i].bh);
+    }
+
+    kfree(Vcb->sbi.s_gd);
+    Vcb->sbi.s_gd = NULL;
+}
+
+
 BOOLEAN
 Ext2LoadGroup(IN PEXT2_VCB Vcb)
 {
@@ -134,34 +155,56 @@ Ext2LoadGroup(IN PEXT2_VCB Vcb)
     struct ext3_sb_info *sbi = &Vcb->sbi;
     ext3_fsblk_t sb_block = 1;
     unsigned long i;
+    BOOLEAN rc = FALSE;
 
-    if (BLOCK_SIZE != EXT3_MIN_BLOCK_SIZE) {
-        sb_block = EXT4_MIN_BLOCK_SIZE / BLOCK_SIZE;
-    }
+    __try {
 
-    if (NULL == sbi->s_group_desc) {
-        sbi->s_group_desc = kzalloc(sbi->s_gdb_count * sizeof(ext3_fsblk_t),
-                                    GFP_KERNEL);
-    }
-    if (sbi->s_group_desc == NULL) {
-        DEBUG(DL_ERR, ("Ext2LoadGroup: not enough memory.\n"));
-        return FALSE;
-    }
+        ExAcquireResourceExclusiveLite(&Vcb->sbi.s_gd_lock, TRUE);
 
-    for (i = 0; i < sbi->s_gdb_count; i++) {
-        sbi->s_group_desc[i] =  descriptor_loc(sb, sb_block, i);
-        if (!sbi->s_group_desc[i]) {
-            DEBUG(DL_ERR, ("Ext2LoadGroup: can't read group descriptor %d\n", i));
-            return FALSE;
+        if (NULL == sbi->s_gd) {
+            sbi->s_gd = kzalloc(sbi->s_gdb_count * sizeof(struct ext3_gd),
+                                        GFP_KERNEL);
         }
+        if (sbi->s_gd == NULL) {
+            DEBUG(DL_ERR, ("Ext2LoadGroup: not enough memory.\n"));
+            __leave;
+        }
+
+        if (BLOCK_SIZE != EXT3_MIN_BLOCK_SIZE) {
+            sb_block = EXT4_MIN_BLOCK_SIZE / BLOCK_SIZE;
+        }
+
+        for (i = 0; i < sbi->s_gdb_count; i++) {
+            sbi->s_gd[i].block =  descriptor_loc(sb, sb_block, i);
+            if (!sbi->s_gd[i].block) {
+                DEBUG(DL_ERR, ("Ext2LoadGroup: can't locate group descriptor %d\n", i));
+                __leave;
+            }
+            sbi->s_gd[i].bh = sb_getblk(sb, sbi->s_gd[i].block);
+            if (!sbi->s_gd[i].bh) {
+                DEBUG(DL_ERR, ("Ext2LoadGroup: can't read group descriptor %d\n", i));
+                __leave;
+            }
+            sbi->s_gd[i].gd = (struct ext4_group_desc *)sbi->s_gd[i].bh->b_data;
+        }
+
+        if (!ext4_check_descriptors(sb)) {
+            DbgBreak();
+            DEBUG(DL_ERR, ("Ext2LoadGroup: group descriptors corrupted!\n"));
+            __leave;
+        }
+
+        rc = TRUE;
+
+    } __finally {
+
+        if (!rc)
+            Ext2PutGroup(Vcb);
+
+        ExReleaseResourceLite(&Vcb->sbi.s_gd_lock);
     }
 
-    if (!ext4_check_descriptors(sb)) {
-        DEBUG(DL_ERR, ("Ext2LoadGroup: group descriptors corrupted!\n"));
-        return FALSE;
-    }
-
-    return TRUE;
+    return rc;
 }
 
 
@@ -169,14 +212,22 @@ VOID
 Ext2DropGroup(IN PEXT2_VCB Vcb)
 {
     struct ext3_sb_info *sbi = &Vcb->sbi;
+    LARGE_INTEGER        timeout;
     unsigned long i;
 
-    if (NULL == sbi->s_group_desc) {
-        return;
+    __try {
+        SetFlag(Vcb->Flags, VCB_BEING_DROPPED);
+        ExAcquireResourceExclusiveLite(&Vcb->sbi.s_gd_lock, TRUE);
+        Ext2PutGroup(Vcb);
+    } __finally {
+        ExReleaseResourceLite(&Vcb->sbi.s_gd_lock);
     }
 
-    kfree(sbi->s_group_desc);
-    sbi->s_group_desc = NULL;
+    timeout.QuadPart = (LONGLONG)-10*1000*1000;
+    KeWaitForSingleObject(&Vcb->bd.bd_bh_notify,
+                           Executive, KernelMode,
+                           FALSE, &timeout);
+    ClearFlag(Vcb->Flags, VCB_BEING_DROPPED);
 }
 
 BOOLEAN
@@ -2179,27 +2230,30 @@ __u16 crc16(__u16 crc, __u8 const *buffer, size_t len)
 __le16 ext4_group_desc_csum(struct ext3_sb_info *sbi, __u32 block_group,
                             struct ext4_group_desc *gdp)
 {
-    __u16 crc = 0;
+	int offset;
+	__u16 crc = 0;
+	__le32 le_group = cpu_to_le32(block_group);
 
-    if (sbi->s_es->s_feature_ro_compat &
-        cpu_to_le32(EXT4_FEATURE_RO_COMPAT_GDT_CSUM)) {
-        int offset = offsetof(struct ext4_group_desc, bg_checksum);
-        __le32 le_group = cpu_to_le32(block_group);
+	/* old crc16 code */
+	if (!(sbi->s_es->s_feature_ro_compat &
+	      cpu_to_le32(EXT4_FEATURE_RO_COMPAT_GDT_CSUM)))
+		return 0;
 
-        crc = crc16(~0, sbi->s_es->s_uuid, sizeof(sbi->s_es->s_uuid));
-        crc = crc16(crc, (__u8 *)&le_group, sizeof(le_group));
-        crc = crc16(crc, (__u8 *)gdp, offset);
-        offset += sizeof(gdp->bg_checksum); /* skip checksum */
-        /* for checksum of struct ext4_group_desc do the rest...*/
-        if ((sbi->s_es->s_feature_incompat &
-                cpu_to_le32(EXT4_FEATURE_INCOMPAT_64BIT)) &&
-                offset < le16_to_cpu(sbi->s_es->s_desc_size))
-            crc = crc16(crc, (__u8 *)gdp + offset,
-                        le16_to_cpu(sbi->s_es->s_desc_size) -
-                        offset);
-    }
+	offset = offsetof(struct ext4_group_desc, bg_checksum);
 
-    return cpu_to_le16(crc);
+	crc = crc16(~0, sbi->s_es->s_uuid, sizeof(sbi->s_es->s_uuid));
+	crc = crc16(crc, (__u8 *)&le_group, sizeof(le_group));
+	crc = crc16(crc, (__u8 *)gdp, offset);
+	offset += sizeof(gdp->bg_checksum); /* skip checksum */
+	/* for checksum of struct ext4_group_desc do the rest...*/
+	if ((sbi->s_es->s_feature_incompat &
+	     cpu_to_le32(EXT4_FEATURE_INCOMPAT_64BIT)) &&
+	    offset < le16_to_cpu(sbi->s_es->s_desc_size))
+		crc = crc16(crc, (__u8 *)gdp + offset,
+			    le16_to_cpu(sbi->s_es->s_desc_size) -
+				offset);
+
+	return cpu_to_le16(crc);
 }
 
 int ext4_group_desc_csum_verify(struct ext3_sb_info *sbi, __u32 block_group,
@@ -2534,12 +2588,10 @@ struct ext4_group_desc * ext4_get_group_desc(struct super_block *sb,
                     ext4_group_t block_group, struct buffer_head **bh)
 {
     struct ext4_group_desc *desc = NULL;
-    struct buffer_head  *gb = NULL;
     struct ext3_sb_info *sbi = EXT3_SB(sb);
     PEXT2_VCB vcb = sb->s_priv;
-
-    unsigned int group;
-    unsigned int offset;
+    ext4_group_t group;
+    ext4_group_t offset;
 
     if (bh)
         *bh = NULL;
@@ -2552,43 +2604,32 @@ struct ext4_group_desc * ext4_get_group_desc(struct super_block *sb,
 
         return NULL;
     }
-    smp_rmb();
 
-    group = block_group >> EXT4_DESC_PER_BLOCK_BITS(sb);
-    offset = block_group & (EXT4_DESC_PER_BLOCK(sb) - 1);
+    __try {
 
-    if (!sbi->s_group_desc || !sbi->s_group_desc[group]) {
-        Ext2LoadGroup(vcb);
+        group = block_group >> EXT4_DESC_PER_BLOCK_BITS(sb);
+        offset = block_group & (EXT4_DESC_PER_BLOCK(sb) - 1);
+
+        if (!sbi->s_gd || !sbi->s_gd[group].block ||
+            !sbi->s_gd[group].bh) {
+            if (!Ext2LoadGroup(vcb)) {
+                __leave;
+            }
+        }
+
+        desc = (struct ext4_group_desc *)((PCHAR)sbi->s_gd[group].gd +
+                                          offset * EXT4_DESC_SIZE(sb));
+        if (bh) {
+            atomic_inc(&sbi->s_gd[group].bh->b_count);
+            *bh = sbi->s_gd[group].bh;
+        }
+    } __finally {
+        /* do cleanup */
     }
-
-    if (!sbi->s_group_desc[group]) {
-        ext4_error(sb, "ext4_get_group_desc",
-                   "Group descriptor not loaded - "
-                   "block_group = %u, group = %u, desc = %u",
-                   block_group, group, offset);
-        goto errorout;
-    }
-
-    gb = sb_getblk(sb, sbi->s_group_desc[group]);
-    if (!gb) {
-        ext4_error(sb, "ext4_get_group_desc",
-                   "failed to load group - "
-                   "block_group = %u, group = %u, desc = %u",
-                   block_group, group, offset);
-        goto errorout;
-    }
-
-    desc = (struct ext4_group_desc *)(gb->b_data +
-                      offset * EXT4_DESC_SIZE(sb));
-    if (bh)
-        *bh = gb;
-    else
-        fini_bh(&gb);
-
-errorout:
 
     return desc;
 }
+
 
 /**
  * ext4_count_free_blocks() -- count filesystem free blocks
@@ -2715,7 +2756,8 @@ int ext4_check_descriptors(struct super_block *sb)
             printk(KERN_ERR "EXT4-fs: ext4_check_descriptors: "
                    "Checksum for group %u failed (%u!=%u)\n",
                    i, le16_to_cpu(ext4_group_desc_csum(sbi, i,
-                                                       gdp)), le16_to_cpu(gdp->bg_checksum));
+                                                       gdp)),
+                   le16_to_cpu(gdp->bg_checksum));
             if (!IsVcbReadOnly(Vcb)) {
                 __brelse(bh);
                 return 0;

@@ -2266,6 +2266,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
     BOOLEAN                     NotifySyncInitialized = FALSE;
     BOOLEAN                     ExtentsInitialized = FALSE;
     BOOLEAN                     InodeLookasideInitialized = FALSE;
+    BOOLEAN                     GroupLoaded = FALSE;
 
     __try {
 
@@ -2314,6 +2315,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         ExInitializeResourceLite(&Vcb->PagingIoResource);
         ExInitializeResourceLite(&Vcb->MetaLock);
         ExInitializeResourceLite(&Vcb->McbLock);
+        ExInitializeResourceLite(&Vcb->sbi.s_gd_lock);
 #ifndef _WIN2K_TARGET_
         ExInitializeFastMutex(&Vcb->Mutex);
         FsRtlSetupAdvancedHeader(&Vcb->Header,  &Vcb->Mutex);
@@ -2622,6 +2624,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             Status = STATUS_UNSUCCESSFUL;
             __leave;
         }
+        GroupLoaded = TRUE;
 
         /* recovery journal since it's ext3 */
         if (Vcb->IsExt3fs) {
@@ -2693,9 +2696,11 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             }
 
             if (ExtentsInitialized) {
-                Ext2DropGroup(Vcb);
-                if (Vcb->bd.bd_bh_cache)
+                if (Vcb->bd.bd_bh_cache) {
+                    if (GroupLoaded)
+                        Ext2PutGroup(Vcb);
                     kmem_cache_destroy(Vcb->bd.bd_bh_cache);
+                }
                 FsRtlUninitializeLargeMcb(&(Vcb->Extents));
             }
 
@@ -2713,6 +2718,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             if (VcbResourceInitialized) {
                 ExDeleteResourceLite(&Vcb->McbLock);
                 ExDeleteResourceLite(&Vcb->MetaLock);
+                ExDeleteResourceLite(&Vcb->sbi.s_gd_lock);
                 ExDeleteResourceLite(&Vcb->MainResource);
                 ExDeleteResourceLite(&Vcb->PagingIoResource);
             }
@@ -2794,6 +2800,7 @@ Ext2DestroyVcb (IN PEXT2_VCB Vcb)
     ExDeleteNPagedLookasideList(&(Vcb->InodeLookasideList));
     ExDeleteResourceLite(&Vcb->McbLock);
     ExDeleteResourceLite(&Vcb->MetaLock);
+    ExDeleteResourceLite(&Vcb->sbi.s_gd_lock);
     ExDeleteResourceLite(&Vcb->PagingIoResource);
     ExDeleteResourceLite(&Vcb->MainResource);
 
