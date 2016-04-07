@@ -476,6 +476,17 @@ typedef PVOID   PBCB;
 // Data that is not specific to a mounted volume
 //
 
+typedef VOID (*EXT2_REAPER_RELEASE)(PVOID);
+
+typedef struct _EXT2_REAPER {
+        KEVENT                  Engine;
+        KEVENT                  Wait;
+        EXT2_REAPER_RELEASE     Free;
+        ULONG                   Flags;
+} EXT2_REAPER, *PEXT2_REAPER;
+
+#define EXT2_REAPER_FLAG_STOP   (1 << 0)
+
 typedef struct _EXT2_GLOBAL {
 
     /* Identifier for this structure */
@@ -511,10 +522,8 @@ typedef struct _EXT2_GLOBAL {
     LIST_ENTRY                  VcbList;
 
     /* Cleaning thread related: resource cleaner */
-    struct {
-        KEVENT                  Engine;
-        KEVENT                  Wait;
-    } Reaper;
+    EXT2_REAPER                 McbReaper;
+    EXT2_REAPER                 bhReaper;
 
     /* Look Aside table of IRP_CONTEXT, FCB, MCB, CCB */
     NPAGED_LOOKASIDE_LIST       Ext2IrpContextLookasideList;
@@ -687,12 +696,6 @@ typedef struct _EXT2_VCB {
     BOOLEAN                     IsExt3fs;
     PEXT2_SUPER_BLOCK           SuperBlock;
 
-    /*
-        // Bitmap Block per group
-        PRTL_BITMAP                 BlockBitMaps;
-        PRTL_BITMAP                 InodeBitMaps;
-    */
-
     // Block / Cluster size
     ULONG                       BlockSize;
 
@@ -763,6 +766,7 @@ typedef struct _EXT2_VCB {
 #define VCB_USER_IDS            0x00000040  /* uid/gid specified by user */
 #define VCB_USER_EIDS           0x00000080  /* euid/egid specified by user */
 
+#define VCB_BEING_DROPPED       0x00002000
 #define VCB_FORCE_WRITING       0x00004000
 #define VCB_DEVICE_REMOVED      0x00008000
 #define VCB_JOURNAL_RECOVER     0x00080000
@@ -2476,6 +2480,17 @@ Ext2LockControl (IN PEXT2_IRP_CONTEXT IrpContext);
 // Memory.c
 //
 
+VOID
+Ext2McbReaperThread(
+    PVOID   Context
+);
+
+VOID
+Ext2bhReaperThread(
+    PVOID   Context
+);
+
+
 PEXT2_IRP_CONTEXT
 Ext2AllocateIrpContext (IN PDEVICE_OBJECT   DeviceObject,
                         IN PIRP             Irp );
@@ -2780,7 +2795,9 @@ Ext2ReaperThread(
 );
 
 NTSTATUS
-Ext2StartReaperThread();
+Ext2StartReaper(PEXT2_REAPER, EXT2_REAPER_RELEASE);
+VOID
+Ext2StopReaper(PEXT2_REAPER Reaper);
 
 //
 // Misc.c

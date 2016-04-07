@@ -31,7 +31,8 @@ extern PEXT2_GLOBAL Ext2Global;
 #pragma alloc_text(PAGE, Ext2DestroyVcb)
 #pragma alloc_text(PAGE, Ext2SyncUninitializeCacheMap)
 #pragma alloc_text(PAGE, Ext2ReaperThread)
-#pragma alloc_text(PAGE, Ext2StartReaperThread)
+#pragma alloc_text(PAGE, Ext2StartReaper)
+#pragma alloc_text(PAGE, Ext2StopReaper)
 #endif
 
 PEXT2_IRP_CONTEXT
@@ -1402,7 +1403,7 @@ Ext2AllocateMcb (
 
     /* need wake the reaper thread if there are many Mcb allocated */
     if (Ext2Global->PerfStat.Current.Mcb > (((ULONG)Ext2Global->MaxDepth) * 4)) {
-        KeSetEvent(&Ext2Global->Reaper.Wait, 0, FALSE);
+        KeSetEvent(&Ext2Global->McbReaper.Wait, 0, FALSE);
     }
 
     /* allocate Mcb from LookasideList */
@@ -2489,7 +2490,10 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         Vcb->bd.bd_volume = Vcb->Volume;
         Vcb->bd.bd_priv = (void *) Vcb;
         memset(&Vcb->bd.bd_bh_root, 0, sizeof(struct rb_root));
-        spin_lock_init(&Vcb->bd.bd_bh_lock);
+        InitializeListHead(&Vcb->bd.bd_bh_free);
+        ExInitializeResourceLite(&Vcb->bd.bd_bh_lock);
+        KeInitializeEvent(&Vcb->bd.bd_bh_notify,
+                           NotificationEvent, TRUE);
         Vcb->bd.bd_bh_cache = kmem_cache_create("bd_bh_buffer",
                                                 Vcb->BlockSize, 0, 0, NULL);
         if (!Vcb->bd.bd_bh_cache) {
@@ -2770,6 +2774,7 @@ Ext2DestroyVcb (IN PEXT2_VCB Vcb)
 
     if (Vcb->bd.bd_bh_cache)
         kmem_cache_destroy(Vcb->bd.bd_bh_cache);
+    ExDeleteResourceLite(&Vcb->bd.bd_bh_lock);
 
     if (Vcb->SuperBlock) {
         Ext2FreePool(Vcb->SuperBlock, EXT2_SB_MAGIC);
@@ -2953,16 +2958,11 @@ Ext2FirstUnusedMcb(PEXT2_VCB Vcb, BOOLEAN Wait, ULONG Number)
 
 /* Reaper thread to release unused Mcb blocks */
 VOID
-Ext2ReaperThread(
+Ext2McbReaperThread(
     PVOID   Context
 )
 {
-    BOOLEAN         GlobalAcquired = FALSE;
-
-    BOOLEAN         DidNothing = TRUE;
-    BOOLEAN         LastState  = TRUE;
-    BOOLEAN         WaitLock;
-
+    PEXT2_REAPER    Reaper = Context;
     PLIST_ENTRY     List = NULL;
     LARGE_INTEGER   Timeout;
 
@@ -2971,13 +2971,19 @@ Ext2ReaperThread(
 
     ULONG           i, NumOfMcbs;
 
+    BOOLEAN         GlobalAcquired = FALSE;
+
+    BOOLEAN         DidNothing = TRUE;
+    BOOLEAN         LastState  = TRUE;
+    BOOLEAN         WaitLock;
+
     __try {
 
         /* wake up DirverEntry */
-        KeSetEvent(&Ext2Global->Reaper.Engine, 0, FALSE);
+        KeSetEvent(&Reaper->Engine, 0, FALSE);
 
         /* now process looping */
-        while (TRUE) {
+        while (!IsFlagOn(Reaper->Flags, EXT2_REAPER_FLAG_STOP)) {
 
             WaitLock = FALSE;
 
@@ -3020,12 +3026,15 @@ Ext2ReaperThread(
 
             /* wait until it is waken or it times out */
             KeWaitForSingleObject(
-                &(Ext2Global->Reaper.Wait),
+                &Reaper->Wait,
                 Executive,
                 KernelMode,
                 FALSE,
                 &Timeout
             );
+
+            if (IsFlagOn(Reaper->Flags, EXT2_REAPER_FLAG_STOP))
+                break;
 
             DidNothing = TRUE;
 
@@ -3065,22 +3074,157 @@ Ext2ReaperThread(
         if (GlobalAcquired) {
             ExReleaseResourceLite(&Ext2Global->Resource);
         }
+
+        KeSetEvent(&Reaper->Engine, 0, FALSE);
     }
 
     PsTerminateSystemThread(STATUS_SUCCESS);
 }
 
 
+/* get the first Mcb record in Vcb->McbList */
+
+BOOLEAN
+Ext2QueryUnusedBH(PEXT2_VCB Vcb, PLIST_ENTRY head)
+{
+    struct buffer_head *bh = NULL;
+    PLIST_ENTRY list = NULL;
+    LARGE_INTEGER now;
+    BOOLEAN       wake = FALSE;
+
+    KeQuerySystemTime(&now);
+
+    ExAcquireResourceExclusiveLite(&Vcb->bd.bd_bh_lock, TRUE);
+    while (!IsListEmpty(&Vcb->bd.bd_bh_free)) {
+        list = RemoveHeadList(&Vcb->bd.bd_bh_free);
+        bh = CONTAINING_RECORD(list, struct buffer_head, b_link);
+        if (atomic_read(&bh->b_count)) {
+            InitializeListHead(&bh->b_link);
+            continue;
+        }
+
+        if ( IsFlagOn(Vcb->Flags, VCB_BEING_DROPPED) ||
+            (bh->b_ts_drop.QuadPart + (LONGLONG)10*1000*1000*15) > now.QuadPart ||
+            (bh->b_ts_creat.QuadPart + (LONGLONG)10*1000*1000*180) > now.QuadPart) {
+            InsertTailList(head, &bh->b_link);
+        } else {
+            InsertHeadList(&Vcb->bd.bd_bh_free, &bh->b_link);
+            break;
+        }
+    }
+    wake = IsListEmpty(&Vcb->bd.bd_bh_free);
+    ExReleaseResourceLite(&Vcb->bd.bd_bh_lock);
+
+    if (wake)
+        KeSetEvent(&Vcb->bd.bd_bh_notify, 0, FALSE);
+
+    return IsFlagOn(Vcb->Flags, VCB_BEING_DROPPED);
+}
+
+
+/* Reaper thread to release unused buffer heads */
+VOID
+Ext2bhReaperThread(
+    PVOID   Context
+)
+{
+    PEXT2_REAPER    Reaper = Context;
+    PEXT2_VCB       Vcb = NULL;
+    LIST_ENTRY      List, *Link;
+    LARGE_INTEGER   Timeout;
+
+    BOOLEAN         GlobalAcquired = FALSE;
+    BOOLEAN         DidNothing = FALSE;
+    BOOLEAN         NonWait = FALSE;
+
+    __try {
+
+        /* wake up DirverEntry */
+        KeSetEvent(&Reaper->Engine, 0, FALSE);
+
+        /* now process looping */
+        while (!IsFlagOn(Reaper->Flags, EXT2_REAPER_FLAG_STOP)) {
+
+            /* wait until it is waken or it times out */
+            if (NonWait) {
+                Timeout.QuadPart = (LONGLONG)-10*1000*10;
+                NonWait = FALSE;
+            } else if (DidNothing) {
+                Timeout.QuadPart = Timeout.QuadPart * 2;
+            } else {
+                Timeout.QuadPart = (LONGLONG)-10*1000*1000*10; /* 10 seconds */
+            }
+            KeWaitForSingleObject(
+                &Reaper->Wait,
+                Executive,
+                KernelMode,
+                FALSE,
+                &Timeout
+            );
+
+            if (IsFlagOn(Reaper->Flags, EXT2_REAPER_FLAG_STOP))
+                break;
+
+            InitializeListHead(&List);
+
+            /* acquire global exclusive lock */
+            ExAcquireResourceSharedLite(&Ext2Global->Resource, TRUE);
+            GlobalAcquired = TRUE;
+            /* search all Vcb to get unused resources freed to system */
+            for (Link = Ext2Global->VcbList.Flink;
+                 Link != &(Ext2Global->VcbList);
+                 Link = Link->Flink ) {
+
+                Vcb = CONTAINING_RECORD(Link, EXT2_VCB, Next);
+                if (Ext2QueryUnusedBH(Vcb, &List))
+                    NonWait = TRUE;
+            }
+            if (GlobalAcquired) {
+                ExReleaseResourceLite(&Ext2Global->Resource);
+                GlobalAcquired = FALSE;
+            }
+
+            DidNothing = IsListEmpty(&List);
+            while (!IsListEmpty(&List)) {
+                struct buffer_head *bh;
+                Link = RemoveHeadList(&List);
+                bh = CONTAINING_RECORD(Link, struct buffer_head, b_link);
+                ASSERT(0 == atomic_read(&bh->b_count));
+                free_buffer_head(bh);
+            }
+        }
+
+    } __finally {
+
+        if (GlobalAcquired) {
+            ExReleaseResourceLite(&Ext2Global->Resource);
+        }
+
+        KeSetEvent(&Reaper->Engine, 0, FALSE);
+    }
+
+    PsTerminateSystemThread(STATUS_SUCCESS);
+}
+
 NTSTATUS
-Ext2StartReaperThread()
+Ext2StartReaper(PEXT2_REAPER Reaper, EXT2_REAPER_RELEASE Free)
 {
     NTSTATUS status = STATUS_SUCCESS;
     OBJECT_ATTRIBUTES  oa;
     HANDLE   handle = 0;
+    LARGE_INTEGER timeout;
+
+    Reaper->Free = Free;
 
     /* initialize wait event */
     KeInitializeEvent(
-        &Ext2Global->Reaper.Wait,
+        &Reaper->Wait,
+        SynchronizationEvent, FALSE
+    );
+
+    /* Reaper thread engine event */
+    KeInitializeEvent(
+        &Reaper->Engine,
         SynchronizationEvent, FALSE
     );
 
@@ -3101,13 +3245,45 @@ Ext2StartReaperThread()
                  &oa,
                  NULL,
                  NULL,
-                 Ext2ReaperThread,
-                 NULL
+                 Free,
+                 (PVOID)Reaper
              );
 
     if (NT_SUCCESS(status)) {
         ZwClose(handle);
+
+        /* make sure Reaperthread is started */
+        timeout.QuadPart = (LONGLONG)-10*1000*1000*2; /* 2 seconds */
+        status = KeWaitForSingleObject(
+                     &Reaper->Engine,
+                     Executive,
+                     KernelMode,
+                     FALSE,
+                     &timeout
+                 );
+        if (status != STATUS_SUCCESS) {
+            status = STATUS_INSUFFICIENT_RESOURCES;
+        }
     }
 
     return status;
+}
+
+
+VOID
+Ext2StopReaper(PEXT2_REAPER Reaper)
+{
+    LARGE_INTEGER timeout;
+
+    Reaper->Flags |= EXT2_REAPER_FLAG_STOP;
+    KeSetEvent(&Reaper->Wait, 0, FALSE);
+
+    /* make sure Reaperthread is started */
+    timeout.QuadPart = (LONGLONG)-10*1000*1000*2; /* 2 seconds */
+    KeWaitForSingleObject(
+                     &Reaper->Engine,
+                     Executive,
+                     KernelMode,
+                     FALSE,
+                     &timeout);
 }

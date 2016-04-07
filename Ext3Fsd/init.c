@@ -457,7 +457,6 @@ DriverEntry (
     PFAST_IO_DISPATCH           FastIoDispatch;
     PCACHE_MANAGER_CALLBACKS    CacheManagerCallbacks;
 
-    LARGE_INTEGER               Timeout;
     NTSTATUS                    Status;
 
     int                         rc = 0;
@@ -516,10 +515,6 @@ DriverEntry (
     InitializeListHead(&(Ext2Global->VcbList));
     ExInitializeResourceLite(&(Ext2Global->Resource));
 
-    /* Reaper thread engine event */
-    KeInitializeEvent(&Ext2Global->Reaper.Engine,
-                      SynchronizationEvent, FALSE);
-
     /* query registry settings */
     Ext2QueryRegistrySettings(RegistryPath);
 
@@ -556,21 +551,18 @@ DriverEntry (
     }
 
     /* start resource reaper thread */
-    Status= Ext2StartReaperThread();
+    Status= Ext2StartReaper(
+                &Ext2Global->McbReaper,
+                Ext2McbReaperThread);
     if (!NT_SUCCESS(Status)) {
         goto errorout;
     }
-    /* make sure Reaperthread is started */
-    Timeout.QuadPart = (LONGLONG)-10*1000*1000*10; /* 10 seconds */
-    Status = KeWaitForSingleObject(
-                 &(Ext2Global->Reaper.Engine),
-                 Executive,
-                 KernelMode,
-                 FALSE,
-                 &Timeout
-             );
-    if (Status != STATUS_SUCCESS) {
-        Status = STATUS_INSUFFICIENT_RESOURCES;
+
+    Status= Ext2StartReaper(
+                &Ext2Global->bhReaper,
+                Ext2bhReaperThread);
+    if (!NT_SUCCESS(Status)) {
+        Ext2StopReaper(&Ext2Global->McbReaper);
         goto errorout;
     }
 
