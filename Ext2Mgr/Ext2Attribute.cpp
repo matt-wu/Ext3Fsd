@@ -376,13 +376,14 @@ store_evp:
     rc = Ext2SetExt2Property(Handle, m_EVP);
 
     if (rc) {
-
+        /* don't bother user at all */
+#if 0
         str = "Ext2 volume settings updated successfully!";
         if (dc) {
             str += "\r\n\r\nFixed mountpoint needs reboot to take into affect.";
         }
         AfxMessageBox(str, MB_OK | MB_ICONINFORMATION);
-
+#endif
     } else {
         AfxMessageBox("Failed to save the Ext2 settings !",
                       MB_OK | MB_ICONWARNING);
