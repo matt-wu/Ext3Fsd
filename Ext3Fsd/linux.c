@@ -344,13 +344,9 @@ free_buffer_head(struct buffer_head * bh)
 
             DEBUG(DL_BH, ("bh=%p mdl=%p (Flags:%xh VA:%p) released.\n", bh, bh->b_mdl,
                           bh->b_mdl->MdlFlags, bh->b_mdl->MappedSystemVa));
-            if (IsFlagOn(bh->b_mdl->MdlFlags, MDL_PAGES_LOCKED)) {
-                /* MmUnlockPages will release it's VA */
-                MmUnlockPages(bh->b_mdl);
-            } else if (IsFlagOn(bh->b_mdl->MdlFlags, MDL_MAPPED_TO_SYSTEM_VA)) {
+            if (IsFlagOn(bh->b_mdl->MdlFlags, MDL_MAPPED_TO_SYSTEM_VA)) {
                 MmUnmapLockedPages(bh->b_mdl->MappedSystemVa, bh->b_mdl);
             }
-
             Ext2DestroyMdl(bh->b_mdl);
         }
         if (bh->b_bcb) {
@@ -499,13 +495,14 @@ again:
         set_buffer_uptodate(bh);
     }
 
-    bh->b_mdl = Ext2CreateMdl(ptr, TRUE, bh->b_size, IoModifyAccess);
+    bh->b_mdl = Ext2CreateMdl(ptr, bh->b_size, IoModifyAccess);
     if (bh->b_mdl) {
         /* muse map the PTE to NonCached zone. journal recovery will
            access the PTE under spinlock: DISPATCH_LEVEL IRQL */
         bh->b_data = MmMapLockedPagesSpecifyCache(
                          bh->b_mdl, KernelMode, MmNonCached,
                          NULL,FALSE, HighPagePriority);
+        /* bh->b_data = MmMapLockedPages(bh->b_mdl, KernelMode); */
     }
     if (!bh->b_mdl || !bh->b_data) {
         free_buffer_head(bh);

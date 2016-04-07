@@ -1137,7 +1137,6 @@ int Ext2CheckFileAccess (PEXT2_VCB Vcb, PEXT2_MCB Mcb, int attempt);
 PMDL
 Ext2CreateMdl (
     IN PVOID Buffer,
-    IN BOOLEAN bPaged,
     IN ULONG Length,
     IN LOCK_OPERATION Operation
 );
