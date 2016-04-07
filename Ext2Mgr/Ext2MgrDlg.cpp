@@ -1663,6 +1663,9 @@ void CExt2MgrDlg::OnTimer(UINT nIDEvent)
         if (m_bHandleChange)
             PostMessage(WM_COMMAND, ID_REFRESH, 0);
         KillTimer('REFR');
+    } else if (nIDEvent == 'REFF') {
+        PostMessage(WM_COMMAND, ID_REFRESH, 0);
+        KillTimer('REFF');
     }
 	
 	CDialog::OnTimer(nIDEvent);

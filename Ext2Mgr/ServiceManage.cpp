@@ -211,7 +211,8 @@ void CServiceManage::OnStartService()
 
     if (m_bStarted) {
         m_srvStatus = _T("Ext2Fsd was just started.");
-        GetParent()->SetTimer('REFR', 1000, NULL);
+        GetParent()->SetTimer('REFF',  500, NULL);
+        GetParent()->SetTimer('REFR', 3000, NULL);
     } else {
         m_srvStatus = _T("Ext2Fsd could NOT be started.");
     }
