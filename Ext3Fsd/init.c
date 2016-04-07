@@ -419,6 +419,20 @@ Ext2QueryRegistrySettings(IN PUNICODE_STRING  RegistryPath)
                (NLS_OEM_LEAD_BYTE_INFO[(UCHAR)(DBCS_CHAR)] != 0))) \
 )
 
+VOID
+Ext2EresourceAlignmentChecking()
+{
+    /* Verify ERESOURCE alignment in structures */
+    CL_ASSERT((FIELD_OFFSET(EXT2_GLOBAL, Resource) & 7) == 0);
+    CL_ASSERT((FIELD_OFFSET(EXT2_VCB, MainResource) & 7) == 0);
+    CL_ASSERT((FIELD_OFFSET(EXT2_VCB, PagingIoResource) & 7) == 0);
+    CL_ASSERT((FIELD_OFFSET(EXT2_VCB, MetaLock) & 7) == 0);
+    CL_ASSERT((FIELD_OFFSET(EXT2_VCB, McbLock) & 7) == 0);
+    CL_ASSERT((FIELD_OFFSET(EXT2_FCBVCB, MainResource) & 7) == 0);
+    CL_ASSERT((FIELD_OFFSET(EXT2_FCBVCB, PagingIoResource) & 7) == 0);
+    CL_ASSERT((FIELD_OFFSET(EXT2_FCB, MainResource) & 7) == 0);
+    CL_ASSERT((FIELD_OFFSET(EXT2_FCB, PagingIoResource) & 7) == 0);
+}
 
 /*
  * NAME: DriverEntry
@@ -449,17 +463,6 @@ DriverEntry (
     int                         rc = 0;
     BOOLEAN                     linux_lib_inited = FALSE;
     BOOLEAN                     journal_module_inited = FALSE;
-
-    /* Verify ERESOURCE alignment in structures */
-    ASSERT((FIELD_OFFSET(EXT2_GLOBAL, Resource) & 7) == 0);
-    ASSERT((FIELD_OFFSET(EXT2_VCB, MainResource) & 7) == 0);
-    ASSERT((FIELD_OFFSET(EXT2_VCB, PagingIoResource) & 7) == 0);
-    ASSERT((FIELD_OFFSET(EXT2_VCB, MetaLock) & 7) == 0);
-    ASSERT((FIELD_OFFSET(EXT2_VCB, McbLock) & 7) == 0);
-    ASSERT((FIELD_OFFSET(EXT2_FCBVCB, MainResource) & 7) == 0);
-    ASSERT((FIELD_OFFSET(EXT2_FCBVCB, PagingIoResource) & 7) == 0);
-    ASSERT((FIELD_OFFSET(EXT2_FCB, MainResource) & 7) == 0);
-    ASSERT((FIELD_OFFSET(EXT2_FCB, PagingIoResource) & 7) == 0);
 
     /* Verity super block ... */
     ASSERT(sizeof(EXT2_SUPER_BLOCK) == 1024);

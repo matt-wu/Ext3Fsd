@@ -104,6 +104,26 @@ typedef struct ext3_dir_entry_2 EXT2_DIR_ENTRY2, *PEXT2_DIR_ENTRY2;
 #define CEILING_ALIGNED(T, A, B) (((A) + (B) - 1) & (~((T)(B) - 1)))
 #define COCKLOFT_ALIGNED(T, A, B) (((A) + (B)) & (~((T)(B) - 1)))
 
+
+
+/*
+ * Compile-time assertion: (Lustre version)
+ *
+ * Check an invariant described by a constant expression at compile time by
+ * forcing a compiler error if it does not hold.  \a cond must be a constant
+ * expression as defined by the ISO C Standard:
+ *
+ *       6.8.4.2  The switch statement
+ *       ....
+ *       [#3] The expression of each case label shall be  an  integer
+ *       constant   expression  and  no  two  of  the  case  constant
+ *       expressions in the same switch statement shall have the same
+ *       value  after  conversion...
+ *
+ */
+
+#define CL_ASSERT(cond) do {switch('x') {case (cond): case 0: break;}} while (0)
+
 /* File System Releated *************************************************/
 
 #define DRIVER_NAME      "Ext2Fsd"
