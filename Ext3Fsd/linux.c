@@ -329,6 +329,9 @@ new_buffer_head()
     struct buffer_head * bh = NULL;
     bh = kmem_cache_alloc(g_jbh.bh_cache, GFP_NOFS);
     if (bh) {
+        atomic_inc(&g_jbh.bh_count);
+        atomic_inc(&g_jbh.bh_acount);
+
         memset(bh, 0, sizeof(struct buffer_head));
         DEBUG(DL_BH, ("bh=%p allocated.\n", bh));
         INC_MEM_COUNT(PS_BUFF_HEAD, bh, sizeof(struct buffer_head));
@@ -356,6 +359,7 @@ free_buffer_head(struct buffer_head * bh)
         DEBUG(DL_BH, ("bh=%p freed.\n", bh));
         DEC_MEM_COUNT(PS_BUFF_HEAD, bh, sizeof(struct buffer_head));
         kmem_cache_free(g_jbh.bh_cache, bh);
+        atomic_dec(&g_jbh.bh_count);
     }
 }
 
@@ -463,8 +467,6 @@ get_block_bh_mdl(
     bh->b_blocknr = block;
     bh->b_size = size;
     bh->b_data = NULL;
-    atomic_inc(&g_jbh.bh_count);
-    atomic_inc(&g_jbh.bh_acount);
 
 again:
 
@@ -640,8 +642,6 @@ get_block_bh(
     bh->b_blocknr = block;
     bh->b_size = size;
     bh->b_data = NULL;
-    atomic_inc(&g_jbh.bh_count);
-    atomic_inc(&g_jbh.bh_acount);
 
 again:
 
@@ -777,7 +777,6 @@ void __brelse(struct buffer_head *bh)
                   bh->b_blocknr, bh, bh->b_data ));
 
     free_buffer_head(bh);
-    atomic_dec(&g_jbh.bh_count);
 }
 
 
