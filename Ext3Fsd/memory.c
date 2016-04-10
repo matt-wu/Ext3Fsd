@@ -2313,7 +2313,8 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         /* initialize eresources */
         ExInitializeResourceLite(&Vcb->MainResource);
         ExInitializeResourceLite(&Vcb->PagingIoResource);
-        ExInitializeResourceLite(&Vcb->MetaLock);
+        ExInitializeResourceLite(&Vcb->MetaInode);
+        ExInitializeResourceLite(&Vcb->MetaBlock);
         ExInitializeResourceLite(&Vcb->McbLock);
         ExInitializeResourceLite(&Vcb->sbi.s_gd_lock);
 #ifndef _WIN2K_TARGET_
@@ -2717,7 +2718,8 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
 
             if (VcbResourceInitialized) {
                 ExDeleteResourceLite(&Vcb->McbLock);
-                ExDeleteResourceLite(&Vcb->MetaLock);
+                ExDeleteResourceLite(&Vcb->MetaInode);
+                ExDeleteResourceLite(&Vcb->MetaBlock);
                 ExDeleteResourceLite(&Vcb->sbi.s_gd_lock);
                 ExDeleteResourceLite(&Vcb->MainResource);
                 ExDeleteResourceLite(&Vcb->PagingIoResource);
@@ -2799,7 +2801,8 @@ Ext2DestroyVcb (IN PEXT2_VCB Vcb)
 
     ExDeleteNPagedLookasideList(&(Vcb->InodeLookasideList));
     ExDeleteResourceLite(&Vcb->McbLock);
-    ExDeleteResourceLite(&Vcb->MetaLock);
+    ExDeleteResourceLite(&Vcb->MetaInode);
+    ExDeleteResourceLite(&Vcb->MetaBlock);
     ExDeleteResourceLite(&Vcb->sbi.s_gd_lock);
     ExDeleteResourceLite(&Vcb->PagingIoResource);
     ExDeleteResourceLite(&Vcb->MainResource);

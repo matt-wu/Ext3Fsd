@@ -643,7 +643,7 @@ Ext2NewBlock(
 
     *Block = 0;
 
-    ExAcquireResourceExclusiveLite(&Vcb->MetaLock, TRUE);
+    ExAcquireResourceExclusiveLite(&Vcb->MetaBlock, TRUE);
 
     /* validate the hint group and hint block */
     if (GroupHint >= Vcb->sbi.s_groups_count) {
@@ -813,7 +813,7 @@ Again:
 
 errorout:
 
-    ExReleaseResourceLite(&Vcb->MetaLock);
+    ExReleaseResourceLite(&Vcb->MetaBlock);
 
     if (bh)
         fini_bh(&bh);
@@ -850,7 +850,7 @@ Ext2FreeBlock(
 
     NTSTATUS        Status = STATUS_UNSUCCESSFUL;
 
-    ExAcquireResourceExclusiveLite(&Vcb->MetaLock, TRUE);
+    ExAcquireResourceExclusiveLite(&Vcb->MetaBlock, TRUE);
 
     DEBUG(DL_INF, ("Ext2FreeBlock: Block %xh - %x to be freed.\n",
                    Block, Block + Number));
@@ -967,7 +967,7 @@ errorout:
     if (gb)
         fini_bh(&gb);
 
-    ExReleaseResourceLite(&Vcb->MetaLock);
+    ExReleaseResourceLite(&Vcb->MetaBlock);
 
     return Status;
 }
@@ -999,7 +999,7 @@ Ext2NewInode(
 
     *Inode = dwInode = 0XFFFFFFFF;
 
-    ExAcquireResourceExclusiveLite(&Vcb->MetaLock, TRUE);
+    ExAcquireResourceExclusiveLite(&Vcb->MetaInode, TRUE);
 
     if (GroupHint >= Vcb->sbi.s_groups_count)
         GroupHint = GroupHint % Vcb->sbi.s_groups_count;
@@ -1323,7 +1323,7 @@ repeat:
 
 errorout:
 
-    ExReleaseResourceLite(&Vcb->MetaLock);
+    ExReleaseResourceLite(&Vcb->MetaInode);
 
     if (bh)
         fini_bh(&bh);
@@ -1347,7 +1347,7 @@ Ext2UpdateGroupDirStat(
     struct buffer_head     *gb = NULL;
     NTSTATUS                status;
 
-    ExAcquireResourceExclusiveLite(&Vcb->MetaLock, TRUE);
+    ExAcquireResourceExclusiveLite(&Vcb->MetaInode, TRUE);
 
     /* get group desc */
     gd = ext4_get_group_desc(sb, group, &gb);
@@ -1364,7 +1364,7 @@ Ext2UpdateGroupDirStat(
 
 errorout:
 
-    ExReleaseResourceLite(&Vcb->MetaLock);
+    ExReleaseResourceLite(&Vcb->MetaInode);
 
     if (gb)
         fini_bh(&gb);
@@ -1397,7 +1397,7 @@ Ext2FreeInode(
 
     NTSTATUS        Status = STATUS_UNSUCCESSFUL;
 
-    ExAcquireResourceExclusiveLite(&Vcb->MetaLock, TRUE);
+    ExAcquireResourceExclusiveLite(&Vcb->MetaInode, TRUE);
 
     Group = (Inode - 1) / INODES_PER_GROUP;
     dwIno = (Inode - 1) % INODES_PER_GROUP;
@@ -1474,7 +1474,7 @@ Ext2FreeInode(
 
 errorout:
 
-    ExReleaseResourceLite(&Vcb->MetaLock);
+    ExReleaseResourceLite(&Vcb->MetaInode);
 
     if (bh)
         fini_bh(&bh);

@@ -626,8 +626,11 @@ typedef struct _EXT2_VCB {
     /* Common header */
     EXT2_FCBVCB;
 
-    // Resource for metadata (super block, tables)
-    ERESOURCE                   MetaLock;
+    // Resource for metadata (inode)
+    ERESOURCE                   MetaInode;
+
+    // Resource for metadata (block)
+    ERESOURCE                   MetaBlock;
 
     // Resource for Mcb (Meta data control block)
     ERESOURCE                   McbLock;

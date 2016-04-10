@@ -426,7 +426,8 @@ Ext2EresourceAlignmentChecking()
     CL_ASSERT((FIELD_OFFSET(EXT2_GLOBAL, Resource) & 7) == 0);
     CL_ASSERT((FIELD_OFFSET(EXT2_VCB, MainResource) & 7) == 0);
     CL_ASSERT((FIELD_OFFSET(EXT2_VCB, PagingIoResource) & 7) == 0);
-    CL_ASSERT((FIELD_OFFSET(EXT2_VCB, MetaLock) & 7) == 0);
+    CL_ASSERT((FIELD_OFFSET(EXT2_VCB, MetaInode) & 7) == 0);
+    CL_ASSERT((FIELD_OFFSET(EXT2_VCB, MetaBlock) & 7) == 0);
     CL_ASSERT((FIELD_OFFSET(EXT2_VCB, McbLock) & 7) == 0);
     CL_ASSERT((FIELD_OFFSET(EXT2_VCB, bd.bd_bh_lock) & 7) == 0);
     CL_ASSERT((FIELD_OFFSET(EXT2_VCB, sbi.s_gd_lock) & 7) == 0);
