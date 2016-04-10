@@ -2,15 +2,15 @@
  About Ext2Fsd
 ======================
 
-Ext2Fsd project is an ext2 file system driver for Windows (2000/2003/XP/7/8).
+Ext2Fsd project is an ext2/3/4 file system driver for Windows (2k/XP/7/8/10).
 
-It's a free software. Everyone can distribute and modify it under GNU GPLv2.
+It's a free software. Everyone can distribute or modify it under GNU GPLv2.
 
 ======================
  Author & Homepage
 ======================
 
-Matt<mattwu@163.com>
+Matt Wu <mattwu@163.com>
 http://www.ext2fsd.com
 
 
@@ -18,8 +18,8 @@ http://www.ext2fsd.com
  Credits 
 ======================
 
-Here, I owe all my thanks to Bo Branten<bosse@acc.umu.se> for his
-project romfs and his great contribution of the free version ntifs.h
+Thanks to Bo Branten<bosse@acc.umu.se> for his project romfs and his great
+contribution of the free version ntifs.h.
 
 Everyone can get to him at http://www.acc.umu.se/~bosse/.
 
@@ -28,9 +28,20 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
  Revision history
 ======================
 
+50, V0.65    2016-04-10
+
+Modifications from V0.64:
+
+Features:
+    1, major performance improvements (small files meta-operatios)
+    2, memory pressure handling for buffer-head structures reclaim
+    3, back support for Windows 2000 (i386, 32bit)
+    4, no bothering user with notification message for Ext2Mgr
+    5, project improvement: Ext2Mgr to be built with WDK or VS2008
+
 49, V0.64    2016-04-04
 
-Modifications from V0.62:
+Modifications from V0.63:
 
 Features:
     1, Drive letter assignment mechanism refined
@@ -41,7 +52,6 @@ Bugs fixed:
     2, Unexpected drive letter removal for virtual devices
     3, Resource lock rules refined to consolidate consistency
     4, Kernel codes improved to make Ext3Fsd more secure
-
 
 48, V0.63:   2016-03-12
 

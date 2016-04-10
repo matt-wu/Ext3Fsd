@@ -1,21 +1,17 @@
 
 ==================================
-Release Notes for Ext2Fsd V0.64
+Release Notes for Ext2Fsd V0.65
 ==================================
 
-Features implemented or bugfix since V0.63:
+Features implemented or bugfix since V0.64:
 
-  Features:
-    1, Drive letter assignment mechanism refined
-    2, Mount as specified user (uid/gid) supported
+    1, major performance improvements (small files meta-operatios)
+    2, memory pressure handling for buffer-head structures reclaim
+    3, back support for Windows 2000 (i386, 32bit)
+    4, no bothering user with notification message for Ext2Mgr
+    5, project improvement: Ext2Mgr to be built with WDK or VS2008
 
-  Bugs fixed:
-    1, Symlink creation breaks metedata statistics for inodes
-    2, Unexpected drive letter removal for virtual devices
-    3, Resource lock rules refined to consolidate consistency
-    4, Kernel codes improved to make Ext3Fsd more secure
-
-Supported Ext3/4 features by 0.64:
+Supported Ext3/4 features by 0.65:
 
     1, flexible inode size: > 128 bytes, up to block size
     2, dir_index:    htree directory index
