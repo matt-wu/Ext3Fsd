@@ -2389,15 +2389,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         /* initialize UUID and serial number */
         if (Ext2IsNullUuid(sb->s_uuid)) {
             ExUuidCreate((UUID *)sb->s_uuid);
-        } else {
-            /* query parameters from registry */
-            if (!NT_SUCCESS(Ext2PerformRegistryVolumeParams(Vcb))) {
-                /* don't mount this volume */
-                Status = STATUS_UNRECOGNIZED_VOLUME;
-                __leave;
-            }
         }
-
         Vpb->SerialNumber = ((ULONG*)sb->s_uuid)[0] +
                             ((ULONG*)sb->s_uuid)[1] +
                             ((ULONG*)sb->s_uuid)[2] +
@@ -2683,6 +2675,9 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         /* get anything doen, then refer target device */
         ObReferenceObject(Vcb->TargetDeviceObject);
         SetLongFlag(Vcb->Flags, VCB_INITIALIZED);
+
+        /* query parameters from registry */
+        Ext2PerformRegistryVolumeParams(Vcb);
 
     } __finally {
 

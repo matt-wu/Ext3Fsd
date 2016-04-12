@@ -215,6 +215,10 @@ Ext2DropGroup(IN PEXT2_VCB Vcb)
     LARGE_INTEGER        timeout;
     unsigned long i;
 
+    /* do nothing if Vcb is not initialized yet */
+    if (!IsFlagOn(Vcb->Flags, VCB_INITIALIZED))
+        return;
+
     __try {
         SetFlag(Vcb->Flags, VCB_BEING_DROPPED);
         ExAcquireResourceExclusiveLite(&Vcb->sbi.s_gd_lock, TRUE);
