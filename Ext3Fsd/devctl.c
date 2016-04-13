@@ -443,8 +443,10 @@ Ext2ProcessVolumeProperty(
         case APP_CMD_SET_PROPERTY:
 
             if (Property->bReadonly) {
-                Ext2FlushFiles(NULL, Vcb, FALSE);
-                Ext2FlushVolume(NULL, Vcb, FALSE);
+                if (IsFlagOn(Vcb->Flags, VCB_INITIALIZED)) {
+                    Ext2FlushFiles(NULL, Vcb, FALSE);
+                    Ext2FlushVolume(NULL, Vcb, FALSE);
+                }
                 SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
 
             } else {

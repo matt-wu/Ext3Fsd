@@ -2674,10 +2674,11 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
 
         /* get anything doen, then refer target device */
         ObReferenceObject(Vcb->TargetDeviceObject);
-        SetLongFlag(Vcb->Flags, VCB_INITIALIZED);
 
         /* query parameters from registry */
         Ext2PerformRegistryVolumeParams(Vcb);
+
+        SetLongFlag(Vcb->Flags, VCB_INITIALIZED);
 
     } __finally {
 
