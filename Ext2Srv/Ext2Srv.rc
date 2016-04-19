@@ -27,7 +27,7 @@ LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
 // TEXTINCLUDE
 //
 
-2 TEXTINCLUDE 
+2 TEXTINCLUDE
 BEGIN
     "#define APSTUDIO_HIDDEN_SYMBOLS\r\n"
     "#include ""windows.h""\r\n"
@@ -35,13 +35,13 @@ BEGIN
     "\0"
 END
 
-3 TEXTINCLUDE 
+3 TEXTINCLUDE
 BEGIN
     "\r\n"
     "\0"
 END
 
-1 TEXTINCLUDE 
+1 TEXTINCLUDE
 BEGIN
 END
 
@@ -66,8 +66,8 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,2,04,11
- PRODUCTVERSION 1,2,04,11
+ FILEVERSION 1,2,4,13
+ PRODUCTVERSION 1,2,4,13
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -85,12 +85,12 @@ BEGIN
             VALUE "Comments", "Matt Wu <matt@ext2fsd.com>"
             VALUE "CompanyName", "www.ext2fsd.com"
             VALUE "FileDescription", "Ext2Fsd Service Management"
-            VALUE "FileVersion", "1.2.04.11"
+            VALUE "FileVersion", "1.2.4.13"
             VALUE "InternalName", "Ext2Srv.exe"
             VALUE "LegalCopyright", "Matt Wu <matt@ext2fsd.com>"
             VALUE "OriginalFilename", "Ext2Srv.exe"
             VALUE "ProductName", "Ext2Fsd Service"
-            VALUE "ProductVersion", "1.2.04.11"
+            VALUE "ProductVersion", "1.2.4.13"
         END
     END
     BLOCK "VarFileInfo"
