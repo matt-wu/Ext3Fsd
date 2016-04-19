@@ -178,7 +178,7 @@ int Ext2StartUserTask(TCHAR *task, DWORD sid, HANDLE token)
     }
 
     /* wait until process exits or timeouts */
-    rc = WaitForSingleObject(pi.hProcess, 30000);
+    rc = WaitForSingleObject(pi.hProcess, 5000);
     if (rc == WAIT_TIMEOUT) {
         TerminateProcess(pi.hProcess, -1);
         ErrLog("Ext2DoAssdNotify: %S timeout, to be terminated.\n", task);
