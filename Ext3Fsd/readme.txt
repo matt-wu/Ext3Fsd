@@ -28,6 +28,13 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
  Revision history
 ======================
 
+51, V0.66    2016-04-13
+
+Modifications from V0.65:
+
+    1, FIXME: BSOD when mounting as readonly
+    2, FIXME: Ext2Srv service blocked by Antivirus
+
 50, V0.65    2016-04-10
 
 Modifications from V0.64:

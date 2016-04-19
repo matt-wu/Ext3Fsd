@@ -1,17 +1,13 @@
-
 ==================================
-Release Notes for Ext2Fsd V0.65
+Release Notes for Ext2Fsd V0.66
 ==================================
 
-Features implemented or bugfix since V0.64:
+Features implemented or bugfix:
 
-    1, major performance improvements (small files meta-operatios)
-    2, memory pressure handling for buffer-head structures reclaim
-    3, back support for Windows 2000 (i386, 32bit)
-    4, no bothering user with notification message for Ext2Mgr
-    5, project improvement: Ext2Mgr to be built with WDK or VS2008
+    1, FIXME: BSOD when mounting as readonly
+    2, FIXME: Ext2Srv service blocked by Antivirus
 
-Supported Ext3/4 features by 0.65:
+Supported Ext3/4 features:
 
     1, flexible inode size: > 128 bytes, up to block size
     2, dir_index:    htree directory index
