@@ -14,13 +14,11 @@ Ext2ReportStatus(
 {
 	// If we're in the start state then we don't want the control manager
 	// sending us control messages because they'll confuse us.
-    if (State == SERVICE_START_PENDING) {
-		ServiceStatus.dwControlsAccepted = 0;
-	} else {
-		ServiceStatus.dwControlsAccepted = SERVICE_ACCEPT_SHUTDOWN |
-                                           SERVICE_ACCEPT_POWEREVENT |
-                                           SERVICE_ACCEPT_SESSIONCHANGE
-                                            ;
+    ServiceStatus.dwControlsAccepted =      SERVICE_ACCEPT_STOP;
+    if (State == SERVICE_RUNNING) {
+		ServiceStatus.dwControlsAccepted |= SERVICE_ACCEPT_SHUTDOWN |
+                                            SERVICE_ACCEPT_POWEREVENT |
+                                            SERVICE_ACCEPT_SESSIONCHANGE ;
     }
 
 	// Save the new status we've been given
@@ -42,7 +40,7 @@ Ext2ReportStatus(
 
 void Ext2StopService()
 {
-    ServiceStatus.dwCurrentState = SERVICE_STOP_PENDING;
+    Ext2ReportStatus(SERVICE_STOP_PENDING, NO_ERROR, 0);
 
     if (ServiceNotify) {
         UnregisterDeviceNotification(ServiceNotify);
@@ -51,6 +49,8 @@ void Ext2StopService()
 
     /* issue stop event to main thread */
     Ext2StopPipeSrv();
+
+    Ext2ReportStatus(SERVICE_STOPPED, NO_ERROR, 0);
 }
 
 VOID Ext2DrivesChangeNotify(BOOLEAN bArrival)
@@ -72,6 +72,7 @@ Ext2CtrlService(
     {
 
 	case SERVICE_CONTROL_STOP:
+    case SERVICE_CONTROL_SHUTDOWN:
 		// STOP : The service must stop
         Ext2StopService();
         break;
@@ -79,9 +80,6 @@ Ext2CtrlService(
     case SERVICE_CONTROL_INTERROGATE:
 		// QUERY : Service control manager just wants to know our state
 		break;
-
-    case SERVICE_CONTROL_SHUTDOWN:
-        break;
 
     case SERVICE_CONTROL_DEVICEEVENT:
     {
@@ -189,8 +187,12 @@ Ext2CtrlService(
             break;
 
         case WTS_SESSION_LOGON:
+        {
+            PWTSSESSION_NOTIFICATION pwn = (PWTSSESSION_NOTIFICATION)lpEventData;
             MsgLog("Session event: Session logon.\n");
+            Ext2StartUserTask(NULL, _T("/startmgr"), pwn->dwSessionId, FALSE);
             break;
+        }
 
         case WTS_SESSION_LOGOFF:
         {
@@ -222,18 +224,11 @@ Ext2CtrlService(
     return NO_ERROR;
 }
 
-VOID Ext2Loop()
-{
-    Ext2StartPipeSrv();
-}
-
-
 VOID
 Ext2StartMain(VOID * arg)
 {
+    Ext2StartPipeSrv();
     Ext2ReportStatus(SERVICE_RUNNING, NO_ERROR, 0);
-    Ext2Loop();
-    Ext2ReportStatus(SERVICE_STOPPED, NO_ERROR, 0);
 }
 
 
@@ -537,6 +532,10 @@ INT __cdecl _tmain(INT argc, TCHAR *argv[])
 
         if (0 == _tcsicmp(argv[1], _T("/removeservice"))) {
             return Ext2SetupService(FALSE);
+        }
+
+        if (0 == _tcsicmp(argv[1], _T("/startmgr"))) {
+            return Ext2StartMgrAsUser();
         }
 
         if (argc >= 4) {

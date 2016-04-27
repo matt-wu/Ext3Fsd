@@ -10,6 +10,7 @@
 #include <process.h>
 #include <WtsApi32.h>
 #include <dbt.h>
+#include <shellapi.h>
 
 /*
  * global defintions
@@ -84,15 +85,17 @@ void Ext2Log(DWORD ll, char *fn, int ln, char *format, ... );
 
 
 typedef struct _EXT2_PIPE {
+    struct _EXT2_PIPE  *l;          /* next pipe handle */
     HANDLE              p;          /* pipe handle */
     HANDLE              e;          /* event handle */
+    HANDLE              q;          /* quiting */
     OVERLAPPED          o;          /* overlap info */
+    volatile BOOL       s;          /* stop flag */
 } EXT2_PIPE, *PEXT2_PIPE;
 
 
-
 /*
- * Engine.cpp
+ * Ext2Pipe.cpp
  */
 
 
@@ -113,11 +116,13 @@ Ext2DrvNotify(TCHAR drive, int add);
 BOOL Ext2AssignDrvLetter(TCHAR *dev, TCHAR drv);
 BOOL Ext2RemoveDrvLetter(TCHAR drive);
 
+int Ext2StartUserTask(TCHAR *usr, TCHAR *srv, DWORD sid, BOOL);
+INT Ext2StartMgrAsUser();
+
 /*
  * Ext2Srv.cpp
  */
 
 VOID Ext2DrivesChangeNotify(BOOLEAN bArrival);
-
 
 #endif /* _EXT2_SRV_INCLUDE_ */

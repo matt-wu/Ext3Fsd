@@ -1,18 +1,14 @@
 #include <Ext2Srv.h>
 #include <tlhelp32.h>
+#include <Sddl.h>
 
 
-BOOL Ext2EnablePrivilege(LPCTSTR lpszPrivilegeName)
+BOOL Ext2SetPrivilege(HANDLE token, LPCTSTR lpszPrivilegeName)
 {
     TOKEN_PRIVILEGES tp = {0};
-    HANDLE           token;
     LUID             luid;
+    DWORD            le;
     BOOL             rc;
-
-    rc = OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES |
-                          TOKEN_QUERY | TOKEN_READ, &token);
-    if(!rc)
-        goto errorout;
 
     rc = LookupPrivilegeValue(NULL, lpszPrivilegeName, &luid);
     if(!rc)
@@ -23,6 +19,26 @@ BOOL Ext2EnablePrivilege(LPCTSTR lpszPrivilegeName)
     tp.Privileges[0].Luid = luid;
     tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
     rc = AdjustTokenPrivileges(token, FALSE, &tp, NULL, NULL, NULL);
+    if (!rc)
+        le = GetLastError();
+
+errorout:
+
+    return rc;
+}
+
+
+BOOL Ext2EnablePrivilege(LPCTSTR lpszPrivilegeName)
+{
+    HANDLE           token;
+    BOOL             rc;
+
+    rc = OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES |
+                          TOKEN_QUERY | TOKEN_READ, &token);
+    if(!rc)
+        goto errorout;
+
+    rc = Ext2SetPrivilege(token, lpszPrivilegeName);
     CloseHandle(token);
 
 errorout:
@@ -91,12 +107,12 @@ errorout:
     return total;
 }
 
-TCHAR * Ext2BuildAssdCMD(TCHAR *task)
+TCHAR * Ext2BuildSrvCMD(TCHAR *task)
 {
     TCHAR  cmd[258]= {0}, *p, *refresh = NULL;
     int    len = 0;
 
-    if (GetModuleFileName(NULL, cmd, 510)) {
+    if (GetModuleFileName(NULL, cmd, 256)) {
     } else { 
         _tcscpy(cmd, GetCommandLine());
         p = _tcsstr(cmd, _T("/"));
@@ -117,21 +133,78 @@ errorout:
     return refresh;
 }
 
-int Ext2CreateToken(DWORD pid, DWORD *sid, HANDLE *token)
+TCHAR *
+Ext2StrStr(TCHAR *s, TCHAR *t)
+{
+    int ls = _tcslen(s), lt = _tcslen(t), i;
+    for (i = 0; i + lt <= ls; i++) {
+        if (0 == _tcsnicmp(&s[i], t, lt))
+            return &s[i];
+    }
+
+    return NULL;
+}
+
+TCHAR * Ext2BuildUsrCMD(TCHAR *task)
+{
+    TCHAR  cmd[258]= {0}, *p, *refresh = NULL;
+    int    len = 0;
+
+    if (GetModuleFileName(NULL, cmd, 256)) {
+    } else {
+        _tcscpy(cmd, GetCommandLine());
+    }
+
+    p = Ext2StrStr(cmd, _T("Ext2Srv"));
+    if (p)
+        *p = 0;
+
+    len = (int)_tcslen(cmd) + 10 + _tcslen(task);
+    refresh = new TCHAR[len];
+    if (!refresh)
+        goto errorout;
+    memset(refresh, 0, sizeof(TCHAR)*len);
+    _tcscpy_s(refresh, len - 1, cmd);
+    _tcscat_s(refresh, len, task);
+
+errorout:
+    return refresh;
+}
+
+int Ext2AdjustTokenGroups(HANDLE token, LPCTSTR group)
+{
+    TOKEN_GROUPS tg = {0};
+    PSID         sid = NULL;
+    DWORD        le;
+    BOOL         rc;
+
+
+    rc = ConvertStringSidToSid(group, &sid);
+    if(!rc)
+        goto errorout;
+
+    /* initialize token groups */
+    tg.GroupCount = 1;
+    tg.Groups[0].Sid = sid;
+    tg.Groups[0].Attributes = SE_GROUP_OWNER;
+    rc = AdjustTokenGroups(token, FALSE, &tg, sizeof(tg), NULL, NULL);
+    if (!rc)
+        le = GetLastError();
+
+errorout:
+
+    return rc;
+}
+
+int Ext2CreateUserToken(DWORD sid, HANDLE *token, BOOL bElevated)
 {
     HANDLE  token_user = NULL;
     int     rc = -1;
 
-    rc = ProcessIdToSessionId(pid, sid);
-    if (!rc) {
-        rc = -1 * GetLastError();
-        goto errorout;
-    }
-
     if (!token)
         goto errorout;
 
-    rc = WTSQueryUserToken(*sid, &token_user);
+    rc = WTSQueryUserToken(sid, &token_user);
     if (!rc) {
         rc = -1 * GetLastError();
         goto errorout;
@@ -145,6 +218,13 @@ int Ext2CreateToken(DWORD pid, DWORD *sid, HANDLE *token)
         goto errorout;
     }
 
+    if (bElevated) {
+        Ext2SetPrivilege(token, SE_IMPERSONATE_NAME);
+        Ext2SetPrivilege(token, SE_CHANGE_NOTIFY_NAME);
+        Ext2SetPrivilege(token, SE_CREATE_GLOBAL_NAME);
+
+        Ext2AdjustTokenGroups(token, _T("S-1-5-32-544"));
+    }
 errorout:
 
     if (token_user && token_user != INVALID_HANDLE_VALUE)
@@ -153,21 +233,31 @@ errorout:
     return rc;
 }
 
-int Ext2StartUserTask(TCHAR *task, DWORD sid, HANDLE token)
+
+int Ext2StartUserTask(TCHAR *usr, TCHAR *srv, DWORD sid, BOOL bElevated)
 {
     LPTSTR  cmd = NULL;
     STARTUPINFO si = {0};
     PROCESS_INFORMATION pi = {0};
+    HANDLE  token = 0;
     int     rc = -1;
 
-    cmd = Ext2BuildAssdCMD(task);
+    if (usr)
+        cmd = Ext2BuildUsrCMD(usr);
+    else
+        cmd = Ext2BuildSrvCMD(srv);
     if (!cmd) {
         rc = -1;
         goto errorout;
     }
 
+    rc = Ext2CreateUserToken(sid, &token, bElevated);
+    if (!rc) {
+        rc = -1 * GetLastError();
+        goto errorout;
+    }
+
     si.cb = sizeof( STARTUPINFO );
-    // si.lpDesktop = _T("winsta0\\default");
     rc = CreateProcessAsUser(token, NULL, cmd, NULL, NULL,
                              FALSE, NORMAL_PRIORITY_CLASS |
                              CREATE_NO_WINDOW, NULL, NULL,
@@ -177,12 +267,6 @@ int Ext2StartUserTask(TCHAR *task, DWORD sid, HANDLE token)
         goto errorout;
     }
 
-    /* wait until process exits or timeouts */
-    rc = WaitForSingleObject(pi.hProcess, 5000);
-    if (rc == WAIT_TIMEOUT) {
-        TerminateProcess(pi.hProcess, -1);
-        ErrLog("Ext2DoAssdNotify: %S timeout, to be terminated.\n", task);
-    }
     if (!GetExitCodeProcess(pi.hProcess, (LPDWORD)&rc)) {
         rc = -2;
     }
@@ -199,33 +283,33 @@ errorout:
     if (cmd)
         delete []cmd;
 
+    if (token)
+        CloseHandle(token);
+
     return rc;
 }
 
 INT Ext2NotifyUser(TCHAR *task, ULONG mgr)
 {
-    DWORD   pid[10] = {0}, num, sid = 0;
-    HANDLE  token = 0;
+    DWORD   pid[64] = {0}, n, i, sid = 0;
     INT     rc = -1;
 
-    num = Ext2QueryMgr(_T("Ext2Mgr.exe"), pid, 10);
+    n = Ext2QueryMgr(_T("Ext2Mgr.exe"), pid, 63);
     if (mgr)
-        pid[num++] = mgr;
+        pid[n++] = mgr;
 
-    while (num > 0 && pid[num - 1]) {
+    for (i = 0; i < n && pid[i]; i++) {
 
-        rc = Ext2CreateToken(pid[--num], &sid, &token);
-        if (rc != 1) {
+        rc = ProcessIdToSessionId(pid[i], &sid);
+        if (!rc) {
             continue;
         }
 
-        rc = Ext2StartUserTask(task, sid, token);
-        if (token && token != INVALID_HANDLE_VALUE) {
-            CloseHandle(token);
-            token = NULL;
-        }
-        if (rc) {
-            break;
+        if (!mgr && mgr == pid[i]) {
+            n--;
+            rc = Ext2StartUserTask(0, task, sid, FALSE);
+        } else {
+            Ext2StartUserTask(0, task, sid, FALSE);
         }
     }
 
@@ -259,4 +343,124 @@ BOOL Ext2RemoveDrvLetter(TCHAR drive)
     Ext2DrvNotify(drive, FALSE);
 
 	return TRUE;
+}
+
+CHAR *Ext2QueryAutoUserList()
+{
+    int     rc = TRUE;
+    HKEY    hKey;
+    CHAR    keyPath[MAX_PATH];
+    CHAR   *userList = NULL;
+    LONG    status, type, len;
+
+    /* Open ext2fsd sevice key */
+    strcpy (keyPath, "SYSTEM\\CurrentControlSet\\Services\\Ext2Fsd\\Parameters") ;
+    status = ::RegOpenKeyEx (HKEY_LOCAL_MACHINE,
+                            keyPath,
+                            0,
+                            KEY_READ | KEY_WOW64_64KEY,
+                            &hKey) ;
+    if (status != ERROR_SUCCESS) {
+        rc = FALSE;
+        goto errorout;
+    }
+
+    /* query autorun user list */
+    len = MAX_PATH - 1;
+    userList = new CHAR[len + 1];
+    if (!userList)
+        goto errorout;
+    memset(userList, 0, len + 1);
+    status = RegQueryValueEx( hKey,
+                              "AutorunUsers",
+                              0,
+                              (LPDWORD)&type,
+                              (BYTE *)userList,
+                              (LPDWORD)&len);
+
+errorout:
+
+    RegCloseKey(hKey);
+
+    return userList;
+}
+
+
+BOOL Ext2RunMgrForCurrentUserVista()
+{
+    CHAR *userList = NULL, *user, e;
+    CHAR  userName[MAX_PATH] = {0};
+    DWORD userLen = MAX_PATH - 1;
+    BOOL  rc = FALSE;
+
+    if (!GetUserName(userName, &userLen))
+        return FALSE;
+
+    userList = Ext2QueryAutoUserList();
+    if (!userList)
+        return FALSE;
+
+    user = userList;
+    while (user = Ext2StrStr(user, userName)) {
+        if (user > userList) {
+            e = user[-1];
+            if (e != ',' && e != ';') {
+                user = user + strlen(userName);
+                continue;
+            }
+        }
+        e = user[strlen(userName)];
+        if (!e || e == ',' || e == ';') {
+            rc = TRUE;
+            goto errorout;
+        }
+        user = user + strlen(userName);
+    }
+
+errorout:
+
+    if (userList)
+        delete [] userList;
+
+    return rc;
+}
+
+INT Ext2StartMgrAsUser()
+{
+    SHELLEXECUTEINFO sei = {0};
+    TCHAR   cmd[258] = {0}, *t;
+    DWORD   rc = 0;
+
+    if (!Ext2RunMgrForCurrentUserVista()) {
+        return 0;
+    }
+
+    /* sleeping 1 second before proceeding */
+    Sleep(1000);
+
+    /* building task CMD path */
+    rc = GetModuleFileName(NULL, cmd, 256);
+    if (!rc) {
+        return 0;
+    }
+
+    t = Ext2StrStr(cmd, "Ext2Srv.exe");
+    if (!t) {
+        return 0;
+    }
+    t[4] = _T('M');
+    t[5] = _T('g');
+    t[6] = _T('r');
+
+    /* starting Ext2Mgr as elevated */
+    sei.cbSize       = sizeof(SHELLEXECUTEINFO);
+    sei.fMask        = SEE_MASK_FLAG_DDEWAIT |
+	                   SEE_MASK_NOCLOSEPROCESS;
+    sei.hwnd         = NULL;
+    sei.lpFile       = cmd;
+    sei.lpParameters = _T("/quiet");
+    sei.lpVerb       = _T("runas");
+    sei.nShow        = SW_SHOW;
+
+    return ShellExecuteEx(&sei);
 }

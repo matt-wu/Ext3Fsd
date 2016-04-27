@@ -16,6 +16,7 @@
  */
 
 BOOLEAN     g_stop = FALSE;
+HANDLE      g_wait;
 
 /* pipe handles */
 
@@ -169,8 +170,14 @@ Ext2CreatePipe()
     }
 
     /* create new sync event */
-    ap->e = CreateEvent(NULL, TRUE, TRUE, NULL);
-    if (INVALID_HANDLE_VALUE == ap->e) {
+    ap->q = CreateEvent(NULL, TRUE,  FALSE, NULL);
+    ap->e = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if (INVALID_HANDLE_VALUE == ap->e ||
+        INVALID_HANDLE_VALUE == ap->q) {
+        if (ap->e && INVALID_HANDLE_VALUE != ap->e)
+            CloseHandle(ap->e);
+        if (ap->q && INVALID_HANDLE_VALUE != ap->q)
+            CloseHandle(ap->q);
         CloseHandle(ap->p);
         delete ap;
         ap = NULL;
@@ -193,6 +200,9 @@ VOID Ext2DestroyPipe(PEXT2_PIPE ap)
 
     if (ap->e && ap->e != INVALID_HANDLE_VALUE)
         CloseHandle(ap->e);
+
+    if (ap->q && INVALID_HANDLE_VALUE != ap->q)
+        CloseHandle(ap->q);
 
     delete ap;
 }
@@ -315,17 +325,14 @@ VOID Ext2NotifyRemoveDrive(PPIPE_REQ pr)
     }
 }
 
-
-DWORD Ext2StartPipeSrv()
+VOID __cdecl
+Ext2ClientEngine(VOID *arg)
 {
-    PEXT2_PIPE      ap = NULL;
+    PEXT2_PIPE      ap = (PEXT2_PIPE)arg;
     PPIPE_REQ       pr = NULL;
     PIPE_REQ        ac;
-    DWORD           le;
     ULONG           len = 0;
     BOOL            rc;
-
-    DEBUG("server mode is to start...\n");
 
     len = REQ_BODY_SIZE;
     pr = (PIPE_REQ *) new CHAR[len];
@@ -333,14 +340,91 @@ DWORD Ext2StartPipeSrv()
         goto errorout;
     }
 
-	while (true) {
+    while (!g_stop) {
+
+		//wait for a command
+		DWORD bytes=0;
+
+        memset(&ac, 0, sizeof(ac));
+	    if (!Ext2ReadPipe(ap->p, &ac, sizeof(ac), &bytes)) {
+			break;
+		}
+
+		if (ac.magic != PIPE_REQ_MAGIC || ac.len <= sizeof(ac)) {
+			break;
+        }
+
+        if (ac.len > len) {
+            if (pr)
+                delete [] pr;
+            pr = (PPIPE_REQ) new CHAR[ac.len + 4];
+            if (!pr) {
+                break;
+            }
+            len = ac.len + 4;
+        }
+
+        memset(pr, 0, len);
+        memcpy(pr, &ac, sizeof(ac));
+		if (!Ext2ReadPipe(ap->p, &pr->data[0],
+                          ac.len - sizeof(ac), &bytes)) {
+		    break;
+        }
+
+        if (pr->cmd == CMD_QUERY_DRV) {
+            DEBUG("got CMD_QUERY_DRV.\n");
+            rc = Ext2QueryDrive(&pr, len);
+        } else if (pr->cmd == CMD_DEFINE_DRV) {
+            DEBUG("got CMD_DEFINE_DRV.\n");
+            rc = Ext2DefineDrive(&pr, len);
+        } else if (pr->cmd == CMD_REMOVE_DRV) {
+            DEBUG("got CMD_REMOVE_DRV.\n");
+            rc = Ext2RemoveDrive(&pr, len);
+        } else {
+            rc = FALSE;
+            DEBUG("got unknown CMD.\n");
+	        break;
+        }
+
+        if (!Ext2WritePipe(ap->p, pr, pr->len, &bytes)) {
+		    break;
+        }
+
+        if (rc) {
+            if (pr->cmd == CMD_REMOVE_DRV) {
+                Ext2NotifyRemoveDrive(pr);
+            } else if (pr->cmd == CMD_DEFINE_DRV) {
+                Ext2NotifyDefineDrive(pr);
+            }
+        }
+    }
+
+    DEBUG("client disconnected.\n");
+
+errorout:
+
+    if (ap && ap->q)
+        SetEvent(ap->q);
+
+    _endthread();
+}
+
+VOID __cdecl
+Ext2PipeEngine(VOID *arg)
+{
+    PEXT2_PIPE      ap = NULL, *cu;
+    DWORD           le;
+    BOOL            rc;
+
+    DEBUG("server mode is to start...\n");
+
+    SetEvent(g_wait);
+
+	while (!g_stop) {
 
         int         times = 0;
 
 retry:
-
-        if (g_stop)
-            goto errorout;
 
         /* create named pipe */
         ap = Ext2CreatePipe();
@@ -363,103 +447,78 @@ retry:
             continue;
         }
 
-        g_hep = ap;
-
         /* wait connection request from client */
         memset(&ap->o, 0, sizeof(OVERLAPPED));
         ap->o.hEvent = ap->e;
         rc = ConnectNamedPipe(ap->p, &ap->o);
         le = GetLastError();
-        if (rc == 0 && le == ERROR_PIPE_CONNECTED) {
-            SetEvent(ap->e);
+        if (rc != 0 || le == ERROR_PIPE_CONNECTED) {
+            DEBUG("got client connected.\n");
+            ap->l = g_hep;
+            g_hep = ap;
+            _beginthread(Ext2ClientEngine, 0, (PVOID)ap);
+        } else {
+            Ext2DestroyPipe(ap);
         }
 
-        DEBUG("server mode started.\n");
+        if (g_stop)
+            goto errorout;
 
-        /* wait until client connects */
-        WaitForSingleObject(ap->e, INFINITE);
-
-        DEBUG("got client connected.\n");
-			
-		do {
-
-			// wait for a command
-			DWORD bytes=0;
-
-            memset(&ac, 0, sizeof(ac));
-			if (!Ext2ReadPipe(ap->p, &ac, sizeof(ac), &bytes)) {
-				break;
-			}
-
-			if (ac.magic != PIPE_REQ_MAGIC || ac.len <= sizeof(ac)) {
-				break;
+        /* do cleanup of closed pipes */
+        cu = &g_hep;
+        while (ap = *cu) {
+            if (ap->s) {
+                *cu = ap->l;
+		        Ext2DestroyPipe(ap);
+            } else {
+                cu = &ap->l;
             }
-
-            if (ac.len > len) {
-                if (pr)
-                    delete [] pr;
-                pr = (PPIPE_REQ) new CHAR[ac.len + 4];
-                if (!pr) {
-                    break;
-                }
-                len = ac.len + 4;
-            }
-
-            memset(pr, 0, len);
-            memcpy(pr, &ac, sizeof(ac));
-			if (!Ext2ReadPipe(ap->p, &pr->data[0],
-                              ac.len - sizeof(ac), &bytes)) {
-				break;
-			}
-
-            if (pr->cmd == CMD_QUERY_DRV) {
-                DEBUG("got CMD_QUERY_DRV.\n");
-                rc = Ext2QueryDrive(&pr, len);
-            } else if (pr->cmd == CMD_DEFINE_DRV) {
-                DEBUG("got CMD_DEFINE_DRV.\n");
-                rc = Ext2DefineDrive(&pr, len);
-            } else if (pr->cmd == CMD_REMOVE_DRV) {
-                DEBUG("got CMD_REMOVE_DRV.\n");
-                rc = Ext2RemoveDrive(&pr, len);
-			} else {
-                rc = FALSE;
-                DEBUG("got unknown CMD.\n");
-				break;
-            }
-
-            if (!Ext2WritePipe(ap->p, pr, pr->len, &bytes)) {
-				break;
-            }
-
-            if (rc) {
-
-                if (pr->cmd == CMD_REMOVE_DRV) {
-                    Ext2NotifyRemoveDrive(pr);
-                } else if (pr->cmd == CMD_DEFINE_DRV) {
-                    Ext2NotifyDefineDrive(pr);
-                }
-            }
-
-		} while (true);
-
-        DEBUG("client disconnected.\n");
-
-		Ext2DestroyPipe(ap);
-        g_hep = NULL;
+        }
 
         DEBUG("Waiting for next client.\n");
-
     }
 
 errorout:
 
-	return 0;
+    SetEvent(g_wait);
+    _endthread();
+}
+
+DWORD Ext2StartPipeSrv()
+{
+    DWORD rc;
+
+    do {
+        g_wait = CreateEvent(NULL, FALSE, FALSE, NULL);
+    } while (!g_wait || g_wait == INVALID_HANDLE_VALUE);
+
+
+    do {
+        _beginthread(Ext2PipeEngine, 0, NULL);
+        rc = WaitForSingleObject(g_wait, 1000*1);
+    } while (rc == WAIT_TIMEOUT);
+
+    return 0;
 }
 
 VOID Ext2StopPipeSrv()
 {
+    PEXT2_PIPE *cu = &g_hep, ap;
+    DWORD rc = 0;
+
     g_stop = TRUE;
 
-    if (g_hep)
-        SetEvent(g_hep->e);
+    /* do cleanup of all remained pipes */
+    cu = &g_hep;
+    while (ap = *cu) {
+        SetEvent(ap->e);
+        rc = WaitForSingleObject(ap->q, INFINITE);
+        if (rc != WAIT_TIMEOUT) {
+            *cu = ap->l;
+	        Ext2DestroyPipe(ap);
+        } else {
+            cu = &ap->l;
+        }
+    }
+    WaitForSingleObject(g_wait, 1000);
 }
