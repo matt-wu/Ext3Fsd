@@ -1748,7 +1748,7 @@ VOID
 Ext2PutGroup(IN PEXT2_VCB Vcb);
 
 VOID
-Ext2DropGroup(IN PEXT2_VCB Vcb);
+Ext2DropBH(IN PEXT2_VCB Vcb);
 
 BOOLEAN
 Ext2SaveGroup(

@@ -2774,7 +2774,7 @@ Ext2DestroyVcb (IN PEXT2_VCB Vcb)
 
     Ext2CleanupAllMcbs(Vcb);
 
-    Ext2DropGroup(Vcb);
+    Ext2DropBH(Vcb);
 
     if (Vcb->bd.bd_bh_cache)
         kmem_cache_destroy(Vcb->bd.bd_bh_cache);

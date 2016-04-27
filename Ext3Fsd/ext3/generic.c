@@ -206,7 +206,7 @@ Ext2LoadGroup(IN PEXT2_VCB Vcb)
 
 
 VOID
-Ext2DropGroup(IN PEXT2_VCB Vcb)
+Ext2DropBH(IN PEXT2_VCB Vcb)
 {
     struct ext3_sb_info *sbi = &Vcb->sbi;
     LARGE_INTEGER        timeout;
@@ -217,17 +217,26 @@ Ext2DropGroup(IN PEXT2_VCB Vcb)
         return;
 
     __try {
+
+        /* acquire bd lock to avoid bh creation */
+        ExAcquireResourceExclusiveLite(&Vcb->bd.bd_bh_lock, TRUE);
+
         SetFlag(Vcb->Flags, VCB_BEING_DROPPED);
-        ExAcquireResourceExclusiveLite(&Vcb->sbi.s_gd_lock, TRUE);
         Ext2PutGroup(Vcb);
+
+        while (!IsListEmpty(&Vcb->bd.bd_bh_free)) {
+            struct buffer_head *bh;
+            PLIST_ENTRY         l;
+            l = RemoveHeadList(&Vcb->bd.bd_bh_free);
+            bh = CONTAINING_RECORD(l, struct buffer_head, b_link);
+            ASSERT(0 == atomic_read(&bh->b_count));
+            free_buffer_head(bh);
+        }
+
     } __finally {
-        ExReleaseResourceLite(&Vcb->sbi.s_gd_lock);
+        ExReleaseResourceLite(&Vcb->bd.bd_bh_lock);
     }
 
-    timeout.QuadPart = (LONGLONG)-10*1000*1000;
-    KeWaitForSingleObject(&Vcb->bd.bd_bh_notify,
-                           Executive, KernelMode,
-                           FALSE, &timeout);
     ClearFlag(Vcb->Flags, VCB_BEING_DROPPED);
 }
 

@@ -2697,7 +2697,10 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
     LIST_ENTRY      FcbList;
     PLIST_ENTRY     ListEntry;
     PFCB_LIST_ENTRY FcbListEntry;
+
     BOOLEAN         VcbResourceAcquired = FALSE;
+    BOOLEAN         gdResourceAcquired = FALSE;
+
     __try {
 
         ASSERT(Vcb != NULL);
@@ -2710,9 +2713,6 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
         if (IsVcbReadOnly(Vcb)) {
             FlushBeforePurge = FALSE;
         }
-
-        /* discard buffer_headers for group_desc */
-        Ext2DropGroup(Vcb);
 
         FcbListEntry= NULL;
         InitializeListHead(&FcbList);
@@ -2732,8 +2732,8 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
                            );
 
             if (FcbListEntry) {
-                FcbListEntry->Fcb = Fcb;
                 Ext2ReferXcb(&Fcb->ReferenceCount);
+                FcbListEntry->Fcb = Fcb;
                 InsertTailList(&FcbList, &FcbListEntry->Next);
             } else {
                 DEBUG(DL_ERR, ( "Ext2PurgeVolume: failed to allocate FcbListEntry ...\n"));
@@ -2764,6 +2764,14 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
             Ext2FreePool(FcbListEntry, EXT2_FLIST_MAGIC);
         }
 
+
+        /* acquire bd lock to avoid bh creation */
+        ExAcquireResourceExclusiveLite(&Vcb->sbi.s_gd_lock, TRUE);
+        gdResourceAcquired = TRUE;
+
+        /* discard buffer_headers for group_desc */
+        Ext2DropBH(Vcb);
+
         if (FlushBeforePurge) {
             ExAcquireSharedStarveExclusive(&Vcb->PagingIoResource, TRUE);
             ExReleaseResourceLite(&Vcb->PagingIoResource);
@@ -2775,11 +2783,6 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
             MmFlushImageSection(&Vcb->SectionObject, MmFlushForWrite);
         }
 
-        if (VcbResourceAcquired) {
-            ExReleaseResourceLite(&Vcb->MainResource);
-            VcbResourceAcquired = FALSE;
-        }
-
         if (Vcb->SectionObject.DataSectionObject) {
             CcPurgeCacheSection(&Vcb->SectionObject, NULL, 0, FALSE);
         }
@@ -2787,6 +2790,10 @@ Ext2PurgeVolume (IN PEXT2_VCB Vcb,
         DEBUG(DL_INF, ( "Ext2PurgeVolume: Volume flushed and purged.\n"));
 
     } __finally {
+
+        if (gdResourceAcquired) {
+            ExReleaseResourceLite(&Vcb->sbi.s_gd_lock);
+        }
 
         if (VcbResourceAcquired) {
             ExReleaseResourceLite(&Vcb->MainResource);
