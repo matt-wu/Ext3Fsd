@@ -14,6 +14,7 @@
 #define IDD_EXT2MGR_DIALOG              102
 #define ID_INDICATOR_MESSAGE            103
 #define ID_INDICATOR_TIME               104
+#define ID_INDICATOR_EXTRA              105
 #define IDR_MAINFRAME                   128
 #define IDR_TRAY                        133
 #define IDI_FLOPPY                      134
@@ -176,6 +177,6 @@
 #define _APS_NEXT_RESOURCE_VALUE        192
 #define _APS_NEXT_COMMAND_VALUE         32799
 #define _APS_NEXT_CONTROL_VALUE         1071
-#define _APS_NEXT_SYMED_VALUE           105
+#define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

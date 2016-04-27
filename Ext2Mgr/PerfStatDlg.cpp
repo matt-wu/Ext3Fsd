@@ -247,6 +247,7 @@ void CPerfStatDlg::OnOK()
 {
 	// TODO: Add extra validation here
 	KillTimer('STAT');
+    Ext2Close(&m_Handle);
     GetParent()->PostMessage(WM_COMMAND, ID_PERFSTOP, 0);
 	CDialog::OnOK();
 }
@@ -255,6 +256,7 @@ void CPerfStatDlg::OnCancel()
 {
 	// TODO: Add extra validation here
 	KillTimer('STAT');
+    Ext2Close(&m_Handle);
     GetParent()->PostMessage(WM_COMMAND, ID_PERFSTOP, 0);
 	CDialog::OnCancel();
 }

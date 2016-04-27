@@ -53,7 +53,7 @@ BOOL CSystemTray::Create(CWnd* pWnd, UINT uCallbackMessage, LPCTSTR szToolTip,
     // load up the NOTIFYICONDATA structure
     m_tnd.cbSize = sizeof(NOTIFYICONDATA);
     m_tnd.hWnd     = pWnd->GetSafeHwnd();
-    m_tnd.uID     = uID;
+    m_tnd.uID     = uID ^ GetCurrentProcessId();
     m_tnd.hIcon  = icon;
     m_tnd.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     m_tnd.uCallbackMessage = uCallbackMessage;
@@ -221,7 +221,7 @@ LRESULT CSystemTray::OnTrayNotification(WPARAM wParam, LPARAM lParam)
 	{
 	case WM_RBUTTONUP:
 		{
-			if (!menu.LoadMenu(m_tnd.uID)) 
+			if (!menu.LoadMenu(m_tnd.uID ^ GetCurrentProcessId())) 
 				return 0;
 			pSubMenu = menu.GetSubMenu(0);
 			if (!pSubMenu) 
@@ -245,7 +245,7 @@ LRESULT CSystemTray::OnTrayNotification(WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_LBUTTONDBLCLK:
 		{
-			if (!menu.LoadMenu(m_tnd.uID)) 
+			if (!menu.LoadMenu(m_tnd.uID ^ GetCurrentProcessId())) 
 				return 0;
 			pSubMenu = menu.GetSubMenu(0);
 			if (!pSubMenu) 

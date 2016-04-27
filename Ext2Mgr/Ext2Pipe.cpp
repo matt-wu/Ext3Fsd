@@ -38,7 +38,7 @@ HANDLE Ext2OpenPipe(CHAR *PipeName)
 
 retry:
 
-    // open assd pipe (created by AssdIo service)
+    // open pipe (created by Ext2Srv)
     g_hPipe = CreateFile(PipeName,
                          GENERIC_READ | GENERIC_WRITE, 
                          0, NULL, OPEN_EXISTING, 0, NULL);
@@ -850,10 +850,6 @@ BOOL Ext2StartPipeSrv()
     rc = Ext2StartSrv();
 
 errorout:
-    if (!rc) {
-        MessageBox(NULL, "Failed to start Ext2Srv.exe !",
-                   "Ext2 Volume Manager", MB_OK | MB_ICONSTOP);
-    }
 
     return rc;
 }

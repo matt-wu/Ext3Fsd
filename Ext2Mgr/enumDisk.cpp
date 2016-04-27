@@ -525,7 +525,7 @@ Ext2QueryDriveLayout(
     NT::NTSTATUS              status;
 
     PDRIVE_LAYOUT_INFORMATION_EXT driveLayout = NULL;
-    ULONG                     dataSize = 256;
+    ULONG                     dataSize = 512;
     ULONG                     retSize = 0;
 
 QueryDrive:
@@ -602,7 +602,7 @@ QueryDrive:
 
     if (status == STATUS_BUFFER_TOO_SMALL) {
         free(driveLayout); driveLayout = NULL;
-        dataSize += 128;
+        dataSize *= 2;
         goto QueryDrive;
     }
 
@@ -613,7 +613,6 @@ QueryDrive:
 
     retSize = FIELD_OFFSET(DRIVE_LAYOUT_INFORMATION_EXT, PartitionEntry);
     retSize += sizeof(PARTITION_INFORMATION) *  driveLayout->PartitionCount;
-    ASSERT(ioSb.Information == retSize);
 
     if (driveLayout->PartitionStyle == PARTITION_STYLE_MBR) {
 
@@ -1524,6 +1523,13 @@ Ext2PartInformation(PEXT2_PARTITION part)
     s = "      Partition Type: ";
     if (part->Entry->PartitionStyle == PARTITION_STYLE_MBR) {
         s += PartitionString(part->Entry->Mbr.PartitionType);
+    } else if (part->Entry->PartitionStyle == PARTITION_STYLE_GPT){
+        s += "GPT";
+        if (part->Entry->Gpt.Name && wcslen(part->Entry->Gpt.Name)) {
+            s += ":";
+            for (size_t i = 0; i < wcslen(part->Entry->Gpt.Name); i++)
+                s += (CHAR)part->Entry->Gpt.Name[i];
+        }
     } else {
         s += "GPT";
     }
@@ -1621,8 +1627,8 @@ Ext2DiskInformation(PEXT2_DISK  disk)
                 } else {
                     s.LoadString(IDS_DISK_TYPE_BASIC);
                 }
-            } else if (disk->Layout->PartitionStyle == PARTITION_STYLE_MBR) {
-                 s = "GUID";
+            } else if (disk->Layout->PartitionStyle == PARTITION_STYLE_GPT) {
+                 s = "GPT";
             }
         }
         s   += "\r\n";
@@ -3058,8 +3064,8 @@ Ext2IsServiceStarted()
     status = Ext2Open("\\DosDevices\\Ext2Fsd",
                       &Handle, EXT2_DESIRED_ACCESS);
 
+    Ext2Close(&Handle);
     if (NT_SUCCESS(status)) {
-        Ext2Close(&Handle);
         return TRUE;
     }
 
@@ -3315,6 +3321,8 @@ Ext2LoadDiskPartitions(PEXT2_DISK Disk)
                     "\\Device\\Harddisk%u\\Partition%u",
                     Disk->OrderNo, cnt + 1);
             Disk->DataParts[cnt].Magic = EXT2_PART_MAGIC;
+            Disk->DataParts[cnt].PartType = Disk->Layout->PartitionStyle;
+
             Disk->DataParts[cnt].Disk = Disk;
             Disk->DataParts[cnt].Number = cnt + 1;
             Disk->DataParts[cnt++].Entry = Part;
@@ -3748,7 +3756,7 @@ Ext2InsertVolume(
     }
 
     nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                             0, 0, nImage, (LONG)chain);
+                             0, 0, nImage, (LPARAM)chain);
 
     Ext2RefreshVLVI(List, chain, nItem);
 }
@@ -3822,7 +3830,7 @@ Ext2InsertCdromAsVolume(
     }
 
     nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                             0, 0, nImage, (LONG)Cdrom);
+                             0, 0, nImage, (LPARAM)Cdrom);
 
     Ext2RefreshVLCD(List, Cdrom, nItem);
 }
@@ -3875,8 +3883,15 @@ Ext2RefreshDVPT(
         CString PartType;
         if (Part->Entry->PartitionStyle == PARTITION_STYLE_MBR) {
             PartType = PartitionString(Part->Entry->Mbr.PartitionType);
-        } else if (Part->Entry->PartitionStyle == PARTITION_STYLE_MBR) {
-            PartType = "GPT";
+        } else if (Part->Entry->PartitionStyle == PARTITION_STYLE_GPT) {
+            PartType = "";
+            if (Part->Entry->Gpt.Name && wcslen(Part->Entry->Gpt.Name)) {
+                for (size_t i = 0; i < wcslen(Part->Entry->Gpt.Name); i++)
+                    PartType += (CHAR)Part->Entry->Gpt.Name[i];
+
+            } else {
+                PartType = "GPT";
+            }
         } else {
             PartType = "RAW";
         }
@@ -3901,8 +3916,8 @@ Ext2RefreshDVPT(
                     } else {
                         s.LoadString(IDS_DISK_TYPE_BASIC);
                     }
-                } else if (disk->Layout->PartitionStyle == PARTITION_STYLE_MBR) {
-                     s = "GUID";
+                } else if (disk->Layout->PartitionStyle == PARTITION_STYLE_GPT) {
+                     s = "GPT";
                 }
             } else {
                 s = "RAW";
@@ -3974,19 +3989,19 @@ Ext2InsertPartition(
 
     if (!Disk) {
         nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                                 0, 0, nImage, (LONG)NULL);
+                                 0, 0, nImage, (LPARAM)NULL);
         return;
     }
 
     if (!Part) {
         nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                                 0, 0, nImage, (LONG)&Disk->Null);
+                                 0, 0, nImage, (LPARAM)&Disk->Null);
         List->SetItem( nItem, 1, LVIF_TEXT, (LPCSTR)"RAW", 0, 0, 0,0);
         return;
     }
 
     nItem = List->InsertItem( LVIF_PARAM| LVIF_IMAGE, nItem, NULL,
-                               0, 0, nImage, (LONG)Part);
+                               0, 0, nImage, (LPARAM)Part);
 
     Ext2RefreshDVPT(List, Part, nItem);
 }
@@ -4004,7 +4019,7 @@ Ext2InsertDisk(
     sprintf(devName, "DISK %d", Disk->OrderNo);
     nItem = List->GetItemCount();
     nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                             0, 0, nImage, (LONG)Disk);
+                             0, 0, nImage, (LPARAM)Disk);
     List->SetItem( nItem, 0, LVIF_TEXT, (LPCSTR)devName, 0, 0, 0,0);
 
     if (Disk->NumParts > 0) {
@@ -4089,7 +4104,7 @@ Ext2InsertCdromAsDisk(
     sprintf(devName, "CDROM %d", Cdrom->OrderNo);
     nItem = List->GetItemCount();
     nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                             0, 0, nImage, (LONG)Cdrom);
+                             0, 0, nImage, (LPARAM)Cdrom);
     List->SetItem( nItem, 0, LVIF_TEXT, (LPCSTR)devName, 0, 0, 0,0);
 
     nItem = List->GetItemCount();
@@ -4102,7 +4117,7 @@ Ext2InsertCdromAsDisk(
     }
 
     nItem = List->InsertItem( LVIF_PARAM|LVIF_IMAGE, nItem, NULL,
-                             0, 0, nImage, (LONG)(&Cdrom->Magic[1]));
+                             0, 0, nImage, (LPARAM)(&Cdrom->Magic[1]));
 
     Ext2RefreshDVCM(List, Cdrom, nItem);
 }
@@ -4258,25 +4273,12 @@ Ext2RemoveDrvLetter(
     }
 
     dosPath[0] = drvPath[0] = drvLetter->Letter;
-
-    if (drvLetter->bTemporary) {
-
-        rc = Ext2DefineDosDevice ( 
-                    DDD_RAW_TARGET_PATH|
-                    DDD_REMOVE_DEFINITION|
-                    DDD_EXACT_MATCH_ON_REMOVE,
-                    dosPath, drvLetter->SymLink);
-        DeleteVolumeMountPoint(drvPath);
-
-    } else {
-
-        Ext2DefineDosDevice ( 
-                    DDD_RAW_TARGET_PATH|
-                    DDD_REMOVE_DEFINITION|
-                    DDD_EXACT_MATCH_ON_REMOVE,
-                    dosPath, drvLetter->SymLink);
-        rc = DeleteVolumeMountPoint(drvPath);
-    }
+    rc = Ext2DefineDosDevice ( 
+                DDD_RAW_TARGET_PATH|
+                DDD_REMOVE_DEFINITION|
+                DDD_EXACT_MATCH_ON_REMOVE,
+                dosPath, drvLetter->SymLink);
+    DeleteVolumeMountPoint(drvPath);
 
     if (!rc) {
         return FALSE;
@@ -4984,9 +4986,47 @@ errorout:
 }
 
 #define EXT2_MANAGER_NAME  "Ext2 Volume Manager"
+
+BOOL Ext2RunMgrForCurrentUserXP()
+{
+    HKEY   key ;
+    CHAR   keyPath[MAX_PATH] ;
+    LONG   status ;
+    DWORD  type, len = MAX_PATH;
+    BOOL   rc = FALSE;
+
+    CHAR   	appPath[MAX_PATH] ;
+
+    GetModuleFileName(NULL, appPath, MAX_PATH - 6);
+    strcat(appPath, " -quiet");
+
+    strcpy (keyPath, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run") ;
+    status = RegOpenKeyEx (HKEY_LOCAL_MACHINE,
+                              keyPath,
+                              0,
+                              KEY_ALL_ACCESS,
+                              &key) ;
+
+    if (status != ERROR_SUCCESS) {
+        return FALSE;
+    }
+
+    status = RegQueryValueEx( key, EXT2_MANAGER_NAME, 0, &type, 
+                               (BYTE *)appPath, &len);
+    if (status != ERROR_SUCCESS) {
+        goto errorout;
+    }
+
+    rc = TRUE;
+
+errorout:
+
+    RegCloseKey (key) ;
+    return rc;
+}
 	
 BOOL
-Ext2SetAppAutorun(BOOL bInstall)
+Ext2SetAppAutorunXP(BOOL bInstall)
 {
     BOOL   rc = FALSE;
     HKEY   key ;
@@ -5029,6 +5069,223 @@ errorout:
     RegCloseKey (key) ;
     return rc;
 }
+
+CHAR *Ext2QueryAutoUserList()
+{
+    int     rc = TRUE;
+    HKEY    hKey;
+    CHAR    keyPath[MAX_PATH];
+    CHAR   *userList = NULL;
+    LONG    status, type, len;
+
+    /* Open ext2fsd sevice key */
+    strcpy (keyPath, "SYSTEM\\CurrentControlSet\\Services\\Ext2Fsd\\Parameters") ;
+    status = ::RegOpenKeyEx (HKEY_LOCAL_MACHINE,
+                            keyPath,
+                            0,
+                            KEY_ALL_ACCESS | KEY_WOW64_64KEY,
+                            &hKey) ;
+    if (status != ERROR_SUCCESS) {
+        rc = FALSE;
+        goto errorout;
+    }
+
+    /* query autorun user list */
+    len = PAGE_SIZE - 1;
+    userList = new CHAR[len + 1];
+    if (!userList)
+        goto errorout;
+    memset(userList, 0, len + 1);
+    status = RegQueryValueEx( hKey,
+                              "AutorunUsers",
+                              0,
+                              (LPDWORD)&type,
+                              (BYTE *)userList,
+                              (LPDWORD)&len);
+
+errorout:
+
+    RegCloseKey(hKey);
+
+    return userList;
+}
+
+BOOL Ext2SetAutoRunUserList(CHAR *userList)
+{
+    HKEY   key;
+    CHAR   keyPath[MAX_PATH] ;
+    LONG   status;
+
+    strcpy (keyPath, "SYSTEM\\CurrentControlSet\\Services\\Ext2Fsd\\Parameters") ;
+    status = ::RegOpenKeyEx (HKEY_LOCAL_MACHINE,
+                            keyPath,
+                            0,
+                            KEY_ALL_ACCESS | KEY_WOW64_64KEY,
+                            &key) ;
+    if (status != ERROR_SUCCESS) {
+        goto errorout;
+    }
+
+    status = RegSetValueEx( key, "AutorunUsers", 0, REG_SZ, 
+                            (BYTE *)userList, strlen(userList));
+    if (status != ERROR_SUCCESS) {
+        goto errorout;
+    }
+
+errorout:
+
+    RegCloseKey(key) ;
+
+    return (status == ERROR_SUCCESS);
+}
+
+TCHAR *
+Ext2StrStr(TCHAR *s, TCHAR *t)
+{
+    int ls = _tcslen(s), lt = _tcslen(t), i;
+    for (i = 0; i + lt <= ls; i++) {
+        if (0 == _tcsnicmp(&s[i], t, lt))
+            return &s[i];
+    }
+
+    return NULL;
+}
+
+
+BOOL Ext2RunMgrForCurrentUserVista()
+{
+    CHAR *userList = NULL, *user, e;
+    CHAR  userName[256] = {0};
+    DWORD userLen = 255;
+    BOOL  rc = FALSE;
+
+    if (!GetUserName(userName, &userLen))
+        return FALSE;
+
+    userList = Ext2QueryAutoUserList();
+    if (!userList)
+        return FALSE;
+
+    user = userList;
+    while (user = Ext2StrStr(user, userName)) {
+        if (user > userList) {
+            e = user[-1];
+            if (e != ',' && e != ';') {
+                user = user + strlen(userName);
+                continue;
+            }
+        }
+        e = user[strlen(userName)];
+        if (!e || e == ',' || e == ';') {
+            rc = TRUE;
+            goto errorout;
+        }
+        user = user + strlen(userName);
+    }
+
+errorout:
+
+    if (userList)
+        delete [] userList;
+
+    return rc;
+}
+
+BOOL
+Ext2SetAppAutorunVista(BOOL bAutorun)
+{
+    CHAR *userList = NULL, *user, *e;
+    CHAR  userName[256] = {0};
+    DWORD userLen = 255;
+    BOOL  changed = FALSE;
+
+    if (!GetUserName(userName, &userLen))
+        return FALSE;
+
+    userList = Ext2QueryAutoUserList();
+    if (!userList)
+        return FALSE;
+
+    if (bAutorun) {
+
+        user = userList;
+        while (user = Ext2StrStr(user, userName)) {
+            if (user > userList) {
+                e = user-1;
+                if (*e != ',' && *e != ';') {
+                    user = user + strlen(userName);
+                    continue;
+                }
+            }
+            e = &user[strlen(userName)];
+            if (!*e || *e == ',' || *e == ';') {
+                goto errorout;
+            }
+            user = user + strlen(userName);
+        }
+
+        e = &userList[strlen(userList) - 1];
+        if (e > userList && *e != ',' && *e != ';') {
+            strcat_s(userList, PAGE_SIZE - 1, ";");
+        }
+        strcat_s(userList, PAGE_SIZE - 1, userName);
+        strcat_s(userList, PAGE_SIZE - 1, ";");
+        changed = TRUE;
+
+    } else {
+        user = userList;
+        while (user = Ext2StrStr(user, userName)) {
+            if (user > userList) {
+                e = user - 1;
+                if (*e != ',' && *e != ';') {
+                    user = user + strlen(userName);
+                    continue;
+                }
+            }
+            e = &user[strlen(userName)];
+            if (!*e) {
+                memset(user, 0, strlen(userName) + 1);
+                changed = TRUE;
+            } else if (*e == ',' || *e == ';') {
+                memmove(user, e + 1, strlen(e));
+                changed = TRUE;
+            } else {
+                user = user + strlen(userName);
+            }
+        }
+    }
+
+    if (changed)
+        changed = Ext2SetAutoRunUserList(userList);
+    else
+        changed = TRUE;
+
+errorout:
+
+    if (userList)
+        delete []userList;
+
+    return TRUE;
+}
+
+BOOL
+Ext2SetAppAutorun(BOOL bAutorun)
+{
+    if (IsWindowsVistaOrGreater())
+        return Ext2SetAppAutorunVista(bAutorun);
+
+    return Ext2SetAppAutorunXP(bAutorun);
+}
+
+
+BOOL Ext2RunMgrForCurrentUser()
+{
+    if (IsWindowsVistaOrGreater())
+        return Ext2RunMgrForCurrentUserVista();
+
+    return Ext2RunMgrForCurrentUserXP();
+}
+
 
 #define SERVICE_CMD_LENGTH (MAX_PATH * 2)
 

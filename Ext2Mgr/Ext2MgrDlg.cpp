@@ -354,7 +354,8 @@ END_MESSAGE_MAP()
 static UINT BASED_CODE indicators[] =
 {
     ID_INDICATOR_MESSAGE,
-    ID_INDICATOR_TIME
+    ID_INDICATOR_TIME,
+    ID_INDICATOR_EXTRA,
 };
 
 /* A5DCBF10-6530-11D2-901F-00C04FB951ED */
@@ -401,7 +402,12 @@ BOOL CExt2MgrDlg::OnInitDialog()
 	//  when the application's main window is not a dialog
 	SetIcon(m_hIcon, TRUE);         // Set large icon
 	SetIcon(m_hIcon, FALSE);        // Set small icon
-	
+
+    /* create new font for views */
+    m_MSSanS.CreatePointFont(80, "MS Sans Serif");
+    m_DiskView.SetFont(&m_MSSanS);
+    m_VolumeList.SetFont(&m_MSSanS);
+
     /* initialize the disk view */
     dwStyle=GetWindowLongPtr(m_DiskView.GetSafeHwnd(),GWL_STYLE);
 	dwStyle&=~LVS_TYPEMASK;
@@ -473,13 +479,16 @@ BOOL CExt2MgrDlg::OnInitDialog()
 
     /* Status Bar Initialization */
     m_bar.Create(this); //We create the status bar
-    m_bar.SetIndicators(indicators, 2);	
+    m_bar.SetIndicators(indicators, 3);
 
     CRect rect;
     GetClientRect(&rect);
-    m_bar.SetPaneInfo(0,ID_INDICATOR_MESSAGE, SBPS_NORMAL,rect.Width()-150);
-    m_bar.SetPaneInfo(1,ID_INDICATOR_TIME,SBPS_STRETCH ,0);
-    m_bar.GetStatusBarCtrl().SetBkColor(RGB(180,180,180));
+    m_bar.SetPaneInfo(0,ID_INDICATOR_MESSAGE, SBPS_NORMAL,rect.Width()-160);
+    m_bar.SetPaneInfo(1,ID_INDICATOR_TIME,SBPS_NORMAL ,132);
+    m_bar.SetPaneInfo(2,ID_INDICATOR_EXTRA,SBPS_STRETCH ,0);
+    /* m_bar.GetStatusBarCtrl().SetBkColor(RGB(180,180,180)); */
+    RepositionBars(AFX_IDW_CONTROLBAR_FIRST,AFX_IDW_CONTROLBAR_LAST,
+                   ID_INDICATOR_EXTRA);
 
     CTime t1;
     t1 = CTime::GetCurrentTime();
@@ -493,9 +502,6 @@ BOOL CExt2MgrDlg::OnInitDialog()
     m_bar.SetPaneText(1, s);
 
     SetTimer(ID_INDICATOR_TIME,1000,NULL);
-
-    RepositionBars(AFX_IDW_CONTROLBAR_FIRST,AFX_IDW_CONTROLBAR_LAST,
-                   ID_INDICATOR_TIME);
 
     /* close the splash window */
     PostMessage(WM_SYSCOMMAND, IDM_CLOSE_SPLASH, 0);
@@ -528,13 +534,15 @@ BOOL CExt2MgrDlg::OnInitDialog()
     /* updating the disk list */    
     Ext2RefreshDiskList(&m_DiskView);
 
-    if (TRUE || IsVistaOrAbove()) {
-        CMenu* pMenu = AfxGetMainWnd()->GetMenu();
-        CMenu* pSubFile = pMenu->GetSubMenu(0);
-        if (pSubFile) {
-            pSubFile->EnableMenuItem(ID_INSTALL_SERVICE, MF_BYCOMMAND|MF_GRAYED|MF_DISABLED);
-            pSubFile->EnableMenuItem(ID_REMOVE_SERVICE, MF_BYCOMMAND|MF_GRAYED|MF_DISABLED);
+    CMenu* pMenu = AfxGetMainWnd()->GetMenu();
+    CMenu* pSubFile = pMenu->GetSubMenu(0);
+    if (pSubFile) {
+        if (Ext2RunMgrForCurrentUser()) {
             pSubFile->EnableMenuItem(ID_ENABLE_AUTOSTART, MF_BYCOMMAND|MF_GRAYED|MF_DISABLED);
+            pSubFile->EnableMenuItem(ID_DISABLE_AUTOSTART, MF_BYCOMMAND|MF_ENABLED);
+        } else {
+            pSubFile->EnableMenuItem(ID_ENABLE_AUTOSTART, MF_BYCOMMAND|MF_ENABLED);
+            pSubFile->EnableMenuItem(ID_DISABLE_AUTOSTART, MF_BYCOMMAND|MF_GRAYED|MF_DISABLED);
         }
     }
 
@@ -667,18 +675,6 @@ void CExt2MgrDlg::OnDestroy()
 
 void CExt2MgrDlg::OnPaint() 
 {
-    CRect rect;
-
-#if 0
-    if (bFirst) {
-        OnSize(SIZE_RESTORED, 520, 408);
-        SetWindowPos(this, 0, 0, 520, 408, SWP_NOZORDER | SWP_NOMOVE | SWP_SHOWWINDOW | SWP_DRAWFRAME );
-        bFirst = FALSE;
-    }
-#endif
-
-    GetClientRect(&rect);
-
 	if (IsIconic())
 	{
 		CPaintDC dc(this); // device context for painting
@@ -712,33 +708,28 @@ HCURSOR CExt2MgrDlg::OnQueryDragIcon()
 void CExt2MgrDlg::OnSize(UINT nType, int cx, int cy) 
 {
     int i = 0;
-    int ctlId[] = {IDOK, IDCANCEL, ID_HELP, 0};
-
-	CDialog::OnSize(nType, cx, cy);
+    int ctlId[] = {IDC_VOLUME_LIST, IDC_DISK_LIST, 0};
 
     return;
 
-	
     // create an instance of the CRect object
-    CRect rect, cr;
+    CRect crw, cri;
 
-    // store the dialog's new size information in the object
-    GetWindowRect(&rect);
+    do {
 
-    while (ctlId[i]) {
-
-        CWnd *pWnd = GetDlgItem(ctlId[i++]);
+        CWnd *pWnd = GetDlgItem(ctlId[i]);
         if (pWnd) {
-            pWnd->GetWindowRect(&cr);
-            ScreenToClient(&cr);
-            cr.bottom -= cr.top;
-            cr.right  -= cr.left;
-
-            pWnd->SetWindowPos(pWnd, cr.left, cy - cr.bottom - 5,
-                               cr.right, cr.bottom,
+            pWnd->GetWindowRect(&cri);
+            ScreenToClient(&cri);
+            pWnd->SetWindowPos(pWnd,
+                               cri.left * cx / crw.Width(),
+                               cri.top * cy / crw.Height(),
+                               cri.Width() * cx / crw.Width(),
+                               cri.Height() * cy / crw.Height(),
                                SWP_NOZORDER | SWP_SHOWWINDOW);
         }
-    }
+
+    } while (ctlId[++i]);
 }
 
 LRESULT CExt2MgrDlg::OnTrayNotification(WPARAM wParam,LPARAM lParam)
@@ -1096,8 +1087,10 @@ void CExt2MgrDlg::OnRclickDiskList(NMHDR* pNMHDR, LRESULT* pResult)
                 s.LoadString(IDS_FLUSH_BUFFER);
                 m_Menu.AppendMenu(MF_STRING, ID_FLUSH_BUFFER, (LPCTSTR)s);
 
-                s.LoadString(IDS_CHANGE_PARTID);
-                m_Menu.AppendMenu(MF_STRING, ID_CHANGE_PARTTYPE, (LPCTSTR)s);
+                if (part->PartType == PARTITION_STYLE_MBR) {
+                    s.LoadString(IDS_CHANGE_PARTID);
+                    m_Menu.AppendMenu(MF_STRING, ID_CHANGE_PARTTYPE, (LPCTSTR)s);
+                }
                 m_Menu.AppendMenu(MF_SEPARATOR, 0, "");
             }
 
@@ -1211,6 +1204,7 @@ void CExt2MgrDlg::OnRclickVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
         if (m_type == EXT2_VOLUME_MAGIC) {
 
             PEXT2_VOLUME volume = (PEXT2_VOLUME) m_sdev;
+            PEXT2_PARTITION part;
 
             s.LoadString(IDS_DRV_QUICK_MOUNT);
             if (0 == volume->DrvLetters)
@@ -1229,7 +1223,8 @@ void CExt2MgrDlg::OnRclickVolumeList(NMHDR* pNMHDR, LRESULT* pResult)
             s.LoadString(IDS_FLUSH_BUFFER);
             m_Menu.AppendMenu(MF_STRING, ID_FLUSH_BUFFER, (LPCTSTR)s);
 
-            if (Ext2QueryVolumePartition(volume)) {
+            part = Ext2QueryVolumePartition(volume);
+            if (part && part->PartType == PARTITION_STYLE_MBR) {
                 s.LoadString(IDS_CHANGE_PARTID);
                 m_Menu.AppendMenu(MF_STRING, ID_CHANGE_PARTTYPE, (LPCTSTR)s);
             }
@@ -1314,7 +1309,7 @@ void CExt2MgrDlg::OnProperty()
 VOID
 CExt2MgrDlg::DriversChangeNotify(
     ULONG           drvsMask,
-    BOOL         bArrival
+    BOOL            bArrival
     )
 {
     for (ULONG i=0; i < 26; i++) {
@@ -1407,11 +1402,11 @@ CExt2MgrDlg::DriverChangeNotify(
 
     if (!bArrival) {
 
-        Ext2SymLinkRemoval(drvLetter->Letter);
-        Ext2RemoveDosSymLink(drvLetter->Letter);
+        //Ext2SymLinkRemoval(drvLetter->Letter);
+        //Ext2RemoveDosSymLink(drvLetter->Letter);
 
         if (drvLetter->bUsed) {
-            Ext2DismountVolume(drvLetter->SymLink);
+            //Ext2DismountVolume(drvLetter->SymLink);
             Ext2RemoveMountPoint(drvLetter, FALSE);
         }
     }
@@ -1981,12 +1976,37 @@ void CExt2MgrDlg::OnRemoveService()
 void CExt2MgrDlg::OnEnableAutorun()
 {
     Ext2SetAppAutorun(TRUE);
-    Ext2SetManagerAsService(FALSE);
+    // Ext2SetManagerAsService(FALSE);
+
+    CMenu* pMenu = AfxGetMainWnd()->GetMenu();
+    CMenu* pSubFile = pMenu->GetSubMenu(0);
+    if (pSubFile) {
+        if (Ext2RunMgrForCurrentUser()) {
+            pSubFile->EnableMenuItem(ID_ENABLE_AUTOSTART, MF_BYCOMMAND|MF_GRAYED|MF_DISABLED);
+            pSubFile->EnableMenuItem(ID_DISABLE_AUTOSTART, MF_BYCOMMAND|MF_ENABLED);
+        } else {
+            pSubFile->EnableMenuItem(ID_ENABLE_AUTOSTART, MF_BYCOMMAND|MF_ENABLED);
+            pSubFile->EnableMenuItem(ID_DISABLE_AUTOSTART, MF_BYCOMMAND|MF_GRAYED|MF_DISABLED);
+        }
+    }
+
 } 
 
 void CExt2MgrDlg::OnDisableAutorun()
 {
     Ext2SetAppAutorun(FALSE);
+
+    CMenu* pMenu = AfxGetMainWnd()->GetMenu();
+    CMenu* pSubFile = pMenu->GetSubMenu(0);
+    if (pSubFile) {
+        if (Ext2RunMgrForCurrentUser()) {
+            pSubFile->EnableMenuItem(ID_ENABLE_AUTOSTART, MF_BYCOMMAND|MF_GRAYED|MF_DISABLED);
+            pSubFile->EnableMenuItem(ID_DISABLE_AUTOSTART, MF_BYCOMMAND|MF_ENABLED);
+        } else {
+            pSubFile->EnableMenuItem(ID_ENABLE_AUTOSTART, MF_BYCOMMAND|MF_ENABLED);
+            pSubFile->EnableMenuItem(ID_DISABLE_AUTOSTART, MF_BYCOMMAND|MF_GRAYED|MF_DISABLED);
+        }
+    }
 } 
 
 void CExt2MgrDlg::OnPerfStat() 

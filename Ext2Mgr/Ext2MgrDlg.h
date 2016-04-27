@@ -112,6 +112,7 @@ public:
     CSplash  *  m_splash;
     CMenu       m_Menu;
 
+    CFont    m_MSSanS;
     BOOL     m_bHide;
     BOOL     m_bQuiet;
     BOOL     m_bService;

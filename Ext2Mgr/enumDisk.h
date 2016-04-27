@@ -349,9 +349,9 @@ typedef struct _EXT2_DISK {
     CHAR                Name[256];
     ULONGLONG           Size;
 
-    BOOL             bEjected;
-    BOOL             bLoaded;
-    BOOL             IsFile;
+    BOOL                bEjected;
+    BOOL                bLoaded;
+    BOOL                IsFile;
     UCHAR               OrderNo;
     UCHAR               NumParts;
     UCHAR               ExtStart;
@@ -372,9 +372,9 @@ typedef struct _EXT2_CDROM {
     ULONGLONG           Size;
 
     UCHAR               OrderNo;
-    BOOL             bLoaded;
-    BOOL             bEjected;
-    BOOL             bIsDVD;
+    BOOL                bLoaded;
+    BOOL                bEjected;
+    BOOL                bIsDVD;
     ULONGLONG           DrvLetters;
 
     DISK_GEOMETRY       DiskGeometry;
@@ -392,8 +392,8 @@ typedef struct _EXT2_VOLUME {
     struct _EXT2_VOLUME *   Next;
     CHAR                    Name[REGSTR_VAL_MAX_HCID_LEN];
     ULONGLONG               DrvLetters;
-    BOOL                 bRecognized;
-    BOOL                 bDynamic;
+    BOOL                    bRecognized;
+    BOOL                    bDynamic;
     PVOLUME_DISK_EXTENTS    Extent;
     NT::FILE_FS_DEVICE_INFORMATION FsdInfo;
     NT::FILE_FS_SIZE_INFORMATION   FssInfo;
@@ -410,11 +410,12 @@ typedef struct _EXT2_VOLUME {
 
 typedef struct _EXT2_PARTITION {
     ULONG                   Magic;
-    UCHAR                   Number;
+    DWORD                   PartType;
     PEXT2_DISK              Disk;
     PPARTITION_INFORMATION_EXT  Entry;
     ULONGLONG               DrvLetters;
     PEXT2_VOLUME            Volume;
+    UCHAR                   Number;
     CHAR                    Name[REGSTR_VAL_MAX_HCID_LEN];
 } EXT2_PARTITION;
 #define EXT2_PART_MAGIC 'EPRT'
@@ -422,9 +423,9 @@ typedef struct _EXT2_PARTITION {
 typedef struct _EXT2_LETTER {
 
     UCHAR               Letter;
-    BOOL             bInvalid;
-    BOOL             bUsed;
-    BOOL             bTemporary;
+    BOOL                bInvalid;
+    BOOL                bUsed;
+    BOOL                bTemporary;
     UINT                DrvType;
 
     PVOLUME_DISK_EXTENTS    Extent;
@@ -866,6 +867,8 @@ Ext2VolumeArrivalNotify(PCHAR  VolumePath);
 BOOL
 Ext2SetAppAutorun(BOOL bInstall);
 
+BOOL Ext2RunMgrForCurrentUser();
+
 int
 Ext2SetManagerAsService(BOOL bInstall);
 
@@ -881,7 +884,6 @@ BOOL
 Ext2RemoveDosSymLink(CHAR drvChar);
 
 BOOL Ext2DismountVolume(CHAR *voldev);
-
 
 #ifdef __cplusplus
 extern "C" {
