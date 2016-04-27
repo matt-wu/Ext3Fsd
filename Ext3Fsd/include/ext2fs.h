@@ -479,6 +479,7 @@ typedef PVOID   PBCB;
 typedef VOID (*EXT2_REAPER_RELEASE)(PVOID);
 
 typedef struct _EXT2_REAPER {
+        PETHREAD                Thread;
         KEVENT                  Engine;
         KEVENT                  Wait;
         EXT2_REAPER_RELEASE     Free;
@@ -522,6 +523,7 @@ typedef struct _EXT2_GLOBAL {
     LIST_ENTRY                  VcbList;
 
     /* Cleaning thread related: resource cleaner */
+    EXT2_REAPER                 FcbReaper;
     EXT2_REAPER                 McbReaper;
     EXT2_REAPER                 bhReaper;
 
@@ -654,7 +656,7 @@ typedef struct _EXT2_VCB {
     // List of FCBs for open files on this volume
     ULONG                       FcbCount;
     LIST_ENTRY                  FcbList;
-    KSPIN_LOCK                  FcbLock;
+    ERESOURCE                   FcbLock;
 
     // Share Access for the file object
     SHARE_ACCESS                ShareAccess;
@@ -805,6 +807,7 @@ typedef struct _EXT2_FCB {
 
     // List of FCBs for this volume
     LIST_ENTRY                      Next;
+    LARGE_INTEGER                   TsDrop; /* drop time */
 
     SECTION_OBJECT_POINTERS         SectionObject;
 
@@ -851,7 +854,7 @@ typedef struct _EXT2_FCB {
 #define FCB_FROM_POOL               0x00000001
 #define FCB_PAGE_FILE               0x00000002
 #define FCB_FILE_MODIFIED           0x00000020
-#define FCB_STATE_BUSY              0x00000040
+
 #define FCB_ALLOC_IN_CREATE         0x00000080
 #define FCB_ALLOC_IN_WRITE          0x00000100
 #define FCB_ALLOC_IN_SETINFO        0x00000200
@@ -946,12 +949,10 @@ struct _EXT2_MCB {
 #define Ext2DerefXcb(_C)  DEC_OBJ_CNT(_C)
 
 __inline ULONG DEC_OBJ_CNT(PULONG _C) {
-    if (*_C > 0) {
-        return InterlockedDecrement(_C);
-    } else {
+    if (*_C <= 0) {
         DbgBreak();
     }
-    return 0;
+    return InterlockedDecrement(_C);
 }
 
 #if EXT2_DEBUG
@@ -2484,6 +2485,11 @@ Ext2LockControl (IN PEXT2_IRP_CONTEXT IrpContext);
 //
 
 VOID
+Ext2FcbReaperThread(
+    PVOID   Context
+);
+
+VOID
 Ext2McbReaperThread(
     PVOID   Context
 );
@@ -2509,13 +2515,15 @@ Ext2AllocateFcb (
 );
 
 VOID
+Ext2UnlinkFcb(IN PEXT2_FCB Fcb);
+
+VOID
 Ext2FreeFcb (IN PEXT2_FCB Fcb);
+VOID
+Ext2ReleaseFcb (IN PEXT2_FCB Fcb);
 
 VOID
 Ext2InsertFcb(PEXT2_VCB Vcb, PEXT2_FCB Fcb);
-
-VOID
-Ext2RemoveFcb(PEXT2_VCB Vcb, PEXT2_FCB Fcb);
 
 PEXT2_CCB
 Ext2AllocateCcb (ULONG Flags, PEXT2_MCB SymLink);
