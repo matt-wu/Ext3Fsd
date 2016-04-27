@@ -48,9 +48,6 @@ Ext2LoadSuper(IN PEXT2_VCB      Vcb,
                  bVerify );
 
     if (!NT_SUCCESS(Status)) {
-
-        DEBUG(DL_ERR, ( "Ext2ReadDisk: disk device error.\n"));
-
         Ext2FreePool(Ext2Sb, EXT2_SB_MAGIC);
         Ext2Sb = NULL;
     }
