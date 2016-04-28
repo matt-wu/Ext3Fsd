@@ -637,12 +637,17 @@ typedef struct _EXT2_VCB {
     // Resource for Mcb (Meta data control block)
     ERESOURCE                   McbLock;
 
-    // Entry of Mcb Tree (Root Node)
-    PEXT2_MCB                   McbTree;
+    // List of FCBs for open files on this volume
+    ERESOURCE                   FcbLock;
+    LIST_ENTRY                  FcbList;
+    ULONG                       FcbCount;
 
     // Mcb list
-    LIST_ENTRY                  McbList;
     ULONG                       NumOfMcb;
+    LIST_ENTRY                  McbList;
+
+    // Entry of Mcb Tree (Root Node)
+    PEXT2_MCB                   McbTree;
 
     // Link list to Global
     LIST_ENTRY                  Next;
@@ -653,10 +658,6 @@ typedef struct _EXT2_VCB {
     // Dirty Mcbs of modifications for volume stream
     LARGE_MCB                   Extents;
 
-    // List of FCBs for open files on this volume
-    ULONG                       FcbCount;
-    LIST_ENTRY                  FcbList;
-    ERESOURCE                   FcbLock;
 
     // Share Access for the file object
     SHARE_ACCESS                ShareAccess;
