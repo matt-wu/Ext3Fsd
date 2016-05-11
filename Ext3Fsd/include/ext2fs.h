@@ -915,6 +915,8 @@ struct _EXT2_MCB {
     // List Link to Vcb->McbList
     LIST_ENTRY                      Link;
 
+	
+
     struct inode                    Inode;
     struct dentry                  *de;
 };
@@ -1791,6 +1793,17 @@ Ext2SaveInode (
     IN PEXT2_VCB Vcb,
     IN struct inode *Inode
 );
+
+BOOLEAN
+Ext2LoadInodeXattr(IN PEXT2_VCB Vcb,
+	IN struct inode *Inode,
+	IN PEXT2_INODE InodeXattr);
+
+BOOLEAN
+Ext2SaveInodeXattr(IN PEXT2_IRP_CONTEXT IrpContext,
+	IN PEXT2_VCB Vcb,
+	IN struct inode *Inode,
+	IN PEXT2_INODE InodeXattr);
 
 BOOLEAN
 Ext2LoadBlock (

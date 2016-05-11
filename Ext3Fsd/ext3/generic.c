@@ -460,6 +460,74 @@ errorout:
     return rc;
 }
 
+BOOLEAN
+Ext2LoadInodeXattr(IN PEXT2_VCB Vcb,
+	IN struct inode *Inode,
+	IN PEXT2_INODE InodeXattr)
+{
+	IO_STATUS_BLOCK     IoStatus;
+	LONGLONG            Offset;
+
+	if (!Ext2GetInodeLba(Vcb, Inode->i_ino, &Offset)) {
+		DEBUG(DL_ERR, ("Ext2LoadRawInode: error get inode(%xh)'s addr.\n", Inode->i_ino));
+		return FALSE;
+	}
+
+	if (!CcCopyRead(
+		Vcb->Volume,
+		(PLARGE_INTEGER)&Offset,
+		Vcb->InodeSize,
+		PIN_WAIT,
+		(PVOID)InodeXattr,
+		&IoStatus)) {
+		return FALSE;
+	}
+
+	if (!NT_SUCCESS(IoStatus.Status)) {
+		return FALSE;
+	}
+
+	Ext2EncodeInode(InodeXattr, Inode);
+	return TRUE;
+}
+
+BOOLEAN
+Ext2SaveInodeXattr(IN PEXT2_IRP_CONTEXT IrpContext,
+	IN PEXT2_VCB Vcb,
+	IN struct inode *Inode,
+	IN PEXT2_INODE InodeXattr)
+{
+	IO_STATUS_BLOCK     IoStatus;
+	LONGLONG            Offset = 0;
+	ULONG               InodeSize = Vcb->InodeSize;
+	BOOLEAN             rc = 0;
+
+	/* There is no way to put EA information in such a small inode */
+	if (InodeSize == EXT2_GOOD_OLD_INODE_SIZE)
+		return FALSE;
+
+	DEBUG(DL_INF, ("Ext2SaveInodeXattr: Saving Inode %xh: Mode=%xh Size=%xh\n",
+		Inode->i_ino, Inode->i_mode, Inode->i_size));
+	rc = Ext2GetInodeLba(Vcb, Inode->i_ino, &Offset);
+	if (!rc) {
+		DEBUG(DL_ERR, ("Ext2SaveInodeXattr: error get inode(%xh)'s addr.\n", Inode->i_ino));
+		goto errorout;
+	}
+
+	rc = Ext2SaveBuffer(IrpContext,
+									Vcb,
+									Offset + EXT2_GOOD_OLD_INODE_SIZE + Inode->i_extra_isize,
+									InodeSize - EXT2_GOOD_OLD_INODE_SIZE - Inode->i_extra_isize,
+									(char *)InodeXattr + EXT2_GOOD_OLD_INODE_SIZE + Inode->i_extra_isize);
+
+	if (rc && IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK)) {
+		Ext2StartFloppyFlushDpc(Vcb, NULL, NULL);
+	}
+
+errorout:
+	return rc;
+}
+
 
 BOOLEAN
 Ext2LoadBlock (IN PEXT2_VCB Vcb,
