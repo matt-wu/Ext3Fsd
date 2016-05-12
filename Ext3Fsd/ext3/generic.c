@@ -326,8 +326,12 @@ void Ext2DecodeInode(struct inode *dst, struct ext3_inode *src)
     dst->i_mtime = src->i_mtime;
     dst->i_dtime = src->i_dtime;
     dst->i_blocks = ext3_inode_blocks(src, dst);
-    dst->i_extra_isize = src->i_extra_isize;
     memcpy(&dst->i_block[0], &src->i_block[0], sizeof(__u32) * 15);
+    if (EXT3_HAS_RO_COMPAT_FEATURE(dst->i_sb,
+                                   EXT4_FEATURE_RO_COMPAT_EXTRA_ISIZE))
+        dst->i_extra_isize = src->i_extra_isize;
+    else
+        dst->i_extra_isize = 0;
 }
 
 void Ext2EncodeInode(struct ext3_inode *dst,  struct inode *src)
@@ -352,6 +356,9 @@ void Ext2EncodeInode(struct ext3_inode *dst,  struct inode *src)
     ASSERT(src->i_sb);
     ext3_inode_blocks_set(dst, src);
     memcpy(&dst->i_block[0], &src->i_block[0], sizeof(__u32) * 15);
+    if (EXT3_HAS_RO_COMPAT_FEATURE(src->i_sb,
+                                   EXT4_FEATURE_RO_COMPAT_EXTRA_ISIZE))
+        dst->i_extra_isize = src->i_extra_isize;
 }
 
 
