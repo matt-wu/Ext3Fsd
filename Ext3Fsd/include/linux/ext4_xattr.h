@@ -38,7 +38,7 @@
 #define EXT4_XATTR_H_
 
 #include <ext2fs.h>
-#include <linux/tree.h>
+#include <linux/rbtree.h>
 
 /* Extended Attribute(EA) */
 
@@ -132,7 +132,7 @@ struct ext4_xattr_item {
 	void  *data;
 	size_t data_size;
 
-	RB_ENTRY(ext4_xattr_item) node;
+	struct rb_node node;
 };
 
 struct ext4_xattr_ref {
@@ -151,8 +151,7 @@ struct ext4_xattr_ref {
 	void *iter_arg;
 	struct ext4_xattr_item *iter_from;
 
-	RB_HEAD(ext4_xattr_tree,
-		ext4_xattr_item) root;
+	struct rb_root root;
 };
 
 #define EXT4_XATTR_ITERATE_CONT 0

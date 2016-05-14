@@ -1,47 +1,21 @@
 /*
- * Copyright (c) 2015 Grzegorz Kostka (kostka.grzegorz@gmail.com)
- * Copyright (c) 2015 Kaho Ng (ngkaho1234@gmail.com)
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * - Redistributions of source code must retain the above copyright
- *   notice, this list of conditions and the following disclaimer.
- * - Redistributions in binary form must reproduce the above copyright
- *   notice, this list of conditions and the following disclaimer in the
- *   documentation and/or other materials provided with the distribution.
- * - The name of the author may not be used to endorse or promote products
- *   derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-/** @addtogroup lwext4
- * @{
- */
-/**
- * @file  ext4_xattr.c
- * @brief Extended Attribute manipulation.
+ * You should have received a copy of the GNU General Public Licens
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-
  */
 
 #include <ext2fs.h>
 #include <linux/module.h>
 #include <linux/ext4_xattr.h>
-
-/**
- * @file  ext4_xattr.c
- * @brief Extended Attribute Manipulation
- */
 
 static ext4_fsblk_t ext4_new_meta_blocks(void *icb, struct inode *inode,
 	ext4_fsblk_t goal,
@@ -184,10 +158,15 @@ ext4_xattr_set_block_checksum(PEXT2_MCB inode_ref,
 	header->h_checksum = 0;
 }
 
-static int ext4_xattr_item_cmp(struct ext4_xattr_item *a,
-			       struct ext4_xattr_item *b)
+static int ext4_xattr_item_cmp(struct rb_node *_a,
+			       struct rb_node *_b)
 {
 	int result;
+	struct ext4_xattr_item *a, *b;
+	a = container_of(_a, struct ext4_xattr_item, node);
+	a = container_of(_a, struct ext4_xattr_item, node);
+	b = container_of(_b, struct ext4_xattr_item, node);
+
 	if (a->in_inode && !b->in_inode)
 		return -1;
 	
@@ -207,8 +186,45 @@ static int ext4_xattr_item_cmp(struct ext4_xattr_item *a,
 	return memcmp(a->name, b->name, a->name_len);
 }
 
-RB_GENERATE_INTERNAL(ext4_xattr_tree, ext4_xattr_item, node,
-		     ext4_xattr_item_cmp, static inline)
+//
+// Red-black tree insert routine.
+//
+
+static struct ext4_xattr_item *
+ext4_xattr_item_search(struct ext4_xattr_ref *xattr_ref,
+		       struct ext4_xattr_item *name)
+{
+	struct rb_node *new = xattr_ref->root.rb_node;
+
+	while (new) {
+		struct ext4_xattr_item *node =
+			container_of(new, struct ext4_xattr_item, node);
+		int result = ext4_xattr_item_cmp(&name->node, new);
+
+		if (result < 0)
+			new = new->rb_left;
+		else if (result > 0)
+			new = new->rb_right;
+		else
+			return node;
+
+	}
+
+	return NULL;
+}
+
+static void ext4_xattr_item_insert(struct ext4_xattr_ref *xattr_ref,
+				   struct ext4_xattr_item *item)
+{
+    rb_insert(&xattr_ref->root, &item->node,
+	      ext4_xattr_item_cmp);
+}
+
+static void ext4_xattr_item_remove(struct ext4_xattr_ref *xattr_ref,
+				   struct ext4_xattr_item *item)
+{
+    rb_erase(&item->node, &xattr_ref->root);
+}
 
 static struct ext4_xattr_item *
 ext4_xattr_item_alloc(__u8 name_index, const char *name, size_t name_len)
@@ -351,7 +367,7 @@ static int ext4_xattr_block_fetch(struct ext4_xattr_ref *xattr_ref)
 			ret = -ENOMEM;
 			goto Finish;
 		}
-		RB_INSERT(ext4_xattr_tree, &xattr_ref->root, item);
+		ext4_xattr_item_insert(xattr_ref, item);
 		xattr_ref->ea_size += EXT4_XATTR_SIZE(item->data_size) +
 				      EXT4_XATTR_LEN(item->name_len);
 	}
@@ -398,7 +414,7 @@ static int ext4_xattr_inode_fetch(struct ext4_xattr_ref *xattr_ref)
 			ret = -ENOMEM;
 			goto Finish;
 		}
-		RB_INSERT(ext4_xattr_tree, &xattr_ref->root, item);
+		ext4_xattr_item_insert(xattr_ref, item);
 		xattr_ref->ea_size += EXT4_XATTR_SIZE(item->data_size) +
 				      EXT4_XATTR_LEN(item->name_len);
 	}
@@ -444,7 +460,7 @@ ext4_xattr_lookup_item(struct ext4_xattr_ref *xattr_ref, __u8 name_index,
 	struct ext4_xattr_item tmp = {
 		FALSE,
 		name_index,
-		(char *)name, /*RB_FIND - won't touch this string*/
+		(char *)name, /*won't touch this string*/
 		name_len,
 	};
 	if (name_index == EXT4_XATTR_INDEX_SYSTEM &&
@@ -452,7 +468,7 @@ ext4_xattr_lookup_item(struct ext4_xattr_ref *xattr_ref, __u8 name_index,
 	    !memcmp(name, "data", 4))
 		tmp.in_inode = TRUE;
 
-	return RB_FIND(ext4_xattr_tree, &xattr_ref->root, &tmp);
+	return ext4_xattr_item_search(xattr_ref, &tmp);
 }
 
 static struct ext4_xattr_item *
@@ -483,7 +499,7 @@ ext4_xattr_insert_item(struct ext4_xattr_ref *xattr_ref, __u8 name_index,
 		ext4_xattr_item_free(item);
 		return NULL;
 	}
-	RB_INSERT(ext4_xattr_tree, &xattr_ref->root, item);
+	ext4_xattr_item_insert(xattr_ref, item);
 	xattr_ref->ea_size +=
 	    EXT4_XATTR_SIZE(item->data_size) + EXT4_XATTR_LEN(item->name_len);
 	xattr_ref->dirty = TRUE;
@@ -498,14 +514,22 @@ static int ext4_xattr_remove_item(struct ext4_xattr_ref *xattr_ref,
 	struct ext4_xattr_item *item =
 	    ext4_xattr_lookup_item(xattr_ref, name_index, name, name_len);
 	if (item) {
-		if (item == xattr_ref->iter_from)
-			xattr_ref->iter_from =
-			    RB_NEXT(ext4_xattr_tree, &xattr_ref->root, item);
+		if (item == xattr_ref->iter_from) {
+			struct rb_node *next_node;
+			next_node = rb_next(&item->node);
+			if (next_node)
+				xattr_ref->iter_from =
+					container_of(next_node,
+						     struct ext4_xattr_item,
+						     node);
+			else
+				xattr_ref->iter_from = NULL;
+		}
 
 		xattr_ref->ea_size -= EXT4_XATTR_SIZE(item->data_size) +
 				      EXT4_XATTR_LEN(item->name_len);
 
-		RB_REMOVE(ext4_xattr_tree, &xattr_ref->root, item);
+		ext4_xattr_item_remove(xattr_ref, item);
 		ext4_xattr_item_free(item);
 		xattr_ref->dirty = TRUE;
 		ret = 0;
@@ -547,11 +571,27 @@ static int ext4_xattr_resize_item(struct ext4_xattr_ref *xattr_ref,
 
 static void ext4_xattr_purge_items(struct ext4_xattr_ref *xattr_ref)
 {
-	struct ext4_xattr_item *item, *save_item;
-	RB_FOREACH_SAFE(item, ext4_xattr_tree, &xattr_ref->root, save_item)
-	{
-		RB_REMOVE(ext4_xattr_tree, &xattr_ref->root, item);
+	struct rb_node *first_node;
+	struct ext4_xattr_item *item = NULL;
+	first_node = rb_first(&xattr_ref->root);
+	if (first_node)
+		item = container_of(first_node, struct ext4_xattr_item,
+				    node);
+
+	while (item) {
+		struct rb_node *next_node;
+		struct ext4_xattr_item *next_item = NULL;
+		next_node = rb_next(&item->node);
+		if (next_node)
+			next_item = container_of(next_node, struct ext4_xattr_item,
+						 node);
+		else
+			next_item = NULL;
+
+		ext4_xattr_item_remove(xattr_ref, item);
 		ext4_xattr_item_free(item);
+
+		item = next_item;
 	}
 	xattr_ref->ea_size = 0;
 }
@@ -646,12 +686,13 @@ static int ext4_xattr_write_to_disk(struct ext4_xattr_ref *xattr_ref)
 	BOOL block_modified = FALSE;
 	void *ibody_data = NULL;
 	void *block_data = NULL;
-	struct ext4_xattr_item *item, *save_item;
 	size_t inode_size_rem, block_size_rem;
 	struct ext4_xattr_ibody_header *ibody_header = NULL;
 	struct ext4_xattr_header *block_header = NULL;
 	struct ext4_xattr_entry *entry = NULL;
 	struct ext4_xattr_entry *block_entry = NULL;
+	struct rb_node *first_node;
+	struct ext4_xattr_item *item = NULL;
 
 	inode_size_rem = ext4_xattr_inode_space(xattr_ref);
 	block_size_rem = ext4_xattr_block_space(xattr_ref);
@@ -707,8 +748,22 @@ static int ext4_xattr_write_to_disk(struct ext4_xattr_ref *xattr_ref)
 			}
 		}
 	}
-	RB_FOREACH_SAFE(item, ext4_xattr_tree, &xattr_ref->root, save_item)
-	{
+
+	first_node = rb_first(&xattr_ref->root);
+	if (first_node)
+		item = container_of(first_node, struct ext4_xattr_item,
+				    node);
+
+	while (item) {
+		struct rb_node *next_node;
+		struct ext4_xattr_item *next_item = NULL;
+		next_node = rb_next(&item->node);
+		if (next_node)
+			next_item = container_of(next_node, struct ext4_xattr_item,
+				node);
+		else
+			next_item = NULL;
+
 		if (EXT4_XATTR_SIZE(item->data_size) +
 			EXT4_XATTR_LEN(item->name_len) <=
 		    inode_size_rem) {
@@ -724,7 +779,7 @@ static int ext4_xattr_write_to_disk(struct ext4_xattr_ref *xattr_ref)
 					  EXT4_XATTR_LEN(item->name_len);
 
 			xattr_ref->IsOnDiskInodeDirty = TRUE;
-			continue;
+			goto next_item;
 		}
 		if (EXT4_XATTR_SIZE(item->data_size) +
 			EXT4_XATTR_LEN(item->name_len) >
@@ -744,6 +799,8 @@ static int ext4_xattr_write_to_disk(struct ext4_xattr_ref *xattr_ref)
 				  EXT4_XATTR_LEN(item->name_len);
 
 		block_modified = TRUE;
+next_item:
+		item = next_item;
 	}
 	xattr_ref->dirty = FALSE;
 	if (block_modified) {
@@ -764,12 +821,28 @@ void ext4_fs_xattr_iterate(struct ext4_xattr_ref *ref,
 				     struct ext4_xattr_item *item))
 {
 	struct ext4_xattr_item *item;
-	if (!ref->iter_from)
-		ref->iter_from = RB_MIN(ext4_xattr_tree, &ref->root);
+	if (!ref->iter_from) {
+		struct rb_node *first_node;
+		first_node = rb_first(&ref->root);
+		if (first_node) {
+			ref->iter_from =
+				container_of(first_node,
+					     struct ext4_xattr_item,
+					     node);
+		}
+	}
 
-	RB_FOREACH_FROM(item, ext4_xattr_tree, ref->iter_from)
-	{
+	item = ref->iter_from;
+	while (item) {
+		struct rb_node *next_node;
+		struct ext4_xattr_item *next_item;
 		int ret = EXT4_XATTR_ITERATE_CONT;
+		next_node = rb_next(&item->node);
+		if (next_node)
+			next_item = container_of(next_node, struct ext4_xattr_item,
+						 node);
+		else
+			next_item = NULL;
 		if (iter)
 			iter(ref, item);
 
@@ -779,6 +852,7 @@ void ext4_fs_xattr_iterate(struct ext4_xattr_ref *ref,
 
 			break;
 		}
+		item = next_item;
 	}
 }
 
@@ -859,7 +933,7 @@ int ext4_fs_get_xattr_ref(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB fs, PEXT2_MCB 
 	int rc;
 	ext4_fsblk_t xattr_block;
 	xattr_block = inode_ref->Inode.i_file_acl;
-	RB_INIT(&ref->root);
+	memset(&ref->root, 0, sizeof(struct rb_root));
 	ref->ea_size = 0;
 	ref->iter_from = NULL;
 	if (xattr_block) {
@@ -1008,7 +1082,3 @@ const char *ext4_get_xattr_name_prefix(__u8 name_index,
 
 	return NULL;
 }
-
-/**
- * @}
- */
