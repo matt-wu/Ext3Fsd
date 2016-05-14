@@ -1586,6 +1586,21 @@ Ext2BuildRequest (
 );
 
 //
+// ea.c
+//
+
+NTSTATUS
+Ext2QueryEa(
+	IN PEXT2_IRP_CONTEXT    IrpContext
+);
+
+NTSTATUS
+Ext2SetEa(
+	IN PEXT2_IRP_CONTEXT    IrpContext
+);
+
+
+//
 // Except.c
 //
 
