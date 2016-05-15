@@ -161,7 +161,7 @@ struct ext4_xattr_ref {
 int ext4_fs_get_xattr_ref(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB fs, PEXT2_MCB inode_ref,
 	struct ext4_xattr_ref *ref);
 
-void ext4_fs_put_xattr_ref(struct ext4_xattr_ref *ref);
+int ext4_fs_put_xattr_ref(struct ext4_xattr_ref *ref);
 
 int ext4_fs_set_xattr(struct ext4_xattr_ref *ref, __u8 name_index,
 		      const char *name, size_t name_len, const void *data,

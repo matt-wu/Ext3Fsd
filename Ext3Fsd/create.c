@@ -1574,22 +1574,6 @@ Openit:
 
     } __finally {
 
-		if (NT_SUCCESS(Status)) {
-			struct ext4_xattr_ref xattr_ref;
-			if (ext4_fs_get_xattr_ref(IrpContext, Vcb, Fcb->Mcb, &xattr_ref))
-				DbgPrint("ext4_fs_get_xattr_ref() failed!\n");
-			else {
-				char test_data[2048], test_data2[24];
-				memset(test_data, 'B', sizeof(test_data));
-				memset(test_data2, 'S', sizeof(test_data2));
-				ext4_fs_set_xattr(&xattr_ref, EXT4_XATTR_INDEX_USER, "Testing",
-					strlen("Testing"), test_data, sizeof(test_data), FALSE);
-				ext4_fs_set_xattr(&xattr_ref, EXT4_XATTR_INDEX_USER, "Testing-small",
-					strlen("Testing-small"), test_data2, sizeof(test_data2), FALSE);
-				ext4_fs_put_xattr_ref(&xattr_ref);
-			}
-		}
-
         if (bFcbLockAcquired) {
             ExReleaseResourceLite(&Vcb->FcbLock);
         }

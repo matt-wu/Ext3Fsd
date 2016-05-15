@@ -982,14 +982,16 @@ int ext4_fs_get_xattr_ref(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB fs, PEXT2_MCB 
 	return 0;
 }
 
-void ext4_fs_put_xattr_ref(struct ext4_xattr_ref *ref)
+int ext4_fs_put_xattr_ref(struct ext4_xattr_ref *ref)
 {
-	ext4_xattr_write_to_disk(ref);
+	int ret = ext4_xattr_write_to_disk(ref);
 	if (ref->IsOnDiskInodeDirty) {
 		ASSERT(ref->fs->InodeSize > EXT4_GOOD_OLD_INODE_SIZE);
-		Ext2SaveInode(ref->IrpContext, ref->fs, &ref->inode_ref->Inode);
-		Ext2SaveInodeXattr(ref->IrpContext,
-						ref->fs, &ref->inode_ref->Inode, ref->OnDiskInode);
+		ret = Ext2SaveInode(ref->IrpContext, ref->fs, &ref->inode_ref->Inode) ? 0 : -EIO;
+		if (!ret) {
+			ret = Ext2SaveInodeXattr(ref->IrpContext,
+				ref->fs, &ref->inode_ref->Inode, ref->OnDiskInode) ? 0 : -EIO;
+		}
 		ref->IsOnDiskInodeDirty = FALSE;
 	}
 	Ext2DestroyInode(ref->fs, ref->OnDiskInode);
@@ -1002,6 +1004,7 @@ void ext4_fs_put_xattr_ref(struct ext4_xattr_ref *ref)
 	ext4_xattr_purge_items(ref);
 	ref->inode_ref = NULL;
 	ref->fs = NULL;
+	return ret;
 }
 
 struct xattr_prefix {
