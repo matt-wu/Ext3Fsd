@@ -272,6 +272,9 @@
     <ClCompile Include="ext4\ext4_xattr.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ea.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\asm\page.h">
