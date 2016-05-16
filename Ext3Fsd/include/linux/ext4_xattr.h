@@ -125,6 +125,7 @@ struct ext4_xattr_entry {
 struct ext4_xattr_item {
 	/* This attribute should be stored in inode body */
 	BOOL in_inode;
+	BOOL is_data;
 
 	__u8 name_index;
 	char  *name;
@@ -141,11 +142,13 @@ struct ext4_xattr_ref {
 	struct buffer_head *block_bh;
 	PEXT2_MCB inode_ref;
 
-	PEXT2_INODE                 OnDiskInode;
-	BOOL                              IsOnDiskInodeDirty;
+	PEXT2_INODE OnDiskInode;
+	BOOL IsOnDiskInodeDirty;
 
 	BOOL   dirty;
 	size_t ea_size;
+	__s32 inode_size_rem;
+	__s32 block_size_rem;
 	PEXT2_VCB fs;
 
 	void *iter_arg;
