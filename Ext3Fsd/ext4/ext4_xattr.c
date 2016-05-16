@@ -494,23 +494,6 @@ ext4_xattr_insert_item(struct ext4_xattr_ref *xattr_ref, __u8 name_index,
 		return NULL;
 	}
 
-	if ((xattr_ref->ea_size + EXT4_XATTR_SIZE(data_size) +
-		EXT4_XATTR_LEN(item->name_len)
-			>
-	    ext4_xattr_inode_space(xattr_ref) -
-	    	sizeof(struct ext4_xattr_ibody_header))
-		&&
-	    (xattr_ref->ea_size + EXT4_XATTR_SIZE(data_size) +
-		EXT4_XATTR_LEN(item->name_len) >
-	    ext4_xattr_block_space(xattr_ref) -
-	    	sizeof(struct ext4_xattr_header))) {
-		ext4_xattr_item_free(item);
-
-		if (err)
-			*err = -ENOSPC;
-
-		return NULL;
-	}
 	item->in_inode = TRUE;
 	if (xattr_ref->inode_size_rem -
 	    (__s32)EXT4_XATTR_SIZE(data_size) -
@@ -607,23 +590,7 @@ static int ext4_xattr_resize_item(struct ext4_xattr_ref *xattr_ref,
 	/*
 	 * Check if we can hold this entry in both in-inode and
 	 * on-block form
-	 */
-	if ((xattr_ref->ea_size - EXT4_XATTR_SIZE(old_data_size) +
-		EXT4_XATTR_SIZE(new_data_size)
-			>
-	    ext4_xattr_inode_space(xattr_ref) -
-		sizeof(struct ext4_xattr_ibody_header))
-		&&
-	    (xattr_ref->ea_size - EXT4_XATTR_SIZE(old_data_size) +
-		EXT4_XATTR_SIZE(new_data_size)
-			>
-	    ext4_xattr_block_space(xattr_ref) -
-		sizeof(struct ext4_xattr_header))) {
-
-		return -ENOSPC;
-	}
-
-	/*
+	 *
 	 * More complicated case: we do not allow entries stucking in
 	 * the middle between in-inode space and on-block space, so
 	 * the entry has to stay in either inode space or block space.
@@ -902,9 +869,7 @@ static int ext4_xattr_write_to_disk(struct ext4_xattr_ref *xattr_ref)
 		else
 			next_item = NULL;
 
-		if (EXT4_XATTR_SIZE(item->data_size) +
-			EXT4_XATTR_LEN(item->name_len) <=
-		    inode_size_rem) {
+		if (item->in_inode) {
 			ibody_data = (char *)ibody_data -
 				     EXT4_XATTR_SIZE(item->data_size);
 			ext4_xattr_set_inode_entry(item, ibody_header, entry,
@@ -933,6 +898,7 @@ static int ext4_xattr_write_to_disk(struct ext4_xattr_ref *xattr_ref)
 		memcpy(EXT4_XATTR_NAME(block_entry), item->name,
 		       item->name_len);
 		memcpy(block_data, item->data, item->data_size);
+		ext4_xattr_compute_hash(block_header, block_entry);
 		block_entry = EXT4_XATTR_NEXT(block_entry);
 		block_size_rem -= EXT4_XATTR_SIZE(item->data_size) +
 				  EXT4_XATTR_LEN(item->name_len);
