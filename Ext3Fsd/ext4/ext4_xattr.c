@@ -583,7 +583,7 @@ static int ext4_xattr_resize_item(struct ext4_xattr_ref *xattr_ref,
 	int ret = 0;
 	BOOL to_inode = FALSE, to_block = FALSE;
 	size_t old_data_size = item->data_size;
-	__s32 orig_room_size = item->in_inode ?
+	size_t orig_room_size = item->in_inode ?
 		xattr_ref->inode_size_rem :
 		xattr_ref->block_size_rem;
 
@@ -1082,8 +1082,8 @@ int ext4_fs_get_xattr_ref(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB fs, PEXT2_MCB 
 		       ext4_xattr_inode_space(ref) -
 		       sizeof(struct ext4_xattr_ibody_header);
 
-	xattr_ref->block_size_rem =
-		ext4_xattr_block_space(xattr_ref) -
+	ref->block_size_rem =
+		ext4_xattr_block_space(ref) -
 		sizeof(struct ext4_xattr_header);
 
 	rc = ext4_xattr_fetch(ref);
