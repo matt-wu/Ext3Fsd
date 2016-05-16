@@ -147,8 +147,8 @@ struct ext4_xattr_ref {
 
 	BOOL   dirty;
 	size_t ea_size;
-	__s32 inode_size_rem;
-	__s32 block_size_rem;
+	size_t inode_size_rem;
+	size_t block_size_rem;
 	PEXT2_VCB fs;
 
 	void *iter_arg;
