@@ -17,7 +17,6 @@ Ext2QueryEa (
 	IN PEXT2_IRP_CONTEXT    IrpContext
 )
 {
-	// TODO: Properly setting value according to caller's request.
 	PIRP                Irp = NULL;
 	PIO_STACK_LOCATION  IrpSp;
 
@@ -28,12 +27,24 @@ Ext2QueryEa (
 	PEXT2_CCB           Ccb = NULL;
 	PEXT2_MCB           Mcb = NULL;
 
+	PUCHAR  UserEaList;
+	ULONG   UserEaListLength;
+	ULONG   UserEaIndex;
+
+	BOOLEAN RestartScan;
+	BOOLEAN ReturnSingleEntry;
+	BOOLEAN IndexSpecified;
+
 	BOOLEAN             MainResourceAcquired = FALSE;
 	BOOLEAN             XattrRefAcquired = FALSE;
 
 	NTSTATUS            Status = STATUS_UNSUCCESSFUL;
 
+#if 0
+
 	struct ext4_xattr_ref xattr_ref;
+	PCHAR UserBuffer;
+	LONG UserBufferLength;
 
 	__try {
 
@@ -48,9 +59,33 @@ Ext2QueryEa (
 		Irp = IrpContext->Irp;
 		IrpSp = IoGetCurrentIrpStackLocation(Irp);
 
+		Irp->IoStatus.Information = 0;
+
+		//
+		// Receive input parameter from caller
+		//
+		UserBuffer = Irp->UserBuffer;
+		UserBufferLength = IrpSp->Parameters.QueryEa.Length;
+		UserEaList = IrpSp->Parameters.QueryEa.EaList;
+		UserEaListLength = IrpSp->Parameters.QueryEa.EaListLength;
+		UserEaIndex = IrpSp->Parameters.QueryEa.EaIndex;
+		RestartScan = BooleanFlagOn(IrpSp->Flags, SL_RESTART_SCAN);
+		ReturnSingleEntry = BooleanFlagOn(IrpSp->Flags, SL_RETURN_SINGLE_ENTRY);
+		IndexSpecified = BooleanFlagOn(IrpSp->Flags, SL_INDEX_SPECIFIED);
+
+		// Check if the EA buffer provided is valid
+		Status = IoCheckEaBufferValidity((PFILE_FULL_EA_INFORMATION)UserBuffer,
+			UserBufferLength,
+			(PULONG)&Irp->IoStatus.Information);
+		if (!NT_SUCCESS(Status))
+			__leave;
+
 		if (!Mcb)
 			__leave;
 
+		//
+		// We do not allow multiple instance gaining EA access to the same file
+		//
 		if (!ExAcquireResourceExclusiveLite(
 			&Fcb->MainResource,
 			IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT))) {
@@ -63,12 +98,53 @@ Ext2QueryEa (
 		if (!NT_SUCCESS(Status)) {
 			DbgPrint("ext4_fs_get_xattr_ref() failed!\n");
 			__leave;
-		} else {
-			// TODO: Properly setting value according to caller's request.
-			char test_data2[24];
-			memset(test_data2, 'S', sizeof(test_data2));
-			ext4_fs_set_xattr(&xattr_ref, EXT4_XATTR_INDEX_USER, "Testing-small",
-				strlen("Testing-small"), test_data2, sizeof(test_data2), FALSE);
+		}
+		else {
+			PFILE_FULL_EA_INFORMATION FullEa;
+
+			// Iterate the whole EA buffer to do inspection
+			for (FullEa = (PFILE_FULL_EA_INFORMATION)UserBuffer;
+				FullEa < (PFILE_FULL_EA_INFORMATION)&UserBuffer[UserBufferLength];
+				FullEa = (PFILE_FULL_EA_INFORMATION)(FullEa->NextEntryOffset == 0 ?
+					&UserBuffer[UserBufferLength] :
+					(PCHAR)FullEa + FullEa->NextEntryOffset)) {
+
+				OEM_STRING EaName;
+
+				EaName.MaximumLength = EaName.Length = FullEa->EaNameLength;
+				EaName.Buffer = &FullEa->EaName[0];
+
+				// Check if EA's name is valid
+				if (!Ext2IsEaNameValid(EaName)) {
+					Irp->IoStatus.Information = (PCHAR)FullEa - UserBuffer;
+					Status = STATUS_INVALID_EA_NAME;
+					__leave;
+				}
+			}
+
+			// Now add EA entries to the inode
+			for (FullEa = (PFILE_FULL_EA_INFORMATION)UserBuffer;
+				FullEa < (PFILE_FULL_EA_INFORMATION)&UserBuffer[UserBufferLength];
+				FullEa = (PFILE_FULL_EA_INFORMATION)(FullEa->NextEntryOffset == 0 ?
+					&UserBuffer[UserBufferLength] :
+					(PCHAR)FullEa + FullEa->NextEntryOffset)) {
+
+				OEM_STRING EaName;
+
+				EaName.MaximumLength = EaName.Length = FullEa->EaNameLength;
+				EaName.Buffer = &FullEa->EaName[0];
+
+				Status = Ext2WinntError(ext4_fs_set_xattr(&xattr_ref,
+					EXT4_XATTR_INDEX_USER,
+					EaName.Buffer,
+					EaName.Length,
+					&FullEa->EaName[0] + FullEa->EaNameLength + 1,
+					FullEa->EaValueLength,
+					TRUE));
+				if (!NT_SUCCESS(Status))
+					__leave;
+
+			}
 		}
 	}
 	__finally {
@@ -104,7 +180,8 @@ Ext2QueryEa (
 			}
 		}
 	}
-	return STATUS_SUCCESS;
+#endif
+	return Status;
 }
 
 BOOLEAN
@@ -191,6 +268,8 @@ Ext2SetEa (
 		Irp = IrpContext->Irp;
 		IrpSp = IoGetCurrentIrpStackLocation(Irp);
 
+		Irp->IoStatus.Information = 0;
+
 		//
 		// Receive input parameter from caller
 		//
@@ -257,13 +336,16 @@ Ext2SetEa (
 					EaName.MaximumLength = EaName.Length = FullEa->EaNameLength;
 					EaName.Buffer = &FullEa->EaName[0];
 
-					ext4_fs_set_xattr(&xattr_ref,
+					Status = Ext2WinntError(ext4_fs_set_xattr(&xattr_ref,
 						EXT4_XATTR_INDEX_USER,
 						EaName.Buffer,
 						EaName.Length,
-						&FullEa->EaName[0] + FullEa->EaNameLength + 1 ,
+						&FullEa->EaName[0] + FullEa->EaNameLength + 1,
 						FullEa->EaValueLength,
-						TRUE);
+						TRUE));
+					if (!NT_SUCCESS(Status))
+						__leave;
+
 			}
 		}
 	} __finally {
@@ -298,5 +380,5 @@ Ext2SetEa (
 			}
 		}
 	}
-	return STATUS_SUCCESS;
+	return Status;
 }

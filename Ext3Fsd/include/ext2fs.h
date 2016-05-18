@@ -991,6 +991,9 @@ typedef struct _EXT2_CCB {
     /* Open handle control block */
     struct file         filp;
 
+	/* The EA index we are on */
+	ULONG           EaIndex;
+
 } EXT2_CCB, *PEXT2_CCB;
 
 //
