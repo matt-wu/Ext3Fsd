@@ -12,6 +12,106 @@
 #include "ext2fs.h"
 #include <linux/ext4_xattr.h>
 
+PVOID
+Ext2MapUserBuffer(
+	IN OUT PIRP Irp
+)
+{
+	PAGED_CODE();
+
+	//
+	// If there is no Mdl, then we must be in the Fsd, and we can simply
+	// return the UserBuffer field from the Irp.
+	//
+
+	if (Irp->MdlAddress == NULL) {
+
+		return Irp->UserBuffer;
+
+	}
+	else {
+
+		PVOID Address = MmGetSystemAddressForMdlSafe(Irp->MdlAddress, NormalPagePriority);
+
+		if (Address == NULL) {
+
+			ExRaiseStatus(STATUS_INSUFFICIENT_RESOURCES);
+		}
+
+		return Address;
+	}
+}
+
+// Ea iterator
+struct EaIterator {
+	// Return only an entry
+	BOOLEAN ReturnSingleEntry;
+
+	// Is the buffer overflowing?
+	BOOL OverFlow;
+
+	// FILE_FULL_EA_INFORMATION output buffer
+	PFILE_FULL_EA_INFORMATION FullEa;
+	PFILE_FULL_EA_INFORMATION LastFullEa;
+
+	// UserBuffer's size
+	ULONG UserBufferLength;
+
+	// Remaining UserBuffer's size
+	ULONG RemainingUserBufferLength;
+
+	// Start scanning from this EA
+	ULONG EaIndex;
+
+	// Next EA index returned by Ext2IterateAllEa
+	ULONG EaIndexCounter;
+};
+
+static int Ext2IterateAllEa(struct ext4_xattr_ref *xattr_ref, struct ext4_xattr_item *item)
+{
+	struct EaIterator *pEaIterator = xattr_ref->iter_arg;
+	ASSERT(pEaIterator);
+
+	// Start iteration from index specified
+	if (pEaIterator->EaIndexCounter < pEaIterator->EaIndex) {
+		pEaIterator->EaIndexCounter++;
+		return EXT4_XATTR_ITERATE_CONT;
+	}
+	pEaIterator->EaIndexCounter++;
+
+	if ((ULONG)(4 + 1 + 1 + 2 + item->name_len + 1 + item->data_size)
+		> pEaIterator->RemainingUserBufferLength) {
+		pEaIterator->OverFlow = TRUE;
+		return EXT4_XATTR_ITERATE_STOP;
+	}
+	pEaIterator->FullEa->NextEntryOffset = 0;
+	pEaIterator->FullEa->Flags = 0;
+	pEaIterator->FullEa->EaNameLength = item->name_len;
+	pEaIterator->FullEa->EaValueLength = item->data_size;
+	RtlCopyMemory(&pEaIterator->FullEa->EaName[0],
+		item->name,
+		item->name_len);
+	RtlCopyMemory(&pEaIterator->FullEa->EaName[0] + item->name_len + 1,
+		item->data,
+		item->data_size);
+
+	// Link FullEa and LastFullEa together
+	if (pEaIterator->LastFullEa) {
+		pEaIterator->LastFullEa->NextEntryOffset =
+			(PCHAR)pEaIterator->FullEa - (PCHAR)pEaIterator->LastFullEa;
+	}
+
+	pEaIterator->LastFullEa = pEaIterator->FullEa;
+	pEaIterator->FullEa = (PFILE_FULL_EA_INFORMATION)
+		(&pEaIterator->FullEa->EaName[0] + item->name_len + 1 + item->data_size);
+	pEaIterator->RemainingUserBufferLength -= 4 + 1 + 1 + 2 + item->name_len + 1 + item->data_size;
+
+	if (pEaIterator->ReturnSingleEntry)
+		return EXT4_XATTR_ITERATE_STOP;
+
+	return EXT4_XATTR_ITERATE_CONT;
+}
+
 NTSTATUS
 Ext2QueryEa (
 	IN PEXT2_IRP_CONTEXT    IrpContext
@@ -40,11 +140,12 @@ Ext2QueryEa (
 
 	NTSTATUS            Status = STATUS_UNSUCCESSFUL;
 
-#if 0
+#if 1
 
 	struct ext4_xattr_ref xattr_ref;
 	PCHAR UserBuffer;
-	LONG UserBufferLength;
+	ULONG UserBufferLength;
+	ULONG RemainingUserBufferLength;
 
 	__try {
 
@@ -61,11 +162,18 @@ Ext2QueryEa (
 
 		Irp->IoStatus.Information = 0;
 
+		UserBuffer = Ext2MapUserBuffer(Irp);
+
 		//
 		// Receive input parameter from caller
 		//
-		UserBuffer = Irp->UserBuffer;
+		UserBuffer = Ext2MapUserBuffer(Irp);
+		if (!UserBuffer) {
+			Status = STATUS_INSUFFICIENT_RESOURCES;
+			__leave;
+		}
 		UserBufferLength = IrpSp->Parameters.QueryEa.Length;
+		RemainingUserBufferLength = UserBufferLength;
 		UserEaList = IrpSp->Parameters.QueryEa.EaList;
 		UserEaListLength = IrpSp->Parameters.QueryEa.EaListLength;
 		UserEaIndex = IrpSp->Parameters.QueryEa.EaIndex;
@@ -74,8 +182,8 @@ Ext2QueryEa (
 		IndexSpecified = BooleanFlagOn(IrpSp->Flags, SL_INDEX_SPECIFIED);
 
 		// Check if the EA buffer provided is valid
-		Status = IoCheckEaBufferValidity((PFILE_FULL_EA_INFORMATION)UserBuffer,
-			UserBufferLength,
+		Status = IoCheckEaBufferValidity((PFILE_FULL_EA_INFORMATION)UserEaList,
+			UserEaListLength,
 			(PULONG)&Irp->IoStatus.Information);
 		if (!NT_SUCCESS(Status))
 			__leave;
@@ -98,51 +206,162 @@ Ext2QueryEa (
 		if (!NT_SUCCESS(Status)) {
 			DbgPrint("ext4_fs_get_xattr_ref() failed!\n");
 			__leave;
-		}
-		else {
-			PFILE_FULL_EA_INFORMATION FullEa;
+		} else {
+			int i = 0;
+			PFILE_FULL_EA_INFORMATION FullEa = UserBuffer,
+															  LastFullEa = NULL;
+			if (RemainingUserBufferLength)
+				RtlZeroMemory(FullEa, RemainingUserBufferLength);
 
-			// Iterate the whole EA buffer to do inspection
-			for (FullEa = (PFILE_FULL_EA_INFORMATION)UserBuffer;
-				FullEa < (PFILE_FULL_EA_INFORMATION)&UserBuffer[UserBufferLength];
-				FullEa = (PFILE_FULL_EA_INFORMATION)(FullEa->NextEntryOffset == 0 ?
-					&UserBuffer[UserBufferLength] :
-					(PCHAR)FullEa + FullEa->NextEntryOffset)) {
+			if (UserEaList != NULL) {
+				PFILE_GET_EA_INFORMATION GetEa;
+				for (GetEa = (PFILE_GET_EA_INFORMATION)&UserEaList[0];
+					  GetEa < (PFILE_GET_EA_INFORMATION)((PUCHAR)UserEaList
+						+ UserEaListLength);
+					GetEa = (GetEa->NextEntryOffset == 0
+						? (PFILE_GET_EA_INFORMATION)MAXUINT_PTR
+						: (PFILE_GET_EA_INFORMATION)((PUCHAR)GetEa
+							+ GetEa->NextEntryOffset))) {
 
-				OEM_STRING EaName;
+					size_t ItemSize;
+					OEM_STRING Str;
+					OEM_STRING OutputEaName;
 
-				EaName.MaximumLength = EaName.Length = FullEa->EaNameLength;
-				EaName.Buffer = &FullEa->EaName[0];
+					Str.MaximumLength = Str.Length = GetEa->EaNameLength;
+					Str.Buffer = &GetEa->EaName[0];
 
-				// Check if EA's name is valid
-				if (!Ext2IsEaNameValid(EaName)) {
-					Irp->IoStatus.Information = (PCHAR)FullEa - UserBuffer;
-					Status = STATUS_INVALID_EA_NAME;
-					__leave;
+					//
+					// At the moment we only need to know whether the item exists
+					// and its size.
+					//
+					Status = Ext2WinntError(ext4_fs_get_xattr(&xattr_ref,
+						EXT4_XATTR_INDEX_USER,
+						Str.Buffer,
+						Str.Length,
+						NULL,
+						0,
+						&ItemSize));
+					if (!NT_SUCCESS(Status))
+						continue;
+
+					//
+					//  We were not able to locate the name therefore we must
+					//  dummy up a entry for the query.  The needed Ea size is
+					//  the size of the name + 4 (next entry offset) + 1 (flags)
+					//  + 1 (name length) + 2 (value length) + the name length +
+					//  1 (null byte) + Data Size.
+					//
+					if ((ULONG)(4 + 1 + 1 + 2 + GetEa->EaNameLength + 1 + ItemSize)
+					  > RemainingUserBufferLength) {
+
+						Status = i ? STATUS_BUFFER_OVERFLOW : STATUS_BUFFER_TOO_SMALL;
+						__leave;
+					}
+					FullEa->NextEntryOffset = 0;
+					FullEa->Flags = 0;
+					FullEa->EaNameLength = GetEa->EaNameLength;
+					FullEa->EaValueLength = ItemSize;
+					RtlCopyMemory(&FullEa->EaName[0],
+						&GetEa->EaName[0],
+						GetEa->EaNameLength);
+
+					//
+					// This query must succeed, or is guarenteed to succeed
+					// since we are only looking up
+					// an EA entry in a in-memory tree structure.
+					// Otherwise that means someone might be operating on
+					// the xattr_ref without acquiring Inode lock.
+					//
+					ASSERT(NT_SUCCESS(Ext2WinntError(
+						ext4_fs_get_xattr(&xattr_ref,
+							EXT4_XATTR_INDEX_USER,
+							Str.Buffer,
+							Str.Length,
+							&FullEa->EaName[0] + FullEa->EaNameLength + 1,
+							ItemSize,
+							&ItemSize
+					))));
+					FullEa->EaValueLength = ItemSize;
+
+					// Link FullEa and LastFullEa together
+					if (LastFullEa)
+						LastFullEa->NextEntryOffset = (PCHAR)FullEa - (PCHAR)LastFullEa;
+
+					LastFullEa = FullEa;
+					FullEa = (PFILE_FULL_EA_INFORMATION)
+						(&FullEa->EaName[0] + FullEa->EaNameLength + 1 + ItemSize);
+					RemainingUserBufferLength -= 4 + 1 + 1 + 2 + GetEa->EaNameLength + 1 + ItemSize;
+					i++;
 				}
-			}
+			} else if (IndexSpecified) {
+				struct EaIterator EaIterator;
+				//
+				//  The user supplied an index into the Ea list.
+				//
+				if (RemainingUserBufferLength)
+					RtlZeroMemory(FullEa, RemainingUserBufferLength);
 
-			// Now add EA entries to the inode
-			for (FullEa = (PFILE_FULL_EA_INFORMATION)UserBuffer;
-				FullEa < (PFILE_FULL_EA_INFORMATION)&UserBuffer[UserBufferLength];
-				FullEa = (PFILE_FULL_EA_INFORMATION)(FullEa->NextEntryOffset == 0 ?
-					&UserBuffer[UserBufferLength] :
-					(PCHAR)FullEa + FullEa->NextEntryOffset)) {
+				EaIterator.OverFlow = FALSE;
+				EaIterator.RemainingUserBufferLength = UserBufferLength;
+				// In this case, return only an entry.
+				EaIterator.ReturnSingleEntry = TRUE;
+				EaIterator.FullEa = (PFILE_FULL_EA_INFORMATION)UserBuffer;
+				EaIterator.LastFullEa = NULL;
+				EaIterator.UserBufferLength = UserBufferLength;
+				EaIterator.EaIndex = UserEaIndex;
+				EaIterator.EaIndexCounter = 1;
 
-				OEM_STRING EaName;
+				xattr_ref.iter_arg = &EaIterator;
+				ext4_fs_xattr_iterate(&xattr_ref, Ext2IterateAllEa);
 
-				EaName.MaximumLength = EaName.Length = FullEa->EaNameLength;
-				EaName.Buffer = &FullEa->EaName[0];
+				RemainingUserBufferLength = EaIterator.RemainingUserBufferLength;
 
-				Status = Ext2WinntError(ext4_fs_set_xattr(&xattr_ref,
-					EXT4_XATTR_INDEX_USER,
-					EaName.Buffer,
-					EaName.Length,
-					&FullEa->EaName[0] + FullEa->EaNameLength + 1,
-					FullEa->EaValueLength,
-					TRUE));
-				if (!NT_SUCCESS(Status))
-					__leave;
+				Status = STATUS_SUCCESS;
+
+				// It seems that the item isn't found
+				if (RemainingUserBufferLength == UserBufferLength)
+					Status = STATUS_OBJECTID_NOT_FOUND;
+
+				if (EaIterator.OverFlow)
+					Status = STATUS_BUFFER_OVERFLOW;
+
+			} else {
+				struct EaIterator EaIterator;
+				//
+				//  Else perform a simple scan, taking into account the restart
+				//  flag and the position of the next Ea stored in the Ccb.
+				//
+				if (RestartScan)
+					Ccb->EaIndex = 1;
+
+				if (RemainingUserBufferLength)
+					RtlZeroMemory(FullEa, RemainingUserBufferLength);
+
+				EaIterator.OverFlow = FALSE;
+				EaIterator.RemainingUserBufferLength = UserBufferLength;
+				EaIterator.ReturnSingleEntry = ReturnSingleEntry;
+				EaIterator.FullEa = (PFILE_FULL_EA_INFORMATION)UserBuffer;
+				EaIterator.LastFullEa = NULL;
+				EaIterator.UserBufferLength = UserBufferLength;
+				EaIterator.EaIndex = Ccb->EaIndex;
+				EaIterator.EaIndexCounter = 1;
+
+				xattr_ref.iter_arg = &EaIterator;
+				ext4_fs_xattr_iterate(&xattr_ref, Ext2IterateAllEa);
+
+				RemainingUserBufferLength = EaIterator.RemainingUserBufferLength;
+
+				if (Ccb->EaIndex < EaIterator.EaIndexCounter)
+					Ccb->EaIndex = EaIterator.EaIndexCounter;
+
+				// See if we reached the end of EA list
+				if (!EaIterator.OverFlow && !EaIterator.ReturnSingleEntry)
+					Ccb->EaIndex = 1;
+
+				Status = STATUS_SUCCESS;
+
+				if (EaIterator.OverFlow)
+					Status = STATUS_BUFFER_OVERFLOW;
 
 			}
 		}
@@ -169,6 +388,7 @@ Ext2QueryEa (
 				Mcb,
 				FILE_NOTIFY_CHANGE_EA,
 				FILE_ACTION_MODIFIED);
+			Irp->IoStatus.Information = UserBufferLength - RemainingUserBufferLength;
 		}
 
 		if (!AbnormalTermination()) {
@@ -247,13 +467,14 @@ Ext2SetEa (
 	PEXT2_MCB           Mcb = NULL;
 
 	BOOLEAN             MainResourceAcquired = FALSE;
+	BOOLEAN             FcbLockAcquired = FALSE;
 	BOOLEAN             XattrRefAcquired = FALSE;
 
 	NTSTATUS            Status = STATUS_UNSUCCESSFUL;
 
 	struct ext4_xattr_ref xattr_ref;
 	PCHAR UserBuffer;
-	LONG UserBufferLength;
+	ULONG UserBufferLength;
 
 	__try {
 
@@ -282,6 +503,9 @@ Ext2SetEa (
 			(PULONG)&Irp->IoStatus.Information);
 		if (!NT_SUCCESS(Status))
 			__leave;
+
+		ExAcquireResourceExclusiveLite(&Vcb->FcbLock, TRUE);
+		FcbLockAcquired = TRUE;
 
 		if (!Mcb)
 			__leave;
@@ -356,6 +580,11 @@ Ext2SetEa (
 				ext4_fs_put_xattr_ref(&xattr_ref);
 			} else
 				Status = Ext2WinntError(ext4_fs_put_xattr_ref(&xattr_ref));
+		}
+
+		if (FcbLockAcquired) {
+			ExReleaseResourceLite(&Vcb->FcbLock);
+			FcbLockAcquired = FALSE;
 		}
 
 		if (MainResourceAcquired) {
