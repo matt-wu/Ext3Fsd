@@ -11,6 +11,7 @@
 
 #include "ext2fs.h"
 #include "linux\ext4.h"
+#include "linux\ext4_xattr.h"
 
 /* GLOBALS ***************************************************************/
 
@@ -28,6 +29,13 @@ extern PEXT2_GLOBAL Ext2Global;
 #pragma alloc_text(PAGE, Ext2SetLinkInfo)
 #pragma alloc_text(PAGE, Ext2DeleteFile)
 #endif
+
+static int Ext2IterateAllEa(struct ext4_xattr_ref *xattr_ref, struct ext4_xattr_item *item)
+{
+	PULONG EaSize = xattr_ref->iter_arg;
+	EaSize += 4 + 1 + 1 + 2 + item->name_len + 1 + item->data_size;
+	return EXT4_XATTR_ITERATE_CONT;
+}
 
 NTSTATUS
 Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
@@ -205,6 +213,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
         case FileEaInformation:
         {
+			struct ext4_xattr_ref xattr_ref;
             PFILE_EA_INFORMATION FileEaInformation;
 
             if (Length < sizeof(FILE_EA_INFORMATION)) {
@@ -213,9 +222,15 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
 
             FileEaInformation = (PFILE_EA_INFORMATION) Buffer;
-
-            // Romfs doesn't have any extended attributes
             FileEaInformation->EaSize = 0;
+
+			Status = Ext2WinntError(ext4_fs_get_xattr_ref(IrpContext, Vcb, Fcb->Mcb, &xattr_ref));
+			if (!NT_SUCCESS(Status))
+				__leave;
+
+			xattr_ref.iter_arg = &FileEaInformation->EaSize;
+			ext4_fs_xattr_iterate(&xattr_ref, Ext2IterateAllEa);
+			ext4_fs_put_xattr_ref(&xattr_ref);
 
             Irp->IoStatus.Information = sizeof(FILE_EA_INFORMATION);
             Status = STATUS_SUCCESS;
