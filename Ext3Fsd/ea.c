@@ -588,6 +588,9 @@ Ext2SetEa (
 							&FullEa->EaName[0] + FullEa->EaNameLength + 1,
 							FullEa->EaValueLength,
 							FALSE));
+					if (!NT_SUCCESS(Status))
+						__leave;
+
 				}
 		}
 	} __finally {
