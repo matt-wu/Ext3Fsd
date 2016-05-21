@@ -290,8 +290,7 @@ Ext2QueryEa (
 					RemainingUserBufferLength -= 4 + 1 + 1 + 2 + GetEa->EaNameLength + 1 + ItemSize;
 					i++;
 				}
-			}
-			else if (IndexSpecified) {
+			} else if (IndexSpecified) {
 				struct EaIterator EaIterator;
 				//
 				//  The user supplied an index into the Ea list.
@@ -355,10 +354,6 @@ Ext2QueryEa (
 
 				if (Ccb->EaIndex < EaIterator.EaIndexCounter)
 					Ccb->EaIndex = EaIterator.EaIndexCounter;
-
-				// See if we reached the end of EA list
-				if (!EaIterator.OverFlow && !EaIterator.ReturnSingleEntry)
-					Ccb->EaIndex = 1;
 
 				Status = STATUS_SUCCESS;
 
