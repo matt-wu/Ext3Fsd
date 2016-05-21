@@ -17,8 +17,6 @@ Ext2MapUserBuffer(
 	IN OUT PIRP Irp
 )
 {
-	PAGED_CODE();
-
 	//
 	// If there is no Mdl, then we must be in the Fsd, and we can simply
 	// return the UserBuffer field from the Irp.
