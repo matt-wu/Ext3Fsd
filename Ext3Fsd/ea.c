@@ -208,7 +208,7 @@ Ext2QueryEa (
 			__leave;
 		} else {
 			int i = 0;
-			PFILE_FULL_EA_INFORMATION FullEa = UserBuffer,
+			PFILE_FULL_EA_INFORMATION FullEa = (PFILE_FULL_EA_INFORMATION)UserBuffer,
 															  LastFullEa = NULL;
 			if (RemainingUserBufferLength)
 				RtlZeroMemory(FullEa, RemainingUserBufferLength);
@@ -225,7 +225,6 @@ Ext2QueryEa (
 
 					size_t ItemSize;
 					OEM_STRING Str;
-					OEM_STRING OutputEaName;
 
 					Str.MaximumLength = Str.Length = GetEa->EaNameLength;
 					Str.Buffer = &GetEa->EaName[0];
@@ -293,7 +292,8 @@ Ext2QueryEa (
 					RemainingUserBufferLength -= 4 + 1 + 1 + 2 + GetEa->EaNameLength + 1 + ItemSize;
 					i++;
 				}
-			} else if (IndexSpecified) {
+			}
+			else if (IndexSpecified) {
 				struct EaIterator EaIterator;
 				//
 				//  The user supplied an index into the Ea list.
@@ -322,8 +322,12 @@ Ext2QueryEa (
 				if (RemainingUserBufferLength == UserBufferLength)
 					Status = STATUS_OBJECTID_NOT_FOUND;
 
-				if (EaIterator.OverFlow)
-					Status = STATUS_BUFFER_OVERFLOW;
+				if (EaIterator.OverFlow) {
+					if (RemainingUserBufferLength == UserBufferLength)
+						Status = STATUS_BUFFER_TOO_SMALL;
+					else
+						Status = STATUS_BUFFER_OVERFLOW;
+				}
 
 			} else {
 				struct EaIterator EaIterator;
@@ -360,8 +364,12 @@ Ext2QueryEa (
 
 				Status = STATUS_SUCCESS;
 
-				if (EaIterator.OverFlow)
-					Status = STATUS_BUFFER_OVERFLOW;
+				if (EaIterator.OverFlow) {
+					if (RemainingUserBufferLength == UserBufferLength)
+						Status = STATUS_BUFFER_TOO_SMALL;
+					else
+						Status = STATUS_BUFFER_OVERFLOW;
+				}
 
 			}
 		}
