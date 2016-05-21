@@ -562,21 +562,33 @@ Ext2SetEa (
 				&UserBuffer[UserBufferLength] :
 				(PCHAR)FullEa + FullEa->NextEntryOffset)) {
 
+				int ret;
 				OEM_STRING EaName;
 
 				EaName.MaximumLength = EaName.Length = FullEa->EaNameLength;
 				EaName.Buffer = &FullEa->EaName[0];
 
-				Status = Ext2WinntError(ext4_fs_set_xattr(&xattr_ref,
-					EXT4_XATTR_INDEX_USER,
-					EaName.Buffer,
-					EaName.Length,
-					&FullEa->EaName[0] + FullEa->EaNameLength + 1,
-					FullEa->EaValueLength,
-					TRUE));
-				if (!NT_SUCCESS(Status))
+				Status = Ext2WinntError(ret =
+					ext4_fs_set_xattr(&xattr_ref,
+						EXT4_XATTR_INDEX_USER,
+						EaName.Buffer,
+						EaName.Length,
+						&FullEa->EaName[0] + FullEa->EaNameLength + 1,
+						FullEa->EaValueLength,
+						TRUE));
+				if (!NT_SUCCESS(Status) && ret != -ENODATA)
 					__leave;
 
+				if (ret == -ENODATA) {
+					Status = Ext2WinntError(
+						ext4_fs_set_xattr(&xattr_ref,
+							EXT4_XATTR_INDEX_USER,
+							EaName.Buffer,
+							EaName.Length,
+							&FullEa->EaName[0] + FullEa->EaNameLength + 1,
+							FullEa->EaValueLength,
+							FALSE));
+				}
 		}
 	} __finally {
 
