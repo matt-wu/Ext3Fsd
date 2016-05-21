@@ -528,6 +528,13 @@ Ext2SetEa (
 
 		XattrRefAcquired = TRUE;
 
+		//
+		// Remove all existing EA entries.
+		//
+		ext4_xattr_purge_items(&xattr_ref);
+		xattr_ref.dirty = TRUE;
+		Status = STATUS_SUCCESS;
+
 		// Iterate the whole EA buffer to do inspection
 		for (FullEa = (PFILE_FULL_EA_INFORMATION)UserBuffer;
 			FullEa < (PFILE_FULL_EA_INFORMATION)&UserBuffer[UserBufferLength];
