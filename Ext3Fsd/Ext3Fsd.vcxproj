@@ -259,6 +259,7 @@
     <ClCompile Include="devctl.c" />
     <ClCompile Include="dirctl.c" />
     <ClCompile Include="dispatch.c" />
+    <ClCompile Include="ea.c" />
     <ClCompile Include="except.c" />
     <ClCompile Include="ext3\generic.c" />
     <ClCompile Include="ext3\htree.c" />
