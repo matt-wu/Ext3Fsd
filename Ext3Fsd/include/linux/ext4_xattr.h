@@ -190,6 +190,8 @@ const char *ext4_extract_xattr_name(const char *full_name, size_t full_name_len,
 const char *ext4_get_xattr_name_prefix(__u8 name_index,
 				       size_t *ret_prefix_len);
 
+void ext4_xattr_purge_items(struct ext4_xattr_ref *xattr_ref);
+
 #endif
 /**
  * @}
