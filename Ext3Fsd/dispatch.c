@@ -271,7 +271,7 @@ Ext2DispatchRequest (IN PEXT2_IRP_CONTEXT IrpContext)
 		return Ext2QueryEa(IrpContext);
 
 	case IRP_MJ_SET_EA:
-		return Ext2QueryEa(IrpContext);
+		return Ext2SetEa(IrpContext);
 
 #if (_WIN32_WINNT >= 0x0500)
     case IRP_MJ_PNP:
