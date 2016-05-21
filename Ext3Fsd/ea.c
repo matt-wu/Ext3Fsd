@@ -179,13 +179,6 @@ Ext2QueryEa (
 		ReturnSingleEntry = BooleanFlagOn(IrpSp->Flags, SL_RETURN_SINGLE_ENTRY);
 		IndexSpecified = BooleanFlagOn(IrpSp->Flags, SL_INDEX_SPECIFIED);
 
-		// Check if the EA buffer provided is valid
-		Status = IoCheckEaBufferValidity((PFILE_FULL_EA_INFORMATION)UserEaList,
-			UserEaListLength,
-			(PULONG)&Irp->IoStatus.Information);
-		if (!NT_SUCCESS(Status))
-			__leave;
-
 		if (!Mcb)
 			__leave;
 
@@ -208,6 +201,9 @@ Ext2QueryEa (
 			int i = 0;
 			PFILE_FULL_EA_INFORMATION FullEa = (PFILE_FULL_EA_INFORMATION)UserBuffer,
 															  LastFullEa = NULL;
+
+			XattrRefAcquired = TRUE;
+
 			if (RemainingUserBufferLength)
 				RtlZeroMemory(FullEa, RemainingUserBufferLength);
 
@@ -528,6 +524,8 @@ Ext2SetEa (
 			__leave;
 		} else {
 			PFILE_FULL_EA_INFORMATION FullEa;
+
+			XattrRefAcquired = TRUE;
 
 			// Iterate the whole EA buffer to do inspection
 			for (FullEa = (PFILE_FULL_EA_INFORMATION)UserBuffer;
