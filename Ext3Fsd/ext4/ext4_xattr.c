@@ -666,7 +666,7 @@ static int ext4_xattr_resize_item(struct ext4_xattr_ref *xattr_ref,
 	return ret;
 }
 
-static void ext4_xattr_purge_items(struct ext4_xattr_ref *xattr_ref)
+void ext4_xattr_purge_items(struct ext4_xattr_ref *xattr_ref)
 {
 	struct rb_node *first_node;
 	struct ext4_xattr_item *item = NULL;
