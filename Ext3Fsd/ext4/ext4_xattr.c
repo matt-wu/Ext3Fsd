@@ -953,7 +953,7 @@ void ext4_fs_xattr_iterate(struct ext4_xattr_ref *ref,
 		else
 			next_item = NULL;
 		if (iter)
-			iter(ref, item);
+			ret = iter(ref, item);
 
 		if (ret != EXT4_XATTR_ITERATE_CONT) {
 			if (ret == EXT4_XATTR_ITERATE_STOP)
