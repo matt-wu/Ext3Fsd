@@ -1597,6 +1597,11 @@ Ext2QueryEa(
 	IN PEXT2_IRP_CONTEXT    IrpContext
 );
 
+BOOLEAN
+Ext2IsEaNameValid(
+	IN OEM_STRING Name
+);
+
 NTSTATUS
 Ext2SetEa(
 	IN PEXT2_IRP_CONTEXT    IrpContext

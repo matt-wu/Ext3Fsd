@@ -671,6 +671,154 @@ errorout:
     return Ext2WinntError(rc);
 }
 
+//
+// Any call to this routine must have Fcb's MainResource and FcbLock acquired.
+//
+
+NTSTATUS
+Ext2OverwriteEa(
+	PEXT2_IRP_CONTEXT    IrpContext,
+	PEXT2_VCB Vcb,
+	PEXT2_FCB Fcb,
+	PIO_STATUS_BLOCK Iosb
+)
+{
+    PEXT2_MCB           Mcb = NULL;
+    PIRP				  Irp;
+    PIO_STACK_LOCATION  IrpSp;
+
+    struct ext4_xattr_ref xattr_ref;
+    BOOLEAN             XattrRefAcquired = FALSE;
+    NTSTATUS            Status = STATUS_UNSUCCESSFUL;
+
+    PFILE_FULL_EA_INFORMATION FullEa;
+    PCHAR EaBuffer;
+    ULONG EaBufferLength;
+
+    __try {
+
+        Irp = IrpContext->Irp;
+        IrpSp = IoGetCurrentIrpStackLocation(Irp);
+        Mcb = Fcb->Mcb;
+
+        EaBuffer = Irp->AssociatedIrp.SystemBuffer;
+        EaBufferLength = IrpSp->Parameters.Create.EaLength;
+
+        if (!Mcb)
+            __leave;
+
+        //
+        // Return peacefully if there is no EaBuffer provided.
+        //
+        if (!EaBuffer) {
+            Status = STATUS_SUCCESS;
+            __leave;
+        }
+
+		//
+		// If the caller specifies an EaBuffer, but has no knowledge about Ea,
+		// we reject the request.
+		//
+		if (EaBuffer != NULL &&
+			FlagOn(IrpSp->Parameters.Create.Options, FILE_NO_EA_KNOWLEDGE)) {
+			Status = STATUS_ACCESS_DENIED;
+			__leave;
+		}
+
+        //
+        // Check Ea Buffer validity.
+        //
+        Status = IoCheckEaBufferValidity(EaBuffer, EaBufferLength, &Iosb->Information);
+        if (!NT_SUCCESS(Status))
+            __leave;
+
+        Status = Ext2WinntError(ext4_fs_get_xattr_ref(IrpContext, Vcb, Fcb->Mcb, &xattr_ref));
+        if (!NT_SUCCESS(Status)) {
+            DbgPrint("ext4_fs_get_xattr_ref() failed!\n");
+            __leave;
+        }
+
+        XattrRefAcquired = TRUE;
+
+        //
+        // Remove all existing EA entries.
+        //
+        ext4_xattr_purge_items(&xattr_ref);
+        xattr_ref.dirty = TRUE;
+        Status = STATUS_SUCCESS;
+
+        // Iterate the whole EA buffer to do inspection
+        for (FullEa = (PFILE_FULL_EA_INFORMATION)EaBuffer;
+            FullEa < (PFILE_FULL_EA_INFORMATION)&EaBuffer[EaBufferLength];
+            FullEa = (PFILE_FULL_EA_INFORMATION)(FullEa->NextEntryOffset == 0 ?
+                &EaBuffer[EaBufferLength] :
+                (PCHAR)FullEa + FullEa->NextEntryOffset)) {
+
+            OEM_STRING EaName;
+
+            EaName.MaximumLength = EaName.Length = FullEa->EaNameLength;
+            EaName.Buffer = &FullEa->EaName[0];
+
+            // Check if EA's name is valid
+            if (!Ext2IsEaNameValid(EaName)) {
+                Status = STATUS_INVALID_EA_NAME;
+                __leave;
+            }
+        }
+
+        // Now add EA entries to the inode
+        for (FullEa = (PFILE_FULL_EA_INFORMATION)EaBuffer;
+            FullEa < (PFILE_FULL_EA_INFORMATION)&EaBuffer[EaBufferLength];
+            FullEa = (PFILE_FULL_EA_INFORMATION)(FullEa->NextEntryOffset == 0 ?
+                &EaBuffer[EaBufferLength] :
+                (PCHAR)FullEa + FullEa->NextEntryOffset)) {
+
+            int ret;
+            OEM_STRING EaName;
+
+            EaName.MaximumLength = EaName.Length = FullEa->EaNameLength;
+            EaName.Buffer = &FullEa->EaName[0];
+
+            Status = Ext2WinntError(ret =
+                ext4_fs_set_xattr(&xattr_ref,
+                    EXT4_XATTR_INDEX_USER,
+                    EaName.Buffer,
+                    EaName.Length,
+                    &FullEa->EaName[0] + FullEa->EaNameLength + 1,
+                    FullEa->EaValueLength,
+                    TRUE));
+            if (!NT_SUCCESS(Status) && ret != -ENODATA)
+                __leave;
+
+            if (ret == -ENODATA) {
+                Status = Ext2WinntError(
+                    ext4_fs_set_xattr(&xattr_ref,
+                        EXT4_XATTR_INDEX_USER,
+                        EaName.Buffer,
+                        EaName.Length,
+                        &FullEa->EaName[0] + FullEa->EaNameLength + 1,
+                        FullEa->EaValueLength,
+                        FALSE));
+                if (!NT_SUCCESS(Status))
+                    __leave;
+
+            }
+        }
+    }
+    __finally {
+
+        if (XattrRefAcquired) {
+            if (!NT_SUCCESS(Status)) {
+                xattr_ref.dirty = FALSE;
+                ext4_fs_put_xattr_ref(&xattr_ref);
+			} else {
+				Status = Ext2WinntError(ext4_fs_put_xattr_ref(&xattr_ref));
+			}
+        }
+    }
+    return Status;
+}
+
 NTSTATUS
 Ext2CreateFile(
     PEXT2_IRP_CONTEXT IrpContext,
@@ -1288,6 +1436,12 @@ Openit:
                 //
                 //  This file is just created.
                 //
+
+				Status = Ext2OverwriteEa(IrpContext, Vcb, Fcb, &Irp->IoStatus);
+				if (!NT_SUCCESS(Status)) {
+					Ext2DeleteFile(IrpContext, Vcb, Fcb, Mcb);
+					__leave;
+				}
 
                 if (DirectoryFile) {
 
@@ -2018,5 +2172,6 @@ Ext2SupersedeOrOverWriteFile(
         Fcb->Inode->i_mtime = Ext2LinuxTime(CurrentTime);
     Ext2SaveInode(IrpContext, Vcb, Fcb->Inode);
 
-    return STATUS_SUCCESS;
+    // See if we need to overwrite EA of the file
+    return Ext2OverwriteEa(IrpContext, Vcb, Fcb, &IrpContext->Irp->IoStatus);
 }
