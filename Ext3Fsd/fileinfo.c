@@ -33,7 +33,7 @@ extern PEXT2_GLOBAL Ext2Global;
 static int Ext2IterateAllEa(struct ext4_xattr_ref *xattr_ref, struct ext4_xattr_item *item)
 {
 	PULONG EaSize = xattr_ref->iter_arg;
-	EaSize += 4 + 1 + 1 + 2 + item->name_len + 1 + item->data_size;
+	*EaSize += 4 + 1 + 1 + 2 + item->name_len + 1 + item->data_size;
 	return EXT4_XATTR_ITERATE_CONT;
 }
 
@@ -224,13 +224,13 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             FileEaInformation = (PFILE_EA_INFORMATION) Buffer;
             FileEaInformation->EaSize = 0;
 
-			Status = Ext2WinntError(ext4_fs_get_xattr_ref(IrpContext, Vcb, Fcb->Mcb, &xattr_ref));
-			if (!NT_SUCCESS(Status))
-				__leave;
+            Status = Ext2WinntError(ext4_fs_get_xattr_ref(IrpContext, Vcb, Fcb->Mcb, &xattr_ref));
+            if (!NT_SUCCESS(Status))
+                __leave;
 
-			xattr_ref.iter_arg = &FileEaInformation->EaSize;
-			ext4_fs_xattr_iterate(&xattr_ref, Ext2IterateAllEa);
-			ext4_fs_put_xattr_ref(&xattr_ref);
+            xattr_ref.iter_arg = &FileEaInformation->EaSize;
+            FileEaInformation->EaSize = xattr_ref.ea_size;
+            ext4_fs_put_xattr_ref(&xattr_ref);
 
             Irp->IoStatus.Information = sizeof(FILE_EA_INFORMATION);
             Status = STATUS_SUCCESS;
