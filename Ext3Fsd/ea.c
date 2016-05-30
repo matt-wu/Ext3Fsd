@@ -65,10 +65,13 @@ struct EaIterator {
 	ULONG EaIndexCounter;
 };
 
-static int Ext2IterateAllEa(struct ext4_xattr_ref *xattr_ref, struct ext4_xattr_item *item)
+static int Ext2IterateAllEa(struct ext4_xattr_ref *xattr_ref, struct ext4_xattr_item *item, BOOL is_last)
 {
 	struct EaIterator *pEaIterator = xattr_ref->iter_arg;
+	ULONG EaEntrySize = 4 + 1 + 1 + 2 + item->name_len + 1 + item->data_size;
 	ASSERT(pEaIterator);
+	if (!is_last && !pEaIterator->ReturnSingleEntry)
+		EaEntrySize = ALIGN_UP(EaEntrySize, ULONG);
 
 	// Start iteration from index specified
 	if (pEaIterator->EaIndexCounter < pEaIterator->EaIndex) {
@@ -77,8 +80,7 @@ static int Ext2IterateAllEa(struct ext4_xattr_ref *xattr_ref, struct ext4_xattr_
 	}
 	pEaIterator->EaIndexCounter++;
 
-	if ((ULONG)(4 + 1 + 1 + 2 + item->name_len + 1 + item->data_size)
-		> pEaIterator->RemainingUserBufferLength) {
+	if (EaEntrySize > pEaIterator->RemainingUserBufferLength) {
 		pEaIterator->OverFlow = TRUE;
 		return EXT4_XATTR_ITERATE_STOP;
 	}
@@ -101,8 +103,8 @@ static int Ext2IterateAllEa(struct ext4_xattr_ref *xattr_ref, struct ext4_xattr_
 
 	pEaIterator->LastFullEa = pEaIterator->FullEa;
 	pEaIterator->FullEa = (PFILE_FULL_EA_INFORMATION)
-		(&pEaIterator->FullEa->EaName[0] + item->name_len + 1 + item->data_size);
-	pEaIterator->RemainingUserBufferLength -= 4 + 1 + 1 + 2 + item->name_len + 1 + item->data_size;
+			((PCHAR)pEaIterator->FullEa + EaEntrySize);
+	pEaIterator->RemainingUserBufferLength -= EaEntrySize;
 
 	if (pEaIterator->ReturnSingleEntry)
 		return EXT4_XATTR_ITERATE_STOP;
@@ -220,6 +222,8 @@ Ext2QueryEa (
 
 				size_t ItemSize;
 				OEM_STRING Str;
+				ULONG EaEntrySize;
+				BOOL is_last = !GetEa->NextEntryOffset;
 
 				Str.MaximumLength = Str.Length = GetEa->EaNameLength;
 				Str.Buffer = &GetEa->EaName[0];
@@ -245,8 +249,11 @@ Ext2QueryEa (
 				//  + 1 (name length) + 2 (value length) + the name length +
 				//  1 (null byte) + Data Size.
 				//
-				if ((ULONG)(4 + 1 + 1 + 2 + GetEa->EaNameLength + 1 + ItemSize)
-					> RemainingUserBufferLength) {
+				EaEntrySize = 4 + 1 + 1 + 2 + GetEa->EaNameLength + 1 + ItemSize;
+				if (!is_last)
+					EaEntrySize = ALIGN_UP(EaEntrySize, ULONG);
+
+				if (EaEntrySize > RemainingUserBufferLength) {
 
 					Status = i ? STATUS_BUFFER_OVERFLOW : STATUS_BUFFER_TOO_SMALL;
 					__leave;
@@ -283,8 +290,8 @@ Ext2QueryEa (
 
 				LastFullEa = FullEa;
 				FullEa = (PFILE_FULL_EA_INFORMATION)
-					(&FullEa->EaName[0] + FullEa->EaNameLength + 1 + ItemSize);
-				RemainingUserBufferLength -= 4 + 1 + 1 + 2 + GetEa->EaNameLength + 1 + ItemSize;
+					((PCHAR)FullEa + EaEntrySize);
+				RemainingUserBufferLength -= EaEntrySize;
 				i++;
 			}
 		} else if (IndexSpecified) {

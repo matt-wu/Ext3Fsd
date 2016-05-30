@@ -178,8 +178,9 @@ int ext4_fs_get_xattr(struct ext4_xattr_ref *ref, __u8 name_index,
 		      size_t buf_size, size_t *data_size);
 
 void ext4_fs_xattr_iterate(struct ext4_xattr_ref *ref,
-			   int (*iter)(struct ext4_xattr_ref *ref,
-				     struct ext4_xattr_item *item));
+	int(*iter)(struct ext4_xattr_ref *ref,
+		struct ext4_xattr_item *item,
+		BOOL is_last));
 
 void ext4_fs_xattr_iterate_reset(struct ext4_xattr_ref *ref);
 

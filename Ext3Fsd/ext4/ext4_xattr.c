@@ -927,7 +927,8 @@ Finish:
 
 void ext4_fs_xattr_iterate(struct ext4_xattr_ref *ref,
 			   int (*iter)(struct ext4_xattr_ref *ref,
-				     struct ext4_xattr_item *item))
+				     struct ext4_xattr_item *item,
+					 BOOL is_last))
 {
 	struct ext4_xattr_item *item;
 	if (!ref->iter_from) {
@@ -953,7 +954,7 @@ void ext4_fs_xattr_iterate(struct ext4_xattr_ref *ref,
 		else
 			next_item = NULL;
 		if (iter)
-			ret = iter(ref, item);
+			ret = iter(ref, item, !next_item);
 
 		if (ret != EXT4_XATTR_ITERATE_CONT) {
 			if (ret == EXT4_XATTR_ITERATE_STOP)
