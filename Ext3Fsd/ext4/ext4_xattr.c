@@ -216,7 +216,7 @@ ext4_xattr_item_search(struct ext4_xattr_ref *xattr_ref,
 static void ext4_xattr_item_insert(struct ext4_xattr_ref *xattr_ref,
 				   struct ext4_xattr_item *item)
 {
-    rb_insert(&xattr_ref->root, &item->node,
+	rb_insert(&xattr_ref->root, &item->node,
 	      ext4_xattr_item_cmp);
 	list_add_tail(&item->list_node, &xattr_ref->ordered_list);
 }
@@ -224,7 +224,7 @@ static void ext4_xattr_item_insert(struct ext4_xattr_ref *xattr_ref,
 static void ext4_xattr_item_remove(struct ext4_xattr_ref *xattr_ref,
 				   struct ext4_xattr_item *item)
 {
-    rb_erase(&item->node, &xattr_ref->root);
+	rb_erase(&item->node, &xattr_ref->root);
 	list_del_init(&item->list_node);
 }
 
