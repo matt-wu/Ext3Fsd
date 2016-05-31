@@ -34,10 +34,8 @@ static int Ext2IterateAllEa(struct ext4_xattr_ref *xattr_ref, struct ext4_xattr_
 {
     PULONG EaSize = xattr_ref->iter_arg;
     ULONG EaEntrySize = 4 + 1 + 1 + 2 + item->name_len + 1 + item->data_size;
-    if (!is_last)
-        EaEntrySize = ALIGN_UP(EaEntrySize, ULONG);
 
-    *EaSize += EaEntrySize;
+    *EaSize += EaEntrySize - 4;
     return EXT4_XATTR_ITERATE_CONT;
 }
 
@@ -235,6 +233,9 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             xattr_ref.iter_arg = &FileEaInformation->EaSize;
             ext4_fs_xattr_iterate(&xattr_ref, Ext2IterateAllEa);
             ext4_fs_put_xattr_ref(&xattr_ref);
+
+            if (FileEaInformation->EaSize)
+                FileEaInformation->EaSize += 4;
 
             Irp->IoStatus.Information = sizeof(FILE_EA_INFORMATION);
             Status = STATUS_SUCCESS;
