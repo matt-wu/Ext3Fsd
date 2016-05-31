@@ -218,12 +218,14 @@ static void ext4_xattr_item_insert(struct ext4_xattr_ref *xattr_ref,
 {
     rb_insert(&xattr_ref->root, &item->node,
 	      ext4_xattr_item_cmp);
+	list_add_tail(&item->list_node, &xattr_ref->ordered_list);
 }
 
 static void ext4_xattr_item_remove(struct ext4_xattr_ref *xattr_ref,
 				   struct ext4_xattr_item *item)
 {
     rb_erase(&item->node, &xattr_ref->root);
+	list_del_init(&item->list_node);
 }
 
 static struct ext4_xattr_item *
@@ -239,6 +241,7 @@ ext4_xattr_item_alloc(__u8 name_index, const char *name, size_t name_len)
 	item->name_len = name_len;
 	item->data = NULL;
 	item->data_size = 0;
+	INIT_LIST_HEAD(&item->list_node);
 
 	memcpy(item->name, name, name_len);
 
@@ -535,6 +538,70 @@ ext4_xattr_insert_item(struct ext4_xattr_ref *xattr_ref, __u8 name_index,
 	return item;
 }
 
+static struct ext4_xattr_item *
+ext4_xattr_insert_item_ordered(struct ext4_xattr_ref *xattr_ref, __u8 name_index,
+	const char *name, size_t name_len, const void *data,
+	size_t data_size,
+	int *err)
+{
+	struct ext4_xattr_item *item, *last_item = NULL;
+	item = ext4_xattr_item_alloc(name_index, name, name_len);
+	if (!item) {
+		if (err)
+			*err = -ENOMEM;
+
+		return NULL;
+	}
+
+	if (!list_empty(&xattr_ref->ordered_list))
+		last_item = list_entry(xattr_ref->ordered_list.prev,
+										 struct ext4_xattr_item,
+										 list_node);
+
+	item->in_inode = TRUE;
+	if ((xattr_ref->inode_size_rem <
+		EXT4_XATTR_SIZE(data_size) +
+		EXT4_XATTR_LEN(item->name_len))
+			||
+		(last_item && !last_item->in_inode)) {
+		if (xattr_ref->block_size_rem <
+			EXT4_XATTR_SIZE(data_size) +
+			EXT4_XATTR_LEN(item->name_len)) {
+			if (err)
+				*err = -ENOSPC;
+
+			return NULL;
+		}
+
+		item->in_inode = FALSE;
+	}
+	if (ext4_xattr_item_alloc_data(item, data, data_size) != 0) {
+		ext4_xattr_item_free(item);
+		if (err)
+			*err = -ENOMEM;
+
+		return NULL;
+	}
+	ext4_xattr_item_insert(xattr_ref, item);
+	xattr_ref->ea_size +=
+		EXT4_XATTR_SIZE(item->data_size) + EXT4_XATTR_LEN(item->name_len);
+	if (item->in_inode) {
+		xattr_ref->inode_size_rem -=
+			EXT4_XATTR_SIZE(item->data_size) +
+			EXT4_XATTR_LEN(item->name_len);
+	}
+	else {
+		xattr_ref->block_size_rem -=
+			EXT4_XATTR_SIZE(item->data_size) +
+			EXT4_XATTR_LEN(item->name_len);
+	}
+	xattr_ref->dirty = TRUE;
+	if (err)
+		*err = 0;
+
+	return item;
+}
+
 static int ext4_xattr_remove_item(struct ext4_xattr_ref *xattr_ref,
 				  __u8 name_index, const char *name,
 				  size_t name_len)
@@ -799,7 +866,6 @@ static int ext4_xattr_write_to_disk(struct ext4_xattr_ref *xattr_ref)
 	struct ext4_xattr_header *block_header = NULL;
 	struct ext4_xattr_entry *entry = NULL;
 	struct ext4_xattr_entry *block_entry = NULL;
-	struct rb_node *first_node;
 	struct ext4_xattr_item *item = NULL;
 
 	inode_size_rem = ext4_xattr_inode_space(xattr_ref);
@@ -858,21 +924,7 @@ static int ext4_xattr_write_to_disk(struct ext4_xattr_ref *xattr_ref)
 		}
 	}
 
-	first_node = rb_first(&xattr_ref->root);
-	if (first_node)
-		item = container_of(first_node, struct ext4_xattr_item,
-				    node);
-
-	while (item) {
-		struct rb_node *next_node;
-		struct ext4_xattr_item *next_item = NULL;
-		next_node = rb_next(&item->node);
-		if (next_node)
-			next_item = container_of(next_node, struct ext4_xattr_item,
-				node);
-		else
-			next_item = NULL;
-
+	list_for_each_entry(item, &xattr_ref->ordered_list, struct ext4_xattr_item, list_node) {
 		if (item->in_inode) {
 			ibody_data = (char *)ibody_data -
 				     EXT4_XATTR_SIZE(item->data_size);
@@ -886,7 +938,7 @@ static int ext4_xattr_write_to_disk(struct ext4_xattr_ref *xattr_ref)
 					  EXT4_XATTR_LEN(item->name_len);
 
 			xattr_ref->IsOnDiskInodeDirty = TRUE;
-			goto next_item;
+			continue;
 		}
 		if (EXT4_XATTR_SIZE(item->data_size) +
 			EXT4_XATTR_LEN(item->name_len) >
@@ -908,8 +960,6 @@ static int ext4_xattr_write_to_disk(struct ext4_xattr_ref *xattr_ref)
 				  EXT4_XATTR_LEN(item->name_len);
 
 		block_modified = TRUE;
-next_item:
-		item = next_item;
 	}
 	xattr_ref->dirty = FALSE;
 	if (block_modified) {
@@ -932,25 +982,25 @@ void ext4_fs_xattr_iterate(struct ext4_xattr_ref *ref,
 {
 	struct ext4_xattr_item *item;
 	if (!ref->iter_from) {
-		struct rb_node *first_node;
-		first_node = rb_first(&ref->root);
-		if (first_node) {
+		struct list_head *first_node;
+		first_node = ref->ordered_list.next;
+		if (first_node && first_node != &ref->ordered_list) {
 			ref->iter_from =
-				container_of(first_node,
+				list_entry(first_node,
 					     struct ext4_xattr_item,
-					     node);
+					     list_node);
 		}
 	}
 
 	item = ref->iter_from;
 	while (item) {
-		struct rb_node *next_node;
+		struct list_head *next_node;
 		struct ext4_xattr_item *next_item;
 		int ret = EXT4_XATTR_ITERATE_CONT;
-		next_node = rb_next(&item->node);
-		if (next_node)
-			next_item = container_of(next_node, struct ext4_xattr_item,
-						 node);
+		next_node = item->list_node.next;
+		if (next_node && next_node != &ref->ordered_list)
+			next_item = list_entry(next_node, struct ext4_xattr_item,
+						 list_node);
 		else
 			next_item = NULL;
 		if (iter)
@@ -998,6 +1048,23 @@ int ext4_fs_set_xattr(struct ext4_xattr_ref *ref, __u8 name_index,
 		item = ext4_xattr_insert_item(ref, name_index, name, name_len,
 					      data, data_size, &ret);
 	}
+Finish:
+	return ret;
+}
+
+int ext4_fs_set_xattr_ordered(struct ext4_xattr_ref *ref, __u8 name_index,
+	const char *name, size_t name_len, const void *data,
+	size_t data_size)
+{
+	int ret = 0;
+	struct ext4_xattr_item *item =
+		ext4_xattr_lookup_item(ref, name_index, name, name_len);
+	if (item) {
+		ret = -EEXIST;
+		goto Finish;
+	}
+	item = ext4_xattr_insert_item_ordered(ref, name_index, name, name_len,
+		data, data_size, &ret);
 Finish:
 	return ret;
 }
@@ -1055,6 +1122,7 @@ int ext4_fs_get_xattr_ref(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB fs, PEXT2_MCB 
 
 	ref->inode_ref = inode_ref;
 	ref->fs = fs;
+	INIT_LIST_HEAD(&ref->ordered_list);
 
 	ref->OnDiskInode = Ext2AllocateInode(fs);
 	if (!ref->OnDiskInode) {

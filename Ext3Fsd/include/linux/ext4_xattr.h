@@ -134,6 +134,7 @@ struct ext4_xattr_item {
 	size_t data_size;
 
 	struct rb_node node;
+	struct list_head list_node;
 };
 
 struct ext4_xattr_ref {
@@ -155,6 +156,7 @@ struct ext4_xattr_ref {
 	struct ext4_xattr_item *iter_from;
 
 	struct rb_root root;
+	struct list_head ordered_list;
 };
 
 #define EXT4_XATTR_ITERATE_CONT 0
@@ -169,6 +171,10 @@ int ext4_fs_put_xattr_ref(struct ext4_xattr_ref *ref);
 int ext4_fs_set_xattr(struct ext4_xattr_ref *ref, __u8 name_index,
 		      const char *name, size_t name_len, const void *data,
 		      size_t data_size, BOOL replace);
+
+int ext4_fs_set_xattr_ordered(struct ext4_xattr_ref *ref, __u8 name_index,
+	const char *name, size_t name_len, const void *data,
+	size_t data_size);
 
 int ext4_fs_remove_xattr(struct ext4_xattr_ref *ref, __u8 name_index,
 			 const char *name, size_t name_len);

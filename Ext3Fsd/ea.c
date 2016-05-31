@@ -576,29 +576,15 @@ Ext2SetEa (
 				EaName.Buffer = &FullEa->EaName[0];
 
 				Status = Ext2WinntError(ret =
-					ext4_fs_set_xattr(&xattr_ref,
+					ext4_fs_set_xattr_ordered(&xattr_ref,
 						EXT4_XATTR_INDEX_USER,
 						EaName.Buffer,
 						EaName.Length,
 						&FullEa->EaName[0] + FullEa->EaNameLength + 1,
-						FullEa->EaValueLength,
-						TRUE));
-				if (!NT_SUCCESS(Status) && ret != -ENODATA)
+						FullEa->EaValueLength));
+				if (!NT_SUCCESS(Status))
 					__leave;
 
-				if (ret == -ENODATA) {
-					Status = Ext2WinntError(
-						ext4_fs_set_xattr(&xattr_ref,
-							EXT4_XATTR_INDEX_USER,
-							EaName.Buffer,
-							EaName.Length,
-							&FullEa->EaName[0] + FullEa->EaNameLength + 1,
-							FullEa->EaValueLength,
-							FALSE));
-					if (!NT_SUCCESS(Status))
-						__leave;
-
-				}
 		}
 	} __finally {
 
