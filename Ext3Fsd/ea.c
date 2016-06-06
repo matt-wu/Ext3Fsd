@@ -12,34 +12,6 @@
 #include "ext2fs.h"
 #include <linux/ext4_xattr.h>
 
-PVOID
-Ext2MapUserBuffer(
-	IN OUT PIRP Irp
-)
-{
-	//
-	// If there is no Mdl, then we must be in the Fsd, and we can simply
-	// return the UserBuffer field from the Irp.
-	//
-
-	if (Irp->MdlAddress == NULL) {
-
-		return Irp->UserBuffer;
-
-	}
-	else {
-
-		PVOID Address = MmGetSystemAddressForMdlSafe(Irp->MdlAddress, NormalPagePriority);
-
-		if (Address == NULL) {
-
-			ExRaiseStatus(STATUS_INSUFFICIENT_RESOURCES);
-		}
-
-		return Address;
-	}
-}
-
 // Ea iterator
 struct EaIterator {
 	// Return only an entry
@@ -163,12 +135,10 @@ Ext2QueryEa (
 
 		Irp->IoStatus.Information = 0;
 
-		UserBuffer = Ext2MapUserBuffer(Irp);
-
 		//
 		// Receive input parameter from caller
 		//
-		UserBuffer = Ext2MapUserBuffer(Irp);
+		UserBuffer = Ext2GetUserBuffer(Irp);
 		if (!UserBuffer) {
 			Status = STATUS_INSUFFICIENT_RESOURCES;
 			__leave;
