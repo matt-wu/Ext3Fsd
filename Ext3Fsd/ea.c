@@ -12,6 +12,12 @@
 #include "ext2fs.h"
 #include <linux/ext4_xattr.h>
 
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, Ext2QueryEa)
+#pragma alloc_text(PAGE, Ext2SetEa)
+#pragma alloc_text(PAGE, Ext2IsEaNameValid)
+#endif
+
 // Ea iterator
 struct EaIterator {
 	// Return only an entry
