@@ -41,7 +41,7 @@
 
 /* STRUCTS & CONSTS******************************************************/
 
-#define EXT2FSD_VERSION                 "0.66"
+#define EXT2FSD_VERSION                 "0.68"
 
 
 /* WDK DEFINITIONS ******************************************************/
