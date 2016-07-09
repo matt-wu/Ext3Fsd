@@ -351,7 +351,7 @@ Ext2ReadWriteBlocks(
 
                 IoBuildPartialMdl( MasterIrp->MdlAddress,
                                    Mdl,
-                                   (PCHAR)MasterIrp->UserBuffer +Extent->Offset,
+                                   (PCHAR)MasterIrp->UserBuffer+Extent->Offset,
                                    Extent->Length );
 
                 IoSetNextIrpStackLocation(Irp);
