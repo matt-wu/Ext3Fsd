@@ -66,8 +66,8 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,2,4,13
- PRODUCTVERSION 1,2,4,13
+ FILEVERSION 1,4,7,9
+ PRODUCTVERSION 1,4,7,9
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -85,12 +85,12 @@ BEGIN
             VALUE "Comments", "Matt Wu <matt@ext2fsd.com>"
             VALUE "CompanyName", "www.ext2fsd.com"
             VALUE "FileDescription", "Ext2Fsd Service Management"
-            VALUE "FileVersion", "1.2.4.13"
+            VALUE "FileVersion", "1.4.7.9"
             VALUE "InternalName", "Ext2Srv.exe"
             VALUE "LegalCopyright", "Matt Wu <matt@ext2fsd.com>"
             VALUE "OriginalFilename", "Ext2Srv.exe"
             VALUE "ProductName", "Ext2Fsd Service"
-            VALUE "ProductVersion", "1.2.4.13"
+            VALUE "ProductVersion", "1.4.7.9"
         END
     END
     BLOCK "VarFileInfo"

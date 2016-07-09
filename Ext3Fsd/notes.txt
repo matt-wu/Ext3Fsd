@@ -1,11 +1,12 @@
 ==================================
-Release Notes for Ext2Fsd V0.66
+Release Notes for Ext2Fsd V0.68
 ==================================
 
 Features implemented or bugfix:
 
-    1, FIXME: BSOD when mounting as readonly
-    2, FIXME: Ext2Srv service blocked by Antivirus
+    1, FIXME: System hang caused by a deadlock in cache manipulation
+    2, Optimization: Reaper mechanism improved (global locks removed)
+    3, Feature: supporting multiple instances & users for Ext2Mgr
 
 Supported Ext3/4 features:
 
@@ -27,7 +28,7 @@ Unsupported Ext3/4 features:
 
 Features to be implemented in next release:
     1, Extents management improvement
-    2, EA and ACL security checking
+    2, EA and ACL security checking (WIP)
 
 WARNINGS:
  

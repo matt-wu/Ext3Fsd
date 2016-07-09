@@ -27,6 +27,13 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
 ======================
  Revision history
 ======================
+52, V0.68    2016-07-09
+
+Modifications from V0.66:
+
+    1, FIXME: System hang caused by a deadlock in cache manipulation
+    2, Performance: Reaper mechanism improved (global locks removed)
+    3, Feature: supporting multiple instances & users for Ext2Mgr
 
 51, V0.66    2016-04-13
 
