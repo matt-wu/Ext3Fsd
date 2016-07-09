@@ -197,7 +197,7 @@ Ext2QueryGlobalParameters(IN PUNICODE_STRING RegistryPath)
      * 1 writing support
      */
     QueryTable[i].Flags = 0;
-    QueryTable[0].Name = WRITING_SUPPORT;
+    QueryTable[i].Name = WRITING_SUPPORT;
     QueryTable[i].DefaultType = REG_NONE;
     QueryTable[i].DefaultLength = 0;
     QueryTable[i].DefaultData = NULL;
