@@ -579,6 +579,11 @@ DriverEntry (
         goto errorout;
     }
 
+#ifdef _PNP_POWER_
+    DiskdevObject->DeviceObjectExtension->PowerControlNeeded = FALSE;
+    CdromdevObject->DeviceObjectExtension->PowerControlNeeded = FALSE;
+#endif
+
     /* initializing */
     Ext2Global->DiskdevObject  = DiskdevObject;
     Ext2Global->CdromdevObject = CdromdevObject;
