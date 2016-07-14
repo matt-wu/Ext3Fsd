@@ -5,7 +5,7 @@
   <assemblyIdentity version=SXS_ASSEMBLY_VERSION
      processorArchitecture=SXS_PROCESSOR_ARCHITECTURE
      name=SXS_ASSEMBLY_NAME/> 
-  <description>Example</description>
+  <description>Ext2Mgr</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>
