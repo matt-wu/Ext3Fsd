@@ -555,8 +555,8 @@ ext4_xattr_insert_item_ordered(struct ext4_xattr_ref *xattr_ref, __u8 name_index
 
 	if (!list_empty(&xattr_ref->ordered_list))
 		last_item = list_entry(xattr_ref->ordered_list.prev,
-										 struct ext4_xattr_item,
-										 list_node);
+					struct ext4_xattr_item,
+					list_node);
 
 	item->in_inode = TRUE;
 	if ((xattr_ref->inode_size_rem <
