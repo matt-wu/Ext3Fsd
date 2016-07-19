@@ -1144,16 +1144,19 @@ int ext4_fs_get_xattr_ref(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB fs, PEXT2_MCB 
 	ref->IsOnDiskInodeDirty = FALSE;
 
 	if (ext4_xattr_inode_space(ref) <
-	   sizeof(struct ext4_xattr_ibody_header))
+	   sizeof(struct ext4_xattr_ibody_header) +
+	   sizeof(__u32))
 		ref->inode_size_rem = 0;
-	else
+	else {
 		ref->inode_size_rem =
-		       ext4_xattr_inode_space(ref) -
-		       sizeof(struct ext4_xattr_ibody_header);
+			ext4_xattr_inode_space(ref) -
+			sizeof(struct ext4_xattr_ibody_header);
+	}
 
 	ref->block_size_rem =
 		ext4_xattr_block_space(ref) -
-		sizeof(struct ext4_xattr_header);
+		sizeof(struct ext4_xattr_header) -
+		sizeof(__u32);
 
 	rc = ext4_xattr_fetch(ref);
 	if (rc != 0) {
