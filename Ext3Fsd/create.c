@@ -346,8 +346,9 @@ Ext2LookupFile (
         }
 
         /* is a directory expected ? */
-        if (FullName->Buffer[End - 1] == L'\\') {
+        while (FullName->Buffer[End - 1] == L'\\') {
             bDirectory = TRUE;
+            End -= 1;
         }
 
         /* loop with every sub name */
@@ -868,13 +869,17 @@ McbExisting:
             PathName = FileName;
             Mcb = NULL;
 
-            if (PathName.Buffer[PathName.Length/2 - 1] == L'\\') {
-                if (DirectoryFile) {
-                    PathName.Length -=2;
-                    PathName.Buffer[PathName.Length/2] = 0;
-                } else {
-                    DirectoryFile = TRUE;
-                }
+            /* here we've found the target file, but it's not matched. */
+            if (STATUS_OBJECT_NAME_NOT_FOUND != Status &&
+                STATUS_NO_SUCH_FILE != Status) {
+                __leave;
+            }
+
+            while (PathName.Length > 0 &&
+                   PathName.Buffer[PathName.Length/2 - 1] == L'\\') {
+                DirectoryFile = TRUE;
+                PathName.Length -= 2;
+                PathName.Buffer[PathName.Length / 2] = 0;
             }
 
             if (!ParentMcb) {
@@ -914,7 +919,8 @@ Dissecting:
 
                 /* quit name resolving loop */
                 if (!NT_SUCCESS(Status)) {
-                    if (Status == STATUS_NO_SUCH_FILE && RemainName.Length != 0) {
+                    if (Status == STATUS_NO_SUCH_FILE ||
+                        Status == STATUS_OBJECT_NAME_NOT_FOUND) {
                         Status = STATUS_OBJECT_PATH_NOT_FOUND;
                     }
                     __leave;
