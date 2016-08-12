@@ -2957,40 +2957,48 @@ Ext2FirstUnusedMcb(PEXT2_VCB Vcb, BOOLEAN Wait, ULONG Number)
 
     while (Number--) {
 
-        if (!IsListEmpty(&Vcb->McbList)) {
+        BOOLEAN     Skip = TRUE;
 
-            while (i++ < Vcb->NumOfMcb) {
+        if (IsListEmpty(&Vcb->McbList)) {
+            break;
+        }
 
-                List = RemoveHeadList(&Vcb->McbList);
-                Mcb = CONTAINING_RECORD(List, EXT2_MCB, Link);
-                ASSERT(IsFlagOn(Mcb->Flags, MCB_VCB_LINK));
+        while (i++ < Vcb->NumOfMcb) {
 
-                if (Mcb->Fcb == NULL && !IsMcbRoot(Mcb) &&
-                        Mcb->Refercount == 0 &&
-                        (Mcb->Child == NULL || IsMcbSymLink(Mcb))) {
+            List = RemoveHeadList(&Vcb->McbList);
+            Mcb = CONTAINING_RECORD(List, EXT2_MCB, Link);
+            ASSERT(IsFlagOn(Mcb->Flags, MCB_VCB_LINK));
 
-                    Ext2RemoveMcb(Vcb, Mcb);
-                    ClearLongFlag(Mcb->Flags, MCB_VCB_LINK);
-                    Ext2DerefXcb(&Vcb->NumOfMcb);
+            if (Mcb->Fcb == NULL && !IsMcbRoot(Mcb) &&
+                    Mcb->Refercount == 0 &&
+                    (Mcb->Child == NULL || IsMcbSymLink(Mcb))) {
 
-                    /* attach all Mcb into a chain*/
-                    if (Head) {
-                        ASSERT(Tail != NULL);
-                        Tail->Next = Mcb;
-                        Tail = Mcb;
-                    } else {
-                        Head = Tail = Mcb;
-                    }
-                    Tail->Next = NULL;
+                Ext2RemoveMcb(Vcb, Mcb);
+                ClearLongFlag(Mcb->Flags, MCB_VCB_LINK);
+                Ext2DerefXcb(&Vcb->NumOfMcb);
 
+                /* attach all Mcb into a chain*/
+                if (Head) {
+                    ASSERT(Tail != NULL);
+                    Tail->Next = Mcb;
+                    Tail = Mcb;
                 } else {
-
-                    InsertTailList(&Vcb->McbList, &Mcb->Link);
-                    Mcb = NULL;
+                    Head = Tail = Mcb;
                 }
+                Tail->Next = NULL;
+                Skip = FALSE;
+
+            } else {
+
+                InsertTailList(&Vcb->McbList, &Mcb->Link);
+                Mcb = NULL;
             }
         }
+
+        if (Skip)
+            break;
     }
+
     ExReleaseResourceLite(&Vcb->McbLock);
 
     return Head;
