@@ -207,7 +207,7 @@ Ext2UnlinkFcb(IN PEXT2_FCB Fcb)
     ExAcquireResourceExclusiveLite(&Vcb->McbLock, TRUE);
     Mcb = Fcb->Mcb;
 
-    DEBUG(DL_ERR, ("Ext2FreeFcb: Fcb (%p) to be unlinked: %wZ.\n",
+    DEBUG(DL_INF, ("Ext2FreeFcb: Fcb (%p) to be unlinked: %wZ.\n",
                     Fcb, Mcb ? &Mcb->FullName : NULL));
 
     if ((Mcb != NULL) && 
