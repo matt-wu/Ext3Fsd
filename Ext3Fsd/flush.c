@@ -77,26 +77,12 @@ Ext2FlushVolume (
     IN BOOLEAN              bShutDown
 )
 {
-    IO_STATUS_BLOCK    IoStatus;
-
     DEBUG(DL_INF, ( "Ext2FlushVolume: Flushing Vcb ...\n"));
 
     ExAcquireSharedStarveExclusive(&Vcb->PagingIoResource, TRUE);
     ExReleaseResourceLite(&Vcb->PagingIoResource);
 
-    /* acquire gd lock to avoid gd/bh creation */
-    ExAcquireResourceExclusiveLite(&Vcb->sbi.s_gd_lock, TRUE);
-
-    /* discard buffer_headers for group_desc */
-    Ext2DropBH(Vcb);
-
-    /* do flushing */
-    CcFlushCache(&(Vcb->SectionObject), NULL, 0, &IoStatus);
-
-    /* release gd lock */
-    ExReleaseResourceLite(&Vcb->sbi.s_gd_lock);
-
-    return IoStatus.Status;
+    return Ext2FlushVcb(Vcb);
 }
 
 NTSTATUS

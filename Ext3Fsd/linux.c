@@ -421,7 +421,7 @@ static void buffer_head_insert(struct block_device *bdev, struct buffer_head *bh
     rb_insert(&bdev->bd_bh_root, &bh->b_rb_node, buffer_head_blocknr_cmp);
 }
 
-static void buffer_head_remove(struct block_device *bdev, struct buffer_head *bh)
+void buffer_head_remove(struct block_device *bdev, struct buffer_head *bh)
 {
     rb_erase(&bh->b_rb_node, &bdev->bd_bh_root);
 }
@@ -817,8 +817,8 @@ void __brelse(struct buffer_head *bh)
         ExReleaseResourceLite(&bdev->bd_bh_lock);
         return;
     }
-    buffer_head_remove(bdev, bh);
     KeQuerySystemTime(&bh->b_ts_drop);
+    RemoveEntryList(&bh->b_link);
     InsertTailList(&Vcb->bd.bd_bh_free, &bh->b_link);
     KeClearEvent(&Vcb->bd.bd_bh_notify);
     ExReleaseResourceLite(&bdev->bd_bh_lock);
@@ -923,6 +923,7 @@ __find_get_block(struct block_device *bdev, sector_t block, unsigned long size)
 {
     return __getblk(bdev, block, size);
 }
+
 
 //
 // inode block mapping

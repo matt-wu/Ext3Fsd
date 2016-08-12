@@ -3160,6 +3160,7 @@ Ext2QueryUnusedBH(PEXT2_VCB Vcb, PLIST_ENTRY head)
             (bh->b_ts_drop.QuadPart + (LONGLONG)10*1000*1000*15) > now.QuadPart ||
             (bh->b_ts_creat.QuadPart + (LONGLONG)10*1000*1000*180) > now.QuadPart) {
             InsertTailList(head, &bh->b_link);
+            buffer_head_remove(&Vcb->bd, bh);
         } else {
             InsertHeadList(&Vcb->bd.bd_bh_free, &bh->b_link);
             break;

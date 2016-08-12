@@ -1744,13 +1744,22 @@ Ext2RefreshSuper(
 );
 
 BOOLEAN
+Ext2LoadGroupBH(IN PEXT2_VCB Vcb);
+
+BOOLEAN
 Ext2LoadGroup(IN PEXT2_VCB Vcb);
+
+VOID
+Ext2DropGroupBH(IN PEXT2_VCB Vcb);
 
 VOID
 Ext2PutGroup(IN PEXT2_VCB Vcb);
 
 VOID
 Ext2DropBH(IN PEXT2_VCB Vcb);
+
+NTSTATUS
+Ext2FlushVcb(IN PEXT2_VCB Vcb);
 
 BOOLEAN
 Ext2SaveGroup(

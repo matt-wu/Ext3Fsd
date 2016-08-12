@@ -125,6 +125,24 @@ Ext2RefreshSuper (
 }
 
 VOID
+Ext2DropGroupBH(IN PEXT2_VCB Vcb)
+{
+    struct ext3_sb_info *sbi = &Vcb->sbi;
+    unsigned long i;
+
+    if (NULL == Vcb->sbi.s_gd) {
+        return;
+    }
+
+    for (i = 0; i < Vcb->sbi.s_gdb_count; i++) {
+        if (Vcb->sbi.s_gd[i].bh) {
+            fini_bh(&sbi->s_gd[i].bh);
+            Vcb->sbi.s_gd[i].bh = NULL;
+        }
+    }
+}
+
+VOID
 Ext2PutGroup(IN PEXT2_VCB Vcb)
 {
     struct ext3_sb_info *sbi = &Vcb->sbi;
@@ -135,13 +153,47 @@ Ext2PutGroup(IN PEXT2_VCB Vcb)
         return;
     }
 
-    for (i = 0; i < Vcb->sbi.s_gdb_count; i++) {
-        if (Vcb->sbi.s_gd[i].bh)
-            fini_bh(&sbi->s_gd[i].bh);
-    }
+    Ext2DropGroupBH(Vcb);
 
     kfree(Vcb->sbi.s_gd);
     Vcb->sbi.s_gd = NULL;
+}
+
+
+BOOLEAN
+Ext2LoadGroupBH(IN PEXT2_VCB Vcb)
+{
+    struct super_block  *sb = &Vcb->sb;
+    struct ext3_sb_info *sbi = &Vcb->sbi;
+    unsigned long i;
+    BOOLEAN rc = FALSE;
+
+    __try {
+
+        ExAcquireResourceExclusiveLite(&Vcb->sbi.s_gd_lock, TRUE);
+        ASSERT (NULL != sbi->s_gd);
+
+        for (i = 0; i < sbi->s_gdb_count; i++) {
+            ASSERT (sbi->s_gd[i].block);
+            if (sbi->s_gd[i].bh)
+                continue;
+            sbi->s_gd[i].bh = sb_getblk(sb, sbi->s_gd[i].block);
+            if (!sbi->s_gd[i].bh) {
+                DEBUG(DL_ERR, ("Ext2LoadGroupBH: can't read group descriptor %d\n", i));
+                DbgBreak();
+                __leave;
+            }
+            sbi->s_gd[i].gd = (struct ext4_group_desc *)sbi->s_gd[i].bh->b_data;
+        }
+
+        rc = TRUE;
+
+    } __finally {
+
+        ExReleaseResourceLite(&Vcb->sbi.s_gd_lock);
+    }
+
+    return rc;
 }
 
 
@@ -177,17 +229,16 @@ Ext2LoadGroup(IN PEXT2_VCB Vcb)
                 DEBUG(DL_ERR, ("Ext2LoadGroup: can't locate group descriptor %d\n", i));
                 __leave;
             }
-            sbi->s_gd[i].bh = sb_getblk(sb, sbi->s_gd[i].block);
-            if (!sbi->s_gd[i].bh) {
-                DEBUG(DL_ERR, ("Ext2LoadGroup: can't read group descriptor %d\n", i));
-                __leave;
-            }
-            sbi->s_gd[i].gd = (struct ext4_group_desc *)sbi->s_gd[i].bh->b_data;
+        }
+
+        if (!Ext2LoadGroupBH(Vcb)) {
+            DEBUG(DL_ERR, ("Ext2LoadGroup: Failed to load group descriptions !\n"));
+            __leave;
         }
 
         if (!ext4_check_descriptors(sb)) {
             DbgBreak();
-            DEBUG(DL_ERR, ("Ext2LoadGroup: group descriptors corrupted!\n"));
+            DEBUG(DL_ERR, ("Ext2LoadGroup: group descriptors corrupted !\n"));
             __leave;
         }
 
@@ -204,13 +255,10 @@ Ext2LoadGroup(IN PEXT2_VCB Vcb)
     return rc;
 }
 
-
 VOID
 Ext2DropBH(IN PEXT2_VCB Vcb)
 {
     struct ext3_sb_info *sbi = &Vcb->sbi;
-    LARGE_INTEGER        timeout;
-    unsigned long i;
 
     /* do nothing if Vcb is not initialized yet */
     if (!IsFlagOn(Vcb->Flags, VCB_INITIALIZED))
@@ -222,15 +270,18 @@ Ext2DropBH(IN PEXT2_VCB Vcb)
         ExAcquireResourceExclusiveLite(&Vcb->bd.bd_bh_lock, TRUE);
 
         SetFlag(Vcb->Flags, VCB_BEING_DROPPED);
-        Ext2PutGroup(Vcb);
+        Ext2DropGroupBH(Vcb);
 
         while (!IsListEmpty(&Vcb->bd.bd_bh_free)) {
             struct buffer_head *bh;
             PLIST_ENTRY         l;
             l = RemoveHeadList(&Vcb->bd.bd_bh_free);
             bh = CONTAINING_RECORD(l, struct buffer_head, b_link);
-            ASSERT(0 == atomic_read(&bh->b_count));
-            free_buffer_head(bh);
+            InitializeListHead(&bh->b_link);
+            if (0 == atomic_read(&bh->b_count)) {
+                buffer_head_remove(&Vcb->bd, bh);
+                free_buffer_head(bh);
+            }
         }
 
     } __finally {
@@ -239,6 +290,90 @@ Ext2DropBH(IN PEXT2_VCB Vcb)
 
     ClearFlag(Vcb->Flags, VCB_BEING_DROPPED);
 }
+
+
+VOID
+Ext2FlushRange(IN PEXT2_VCB Vcb, LARGE_INTEGER s, LARGE_INTEGER e)
+{
+    ULONG len;
+
+    if (e.QuadPart <= s.QuadPart)
+        return;
+
+    /* loop per 2G */
+    while (s.QuadPart < e.QuadPart) {
+        if (e.QuadPart > s.QuadPart + 1024 * 1024 * 1024) {
+            len = 1024 * 1024 * 1024;
+        } else {
+            len = (ULONG) (e.QuadPart - s.QuadPart);
+        }
+        CcFlushCache(&Vcb->SectionObject, &s, len, NULL);
+        s.QuadPart += len;
+    }
+}
+
+NTSTATUS
+Ext2FlushVcb(IN PEXT2_VCB Vcb)
+{
+    LARGE_INTEGER        s = {0}, o;
+    struct ext3_sb_info *sbi = &Vcb->sbi;
+    struct rb_node      *node;
+    struct buffer_head  *bh;
+
+    if (!IsFlagOn(Vcb->Flags, VCB_INITIALIZED)) {
+        CcFlushCache(&Vcb->SectionObject, NULL, 0, NULL);
+        goto errorout;
+    }
+
+    ASSERT(ExIsResourceAcquiredExclusiveLite(&Vcb->MainResource));
+
+    __try {
+
+        /* acqurie gd block */
+        ExAcquireResourceExclusiveLite(&Vcb->sbi.s_gd_lock, TRUE);
+
+        /* acquire bd lock to avoid bh creation */
+        ExAcquireResourceExclusiveLite(&Vcb->bd.bd_bh_lock, TRUE);
+
+        /* drop unused bh */
+        Ext2DropBH(Vcb);
+
+        /* flush volume with all outstanding bh skipped */
+
+        node = rb_first(&Vcb->bd.bd_bh_root);
+        while (node) {
+
+            bh = container_of(node, struct buffer_head, b_rb_node);
+            node = rb_next(node);
+
+            o.QuadPart = bh->b_blocknr << BLOCK_BITS;
+            ASSERT(o.QuadPart >= s.QuadPart);
+
+            if (o.QuadPart == s.QuadPart) {
+                s.QuadPart = s.QuadPart + bh->b_size;
+                continue;
+            }
+
+            if (o.QuadPart > s.QuadPart) {
+                Ext2FlushRange(Vcb, s, o);
+                s.QuadPart = (bh->b_blocknr << BLOCK_BITS) + bh->b_size;
+                continue;
+            }
+        }
+
+        o = Vcb->PartitionInformation.PartitionLength;
+        Ext2FlushRange(Vcb, s, o);
+
+    } __finally {
+
+        ExReleaseResourceLite(&Vcb->bd.bd_bh_lock);
+        ExReleaseResourceLite(&Vcb->sbi.s_gd_lock);
+    }
+
+errorout:
+    return STATUS_SUCCESS;
+}
+
 
 BOOLEAN
 Ext2SaveGroup(
@@ -2620,9 +2755,13 @@ struct ext4_group_desc * ext4_get_group_desc(struct super_block *sb,
         group = block_group >> EXT4_DESC_PER_BLOCK_BITS(sb);
         offset = block_group & (EXT4_DESC_PER_BLOCK(sb) - 1);
 
-        if (!sbi->s_gd || !sbi->s_gd[group].block ||
-            !sbi->s_gd[group].bh) {
+        if (!sbi->s_gd) {
             if (!Ext2LoadGroup(vcb)) {
+                __leave;
+            }
+        } else if ( !sbi->s_gd[group].block ||
+                    !sbi->s_gd[group].bh) {
+            if (!Ext2LoadGroupBH(vcb)) {
                 __leave;
             }
         }
