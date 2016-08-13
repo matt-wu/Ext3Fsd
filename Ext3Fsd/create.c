@@ -1756,7 +1756,9 @@ Ext2CreateVolume(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb)
         SetLongFlag(Vcb->Flags, VCB_VOLUME_LOCKED);
         Vcb->LockFile = IrpSp->FileObject;
     } else {
-        if (FlagOn(DesiredAccess, FILE_READ_DATA | FILE_WRITE_DATA | FILE_APPEND_DATA) ) {
+
+        if (FlagOn(IrpSp->FileObject->Flags, FO_NO_INTERMEDIATE_BUFFERING) &&
+            FlagOn(DesiredAccess, FILE_READ_DATA | FILE_WRITE_DATA) ) {
             if (!IsVcbReadOnly(Vcb)) {
                 Ext2FlushFiles(IrpContext, Vcb, FALSE);
                 Ext2FlushVolume(IrpContext, Vcb, FALSE);
