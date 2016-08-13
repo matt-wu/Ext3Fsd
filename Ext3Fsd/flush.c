@@ -36,41 +36,6 @@ Ext2FlushCompletionRoutine (
 }
 
 NTSTATUS
-Ext2FlushFiles(
-    IN PEXT2_IRP_CONTEXT    IrpContext,
-    IN PEXT2_VCB            Vcb,
-    IN BOOLEAN              bShutDown
-)
-{
-    IO_STATUS_BLOCK    IoStatus;
-
-    PEXT2_FCB       Fcb;
-    PLIST_ENTRY     ListEntry;
-
-    if (IsVcbReadOnly(Vcb)) {
-        return STATUS_SUCCESS;
-    }
-
-    IoStatus.Status = STATUS_SUCCESS;
-
-    DEBUG(DL_INF, ( "Flushing Files ...\n"));
-
-    // Flush all Fcbs in Vcb list queue.
-    for (ListEntry = Vcb->FcbList.Flink;
-            ListEntry != &Vcb->FcbList;
-            ListEntry = ListEntry->Flink ) {
-
-        Fcb = CONTAINING_RECORD(ListEntry, EXT2_FCB, Next);
-        ExAcquireResourceExclusiveLite(
-            &Fcb->MainResource, TRUE);
-        IoStatus.Status = Ext2FlushFile(IrpContext, Fcb, NULL);
-        ExReleaseResourceLite(&Fcb->MainResource);
-    }
-
-    return IoStatus.Status;
-}
-
-NTSTATUS
 Ext2FlushVolume (
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
@@ -92,13 +57,19 @@ Ext2FlushFile (
     IN PEXT2_CCB            Ccb
 )
 {
-    IO_STATUS_BLOCK     IoStatus;
+    IO_STATUS_BLOCK     IoStatus = {0};
 
     ASSERT(Fcb != NULL);
     ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
            (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 
     __try {
+
+        /* do nothing if target fie was deleted */
+        if (FlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
+            IoStatus.Status = STATUS_FILE_DELETED;
+            __leave;
+        }
 
         /* update timestamp and achieve attribute */
         if (Ccb != NULL) {
@@ -128,6 +99,41 @@ Ext2FlushFile (
     } __finally {
 
         /* do cleanup here */
+    }
+
+    return IoStatus.Status;
+}
+
+NTSTATUS
+Ext2FlushFiles(
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN BOOLEAN              bShutDown
+)
+{
+    IO_STATUS_BLOCK    IoStatus;
+
+    PEXT2_FCB       Fcb;
+    PLIST_ENTRY     ListEntry;
+
+    if (IsVcbReadOnly(Vcb)) {
+        return STATUS_SUCCESS;
+    }
+
+    IoStatus.Status = STATUS_SUCCESS;
+
+    DEBUG(DL_INF, ( "Flushing Files ...\n"));
+
+    // Flush all Fcbs in Vcb list queue.
+    for (ListEntry = Vcb->FcbList.Flink;
+            ListEntry != &Vcb->FcbList;
+            ListEntry = ListEntry->Flink ) {
+
+        Fcb = CONTAINING_RECORD(ListEntry, EXT2_FCB, Next);
+        ExAcquireResourceExclusiveLite(
+            &Fcb->MainResource, TRUE);
+        Ext2FlushFile(IrpContext, Fcb, NULL);
+        ExReleaseResourceLite(&Fcb->MainResource);
     }
 
     return IoStatus.Status;
