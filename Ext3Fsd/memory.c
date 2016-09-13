@@ -2950,10 +2950,13 @@ Ext2FirstUnusedMcb(PEXT2_VCB Vcb, BOOLEAN Wait, ULONG Number)
     PEXT2_MCB   Mcb = NULL;
     PLIST_ENTRY List = NULL;
     ULONG       i = 0;
+    LARGE_INTEGER   start, now;
 
     if (!ExAcquireResourceExclusiveLite(&Vcb->McbLock, Wait)) {
         return NULL;
     }
+
+    KeQuerySystemTime(&start);
 
     while (Number--) {
 
@@ -2964,6 +2967,11 @@ Ext2FirstUnusedMcb(PEXT2_VCB Vcb, BOOLEAN Wait, ULONG Number)
         }
 
         while (i++ < Vcb->NumOfMcb) {
+
+            KeQuerySystemTime(&now);
+            if (now.QuadPart > start.QuadPart + (LONGLONG)10*1000*1000) {
+                break;
+            }
 
             List = RemoveHeadList(&Vcb->McbList);
             Mcb = CONTAINING_RECORD(List, EXT2_MCB, Link);
@@ -3113,7 +3121,9 @@ Ext2McbReaperThread(
                     LastState = DidNothing = FALSE;
                 }
             }
-
+            if (DidNothing) {
+                KeClearEvent(&Reaper->Wait);
+            }
             if (GlobalAcquired) {
                 ExReleaseResourceLite(&Ext2Global->Resource);
                 GlobalAcquired = FALSE;
@@ -3139,15 +3149,21 @@ BOOLEAN
 Ext2QueryUnusedBH(PEXT2_VCB Vcb, PLIST_ENTRY head)
 {
     struct buffer_head *bh = NULL;
-    PLIST_ENTRY      next = NULL;
-    LARGE_INTEGER   now;
-    BOOLEAN         wake = FALSE;
+    PLIST_ENTRY         next = NULL;
+    LARGE_INTEGER       start, now;
+    BOOLEAN             wake = FALSE;
 
-    KeQuerySystemTime(&now);
+    KeQuerySystemTime(&start);
 
     ExAcquireResourceExclusiveLite(&Vcb->bd.bd_bh_lock, TRUE);
 
     while (!IsListEmpty(&Vcb->bd.bd_bh_free)) {
+
+        KeQuerySystemTime(&now);
+        if (now.QuadPart > start.QuadPart + (LONGLONG)10*1000*1000) {
+            break;
+        }
+
         next = RemoveHeadList(&Vcb->bd.bd_bh_free);
         bh = CONTAINING_RECORD(next, struct buffer_head, b_link);
         if (atomic_read(&bh->b_count)) {
@@ -3235,12 +3251,15 @@ Ext2bhReaperThread(
                 Vcb = CONTAINING_RECORD(Link, EXT2_VCB, Next);
                 NonWait = Ext2QueryUnusedBH(Vcb, &List);
             }
+            DidNothing = IsListEmpty(&List);
+            if (DidNothing) {
+                KeClearEvent(&Reaper->Wait);
+            }
             if (GlobalAcquired) {
                 ExReleaseResourceLite(&Ext2Global->Resource);
                 GlobalAcquired = FALSE;
             }
 
-            DidNothing = IsListEmpty(&List);
             while (!IsListEmpty(&List)) {
                 struct buffer_head *bh;
                 Link = RemoveHeadList(&List);
@@ -3269,19 +3288,20 @@ Ext2QueryUnusedFcb(PEXT2_VCB Vcb, PLIST_ENTRY list)
 {
     PEXT2_FCB       Fcb;
     PLIST_ENTRY     next = NULL;
-    LARGE_INTEGER   now;
+    LARGE_INTEGER   start, now;
 
     ULONG           count = 0;
     ULONG           tries = 0;
     BOOLEAN         wake = FALSE;
     BOOLEAN         retry = TRUE;
 
-    KeQuerySystemTime(&now);
+    KeQuerySystemTime(&start);
 
     ExAcquireResourceExclusiveLite(&Vcb->FcbLock, TRUE);
 
 again:
 
+    KeQuerySystemTime(&now);
     while (!IsListEmpty(&Vcb->FcbList)) {
 
         next = RemoveHeadList(&Vcb->FcbList);
@@ -3305,6 +3325,10 @@ again:
         if (++count >= Ext2Global->MaxDepth) {
             break;
         }
+    }
+
+    if (start.QuadPart + 10*1000*1000 > now.QuadPart) {
+        retry = FALSE;
     }
 
     if (retry) {
@@ -3375,12 +3399,15 @@ Ext2FcbReaperThread(
                 Vcb = CONTAINING_RECORD(Link, EXT2_VCB, Next);
                 NonWait = Ext2QueryUnusedFcb(Vcb, &List);
             }
+            DidNothing = IsListEmpty(&List);
+            if (DidNothing) {
+                KeClearEvent(&Reaper->Wait);
+            }
             if (GlobalAcquired) {
                 ExReleaseResourceLite(&Ext2Global->Resource);
                 GlobalAcquired = FALSE;
             }
 
-            DidNothing = IsListEmpty(&List);
             while (!IsListEmpty(&List)) {
                 PEXT2_FCB  Fcb;
                 Link = RemoveHeadList(&List);
