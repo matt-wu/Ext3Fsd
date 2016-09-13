@@ -1818,6 +1818,15 @@ Ext2SaveBlock (
 );
 
 BOOLEAN
+Ext2LoadBuffer(
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN LONGLONG             Offset,
+    IN ULONG                Size,
+    IN PVOID                Buf
+);
+
+BOOLEAN
 Ext2ZeroBuffer(
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,

@@ -497,27 +497,15 @@ BOOLEAN
 Ext2LoadInode (IN PEXT2_VCB Vcb,
                IN struct inode *Inode)
 {
-    struct ext3_inode   ext3i;
+    struct ext3_inode   ext3i = {0};
+    LONGLONG            offset;
 
-    IO_STATUS_BLOCK     IoStatus;
-    LONGLONG            Offset;
-
-    if (!Ext2GetInodeLba(Vcb, Inode->i_ino, &Offset))  {
-        DEBUG(DL_ERR, ( "Ext2LoadInode: error get inode(%xh)'s addr.\n", Inode->i_ino));
+    if (!Ext2GetInodeLba(Vcb, Inode->i_ino, &offset))  {
+        DEBUG(DL_ERR, ("Ext2LoadInode: failed inode %u.\n", Inode->i_ino));
         return FALSE;
     }
 
-    if (!CcCopyRead(
-                Vcb->Volume,
-                (PLARGE_INTEGER)&Offset,
-                sizeof(struct ext3_inode),
-                PIN_WAIT,
-                (PVOID)&ext3i,
-                &IoStatus )) {
-        return FALSE;
-    }
-
-    if (!NT_SUCCESS(IoStatus.Status)) {
+    if (!Ext2LoadBuffer(NULL, Vcb, offset, sizeof(ext3i), &ext3i)) {
         return FALSE;
     }
 
@@ -538,7 +526,7 @@ Ext2ClearInode (
 
     rc = Ext2GetInodeLba(Vcb, Inode, &Offset);
     if (!rc)  {
-        DEBUG(DL_ERR, ( "Ext2SaveInode: error get inode(%xh)'s addr.\n", Inode));
+        DEBUG(DL_ERR, ( "Ext2SaveInode: failed inode %u.\n", Inode));
         goto errorout;
     }
 
@@ -554,9 +542,8 @@ Ext2SaveInode ( IN PEXT2_IRP_CONTEXT IrpContext,
                 IN PEXT2_VCB Vcb,
                 IN struct inode *Inode)
 {
-    struct ext3_inode   ext3i;
+    struct ext3_inode   ext3i = {0};
 
-    IO_STATUS_BLOCK     IoStatus;
     LONGLONG            Offset = 0;
     ULONG               InodeSize = sizeof(ext3i);
     BOOLEAN             rc = 0;
@@ -565,24 +552,14 @@ Ext2SaveInode ( IN PEXT2_IRP_CONTEXT IrpContext,
                     Inode->i_ino, Inode->i_mode, Inode->i_size));
     rc = Ext2GetInodeLba(Vcb,  Inode->i_ino, &Offset);
     if (!rc)  {
-        DEBUG(DL_ERR, ( "Ext2SaveInode: error get inode(%xh)'s addr.\n", Inode->i_ino));
+        DEBUG(DL_ERR, ( "Ext2SaveInode: failed inode %u.\n", Inode->i_ino));
         goto errorout;
     }
 
-    if (!CcCopyRead(
-                Vcb->Volume,
-                (PLARGE_INTEGER)&Offset,
-                sizeof(struct ext3_inode),
-                PIN_WAIT,
-                (PVOID)&ext3i,
-                &IoStatus )) {
-        rc = FALSE;
-        goto errorout;
-    }
-
-    if (!NT_SUCCESS(IoStatus.Status)) {
-        rc = FALSE;
-        goto errorout;
+    rc = Ext2LoadBuffer(NULL, Vcb, Offset, InodeSize, &ext3i);
+    if (!rc) {
+        DEBUG(DL_ERR, ( "Ext2SaveInode: failed reading inode %u.\n", Inode->i_ino));
+        goto errorout;;
     }
 
     Ext2EncodeInode(&ext3i, Inode);
@@ -604,25 +581,37 @@ Ext2LoadBlock (IN PEXT2_VCB Vcb,
                IN ULONG     Index,
                IN PVOID     Buffer )
 {
-    IO_STATUS_BLOCK     IoStatus;
-    LONGLONG            Offset;
+    struct buffer_head *bh = NULL;
+    BOOLEAN             rc = 0;
 
-    Offset = (LONGLONG) Index;
-    Offset = Offset * Vcb->BlockSize;
+    __try {
 
-    if (!CcCopyRead(
-                Vcb->Volume,
-                (PLARGE_INTEGER)&Offset,
-                Vcb->BlockSize,
-                PIN_WAIT,
-                Buffer,
-                &IoStatus ));
+        bh = sb_getblk(&Vcb->sb, (sector_t)Index);
 
-    if (!NT_SUCCESS(IoStatus.Status)) {
-        return FALSE;
+        if (!bh) {
+            DEBUG(DL_ERR, ("Ext2Loadblock: can't load block %u\n", Index));
+            DbgBreak();
+            __leave;
+        }
+
+        if (!buffer_uptodate(bh)) {
+            int err = bh_submit_read(bh);
+	        if (err < 0) {
+	            DEBUG(DL_ERR, ("Ext2LoadBlock: reading failed %d\n", err));
+		        __leave;
+	        }
+        }
+
+        RtlCopyMemory(Buffer, bh->b_data, BLOCK_SIZE);
+        rc = TRUE;
+
+    } __finally {
+
+        if (bh)
+            fini_bh(&bh);
     }
 
-    return TRUE;
+    return rc; 
 }
 
 
@@ -632,120 +621,230 @@ Ext2SaveBlock ( IN PEXT2_IRP_CONTEXT    IrpContext,
                 IN ULONG                Index,
                 IN PVOID                Buf )
 {
-    LONGLONG Offset;
-    BOOLEAN  rc;
+    struct buffer_head *bh = NULL;
+    BOOLEAN             rc = 0;
 
-    Offset = (LONGLONG) Index;
-    Offset = Offset * Vcb->BlockSize;
+    __try {
 
-    rc = Ext2SaveBuffer(IrpContext, Vcb, Offset, Vcb->BlockSize, Buf);
+        bh = sb_getblk_zero(&Vcb->sb, (sector_t)Index);
 
-    if (IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK)) {
-        Ext2StartFloppyFlushDpc(Vcb, NULL, NULL);
+        if (!bh) {
+            DEBUG(DL_ERR, ("Ext2Saveblock: can't load block %u\n", Index));
+            DbgBreak();
+            __leave;
+        }
+
+        if (!buffer_uptodate(bh)) {
+        }
+
+        RtlCopyMemory(bh->b_data, Buf, BLOCK_SIZE);
+        mark_buffer_dirty(bh);
+        rc = TRUE;
+
+    } __finally {
+
+        if (bh)
+            fini_bh(&bh);
     }
 
     return rc;
 }
+
+BOOLEAN
+Ext2LoadBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
+                IN PEXT2_VCB            Vcb,
+                IN LONGLONG             offset,
+                IN ULONG                size,
+                IN PVOID                buf )
+{
+    struct buffer_head *bh = NULL;
+    BOOLEAN             rc;
+
+    __try {
+
+        while (size) {
+
+            sector_t    block;
+            ULONG       len = 0, delta = 0;
+
+            block = (sector_t) (offset >> BLOCK_BITS);
+            delta = (ULONG)offset & (BLOCK_SIZE - 1);
+            len = BLOCK_SIZE - delta;
+            if (size < len)
+                len = size;
+
+            bh = sb_getblk(&Vcb->sb, block);
+            if (!bh) {
+                DEBUG(DL_ERR, ("Ext2SaveBuffer: can't load block %I64u\n", block));
+                DbgBreak();
+                __leave;
+            }
+
+            if (!buffer_uptodate(bh)) {
+	            int err = bh_submit_read(bh);
+	            if (err < 0) {
+		            DEBUG(DL_ERR, ("Ext2SaveBuffer: bh_submit_read failed: %d\n", err));
+		            __leave;
+	            }
+            }
+
+            __try {
+                RtlCopyMemory(buf, bh->b_data + delta, len);
+            } __finally {
+                fini_bh(&bh);
+            }
+
+            buf = (PUCHAR)buf + len;
+            offset = offset + len;
+            size = size - len;
+        }
+
+        rc = TRUE;
+
+    } __finally {
+
+        if (bh)
+            fini_bh(&bh);
+
+    }
+
+    return rc;
+}
+
 
 BOOLEAN
 Ext2ZeroBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
                 IN PEXT2_VCB            Vcb,
-                IN LONGLONG             Offset,
-                IN ULONG                Size )
+                IN LONGLONG             offset,
+                IN ULONG                size
+    )
 {
-    PBCB        Bcb;
-    PVOID       Buffer;
-    BOOLEAN     rc;
-
-    if ( !CcPreparePinWrite(
-                Vcb->Volume,
-                (PLARGE_INTEGER) (&Offset),
-                Size,
-                FALSE,
-                PIN_WAIT | PIN_EXCLUSIVE,
-                &Bcb,
-                &Buffer )) {
-
-        DEBUG(DL_ERR, ( "Ext2SaveBuffer: failed to PinLock offset %I64xh ...\n", Offset));
-        return FALSE;
-    }
+    struct buffer_head *bh = NULL;
+    BOOLEAN             rc = 0;
 
     __try {
 
-        RtlZeroMemory(Buffer, Size);
-        CcSetDirtyPinnedData(Bcb, NULL );
-        SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
+        while (size) {
 
-        rc = Ext2AddVcbExtent(Vcb, Offset, (LONGLONG)Size);
-        if (!rc) {
-            DbgBreak();
-            Ext2Sleep(100);
-            rc = Ext2AddVcbExtent(Vcb, Offset, (LONGLONG)Size);
+            sector_t    block;
+            ULONG       len = 0, delta = 0;
+
+            block = (sector_t) (offset >> BLOCK_BITS);
+            delta = (ULONG)offset & (BLOCK_SIZE - 1);
+            len = BLOCK_SIZE - delta;
+            if (size < len)
+                len = size;
+
+            if (delta == 0 && len >= BLOCK_SIZE) {
+                bh = sb_getblk_zero(&Vcb->sb, block);
+            } else {
+                bh = sb_getblk(&Vcb->sb, block);
+            }
+
+            if (!bh) {
+                DEBUG(DL_ERR, ("Ext2SaveBuffer: can't load block %I64u\n", block));
+                DbgBreak();
+                __leave;
+            }
+
+            if (!buffer_uptodate(bh)) {
+	            int err = bh_submit_read(bh);
+	            if (err < 0) {
+		            DEBUG(DL_ERR, ("Ext2SaveBuffer: bh_submit_read failed: %d\n", err));
+		            __leave;
+	            }
+            }
+
+            __try {
+                if (delta == 0 && len >= BLOCK_SIZE) {
+                    /* bh (cache) was already cleaned as zero */
+                } else {
+                    RtlZeroMemory(bh->b_data + delta, len);
+                }
+                mark_buffer_dirty(bh);
+            } __finally {
+                fini_bh(&bh);
+            }
+
+            offset = offset + len;
+            size = size - len;
         }
 
-    } __finally {
-        CcUnpinData(Bcb);
-    }
+        rc = TRUE;
 
+    } __finally {
+
+        if (bh)
+            fini_bh(&bh);
+
+    }
 
     return rc;
 }
 
-#define SIZE_256K 0x40000
 
 BOOLEAN
 Ext2SaveBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
                 IN PEXT2_VCB            Vcb,
-                IN LONGLONG             Offset,
-                IN ULONG                Size,
-                IN PVOID                Buf )
+                IN LONGLONG             offset,
+                IN ULONG                size,
+                IN PVOID                buf )
 {
-    BOOLEAN     rc;
+    struct buffer_head *bh = NULL;
+    BOOLEAN             rc = 0;
 
-    while (Size) {
+    __try {
 
-        PBCB        Bcb;
-        PVOID       Buffer;
-        ULONG       Length;
+        while (size) {
 
-        Length = (ULONG)Offset & (SIZE_256K - 1);
-        Length = SIZE_256K - Length;
-        if (Size < Length)
-            Length = Size;
+            sector_t    block;
+            ULONG       len = 0, delta = 0;
 
-        if ( !CcPreparePinWrite(
-                    Vcb->Volume,
-                    (PLARGE_INTEGER) (&Offset),
-                    Length,
-                    FALSE,
-                    PIN_WAIT | PIN_EXCLUSIVE,
-                    &Bcb,
-                    &Buffer )) {
+            block = (sector_t) (offset >> BLOCK_BITS);
+            delta = (ULONG)offset & (BLOCK_SIZE - 1);
+            len = BLOCK_SIZE - delta;
+            if (size < len)
+                len = size;
 
-            DEBUG(DL_ERR, ( "Ext2SaveBuffer: failed to PinLock offset %I64xh ...\n", Offset));
-            return FALSE;
-        }
-
-        __try {
-
-            RtlCopyMemory(Buffer, Buf, Length);
-            CcSetDirtyPinnedData(Bcb, NULL );
-            SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
-
-            rc = Ext2AddVcbExtent(Vcb, Offset, (LONGLONG)Length);
-            if (!rc) {
-                DbgBreak();
-                Ext2Sleep(100);
-                rc = Ext2AddVcbExtent(Vcb, Offset, (LONGLONG)Length);
+            if (delta == 0 && len >= BLOCK_SIZE) {
+                bh = sb_getblk_zero(&Vcb->sb, block);
+            } else {
+                bh = sb_getblk(&Vcb->sb, block);
             }
 
-        } __finally {
-            CcUnpinData(Bcb);
+            if (!bh) {
+                DEBUG(DL_ERR, ("Ext2SaveBuffer: can't load block %I64u\n", block));
+                DbgBreak();
+                __leave;
+            }
+
+            if (!buffer_uptodate(bh)) {
+	            int err = bh_submit_read(bh);
+	            if (err < 0) {
+		            DEBUG(DL_ERR, ("Ext2SaveBuffer: bh_submit_read failed: %d\n", err));
+		            __leave;
+	            }
+            }
+
+            __try {
+                RtlCopyMemory(bh->b_data + delta, buf, len);
+                mark_buffer_dirty(bh);
+            } __finally {
+                fini_bh(&bh);
+            }
+
+            buf = (PUCHAR)buf + len;
+            offset = offset + len;
+            size = size - len;
         }
 
-        Buf = (PUCHAR)Buf + Length;
-        Offset = Offset + Length;
-        Size = Size - Length;
+        rc = TRUE;
+
+    } __finally {
+
+        if (bh)
+            fini_bh(&bh);
+
     }
 
     return rc;
