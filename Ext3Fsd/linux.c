@@ -476,11 +476,12 @@ again:
     offset.QuadPart <<= BLOCK_BITS;
 
     if (zero) {
+        /* PIN_EXCLUSIVE disabled, likely to deadlock with volume operations */
         if (!CcPreparePinWrite(Vcb->Volume,
                             &offset,
                             bh->b_size,
                             FALSE,
-                            PIN_WAIT | PIN_EXCLUSIVE,
+                            PIN_WAIT /* | PIN_EXCLUSIVE */,
                             &bcb,
                             &ptr)) {
             Ext2Sleep(100);
@@ -563,12 +564,14 @@ int submit_bh_mdl(int rw, struct buffer_head *bh)
 
         SetFlag(Vcb->Volume->Flags, FO_FILE_MODIFIED);
         Offset.QuadPart = ((LONGLONG)bh->b_blocknr) << BLOCK_BITS;
+
+        /* PIN_EXCLUSIVE disabled, likely to deadlock with volume operations */
         if (CcPreparePinWrite(
                     Vcb->Volume,
                     &Offset,
                     BLOCK_SIZE,
                     FALSE,
-                    PIN_WAIT | PIN_EXCLUSIVE,
+                    PIN_WAIT /* | PIN_EXCLUSIVE */,
                     &Bcb,
                     &Buffer )) {
 #if 0
