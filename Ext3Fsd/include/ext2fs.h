@@ -771,6 +771,7 @@ typedef struct _EXT2_VCB {
 #define VCB_BEING_CLOSED        0x00000020
 #define VCB_USER_IDS            0x00000040  /* uid/gid specified by user */
 #define VCB_USER_EIDS           0x00000080  /* euid/egid specified by user */
+#define VCB_GD_LOADED           0x00000100  /* group desc loaded */
 
 #define VCB_BEING_DROPPED       0x00002000
 #define VCB_FORCE_WRITING       0x00004000

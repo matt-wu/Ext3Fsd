@@ -157,6 +157,8 @@ Ext2PutGroup(IN PEXT2_VCB Vcb)
 
     kfree(Vcb->sbi.s_gd);
     Vcb->sbi.s_gd = NULL;
+
+    ClearFlag(Vcb->Flags, VCB_GD_LOADED);
 }
 
 
@@ -242,6 +244,7 @@ Ext2LoadGroup(IN PEXT2_VCB Vcb)
             __leave;
         }
 
+        SetFlag(Vcb->Flags, VCB_GD_LOADED);
         rc = TRUE;
 
     } __finally {
@@ -320,7 +323,7 @@ Ext2FlushVcb(IN PEXT2_VCB Vcb)
     struct rb_node      *node;
     struct buffer_head  *bh;
 
-    if (!IsFlagOn(Vcb->Flags, VCB_INITIALIZED)) {
+    if (!IsFlagOn(Vcb->Flags, VCB_GD_LOADED)) {
         CcFlushCache(&Vcb->SectionObject, NULL, 0, NULL);
         goto errorout;
     }
