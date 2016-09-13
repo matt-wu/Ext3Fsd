@@ -1936,12 +1936,14 @@ Ext2DeleteFile(
         ExAcquireResourceExclusiveLite(&Vcb->FcbLock, TRUE);
         bFcbLockAcquired = TRUE;
 
-        if (!(Dcb = Mcb->Parent->Fcb)) {
-            Dcb = Ext2AllocateFcb(Vcb, Mcb->Parent);
+        /* Mcb->Parent could be NULL when working with layered file systems */
+        if (Mcb->Parent) {
+            Dcb = Mcb->Parent->Fcb;
+            if (!Dcb)
+                Dcb = Ext2AllocateFcb(Vcb, Mcb->Parent);
         }
-        if (Dcb) {
+        if (Dcb)
             Ext2ReferXcb(&Dcb->ReferenceCount);
-        }
 
         if (bFcbLockAcquired) {
             ExReleaseResourceLite(&Vcb->FcbLock);
