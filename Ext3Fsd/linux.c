@@ -595,8 +595,6 @@ int submit_bh_mdl(int rw, struct buffer_head *bh)
         }
 
     } else {
-
-        DbgBreak();
     }
 
 errorout:
@@ -737,7 +735,6 @@ int submit_bh_pin(int rw, struct buffer_head *bh)
                             (ULONG)bh->b_blocknr,
                             (bh->b_size >> BLOCK_BITS));
     } else {
-        DbgBreak();
     }
 
 errorout:
