@@ -693,11 +693,11 @@ again:
     tbh = buffer_head_search(bdev, block);
     if (tbh) {
         get_bh(tbh);
-        ExReleaseResourceLite(&bdev->bd_bh_lock);
         free_buffer_head(bh);
         bh = tbh;
         RemoveEntryList(&bh->b_link);
         InitializeListHead(&bh->b_link);
+        ExReleaseResourceLite(&bdev->bd_bh_lock);
         goto errorout;
     } else {
         buffer_head_insert(bdev, bh);
@@ -801,13 +801,6 @@ void __brelse(struct buffer_head *bh)
     /* write data in case it's dirty */
     while (buffer_dirty(bh)) {
         ll_rw_block(WRITE, 1, &bh);
-    }
-
-    if (1 == atomic_read(&bh->b_count)) {
-    } else if (atomic_dec_and_test(&bh->b_count)) {
-        atomic_inc(&bh->b_count);
-    } else {
-        return;
     }
 
     ExAcquireResourceExclusiveLite(&bdev->bd_bh_lock, TRUE);
