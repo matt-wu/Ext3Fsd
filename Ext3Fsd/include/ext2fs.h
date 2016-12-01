@@ -916,6 +916,8 @@ struct _EXT2_MCB {
     // List Link to Vcb->McbList
     LIST_ENTRY                      Link;
 
+	
+
     struct inode                    Inode;
     struct dentry                  *de;
 };
@@ -989,6 +991,9 @@ typedef struct _EXT2_CCB {
 
     /* Open handle control block */
     struct file         filp;
+
+	/* The EA index we are on */
+	ULONG           EaIndex;
 
 } EXT2_CCB, *PEXT2_CCB;
 
@@ -1585,6 +1590,26 @@ Ext2BuildRequest (
 );
 
 //
+// ea.c
+//
+
+NTSTATUS
+Ext2QueryEa(
+	IN PEXT2_IRP_CONTEXT    IrpContext
+);
+
+BOOLEAN
+Ext2IsEaNameValid(
+	IN OEM_STRING Name
+);
+
+NTSTATUS
+Ext2SetEa(
+	IN PEXT2_IRP_CONTEXT    IrpContext
+);
+
+
+//
 // Except.c
 //
 
@@ -1801,6 +1826,17 @@ Ext2SaveInode (
     IN PEXT2_VCB Vcb,
     IN struct inode *Inode
 );
+
+BOOLEAN
+Ext2LoadInodeXattr(IN PEXT2_VCB Vcb,
+	IN struct inode *Inode,
+	IN PEXT2_INODE InodeXattr);
+
+BOOLEAN
+Ext2SaveInodeXattr(IN PEXT2_IRP_CONTEXT IrpContext,
+	IN PEXT2_VCB Vcb,
+	IN struct inode *Inode,
+	IN PEXT2_INODE InodeXattr);
 
 BOOLEAN
 Ext2LoadBlock (

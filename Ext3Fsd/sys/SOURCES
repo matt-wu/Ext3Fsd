@@ -59,4 +59,5 @@ SOURCES=    ..\Ext3fsd.rc   \
             ..\flush.c      \
             ..\shutdown.c   \
             ..\nls.c        \
-            ..\linux.c
+            ..\linux.c      \
+            ..\ea.c

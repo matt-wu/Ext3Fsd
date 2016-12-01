@@ -2387,7 +2387,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
 
         /* initialize inode lookaside list */
         ExInitializeNPagedLookasideList(&(Vcb->InodeLookasideList),
-                                        NULL, NULL, 0, sizeof(EXT2_INODE),
+                                        NULL, NULL, 0, Vcb->InodeSize,
                                         'SNIE', 0);
 
         InodeLookasideInitialized = TRUE;

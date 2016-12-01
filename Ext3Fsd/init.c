@@ -607,6 +607,9 @@ DriverEntry (
     DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL]      = Ext2BuildRequest;
     DriverObject->MajorFunction[IRP_MJ_LOCK_CONTROL]        = Ext2BuildRequest;
 
+    DriverObject->MajorFunction[IRP_MJ_QUERY_EA] = Ext2BuildRequest;
+    DriverObject->MajorFunction[IRP_MJ_SET_EA] = Ext2BuildRequest;
+
     DriverObject->MajorFunction[IRP_MJ_CLEANUP]             = Ext2BuildRequest;
 
 #if (_WIN32_WINNT >= 0x0500)
