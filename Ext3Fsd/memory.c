@@ -2350,6 +2350,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
         ExInitializeResourceLite(&Vcb->MetaInode);
         ExInitializeResourceLite(&Vcb->MetaBlock);
         ExInitializeResourceLite(&Vcb->McbLock);
+        ExInitializeResourceLite(&Vcb->FcbLock);
         ExInitializeResourceLite(&Vcb->sbi.s_gd_lock);
 #ifndef _WIN2K_TARGET_
         ExInitializeFastMutex(&Vcb->Mutex);
@@ -2359,7 +2360,6 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
 
         /* initialize Fcb list head */
         InitializeListHead(&Vcb->FcbList);
-        ExInitializeResourceLite(&Vcb->FcbLock);
 
         /* initialize Mcb list head  */
         InitializeListHead(&(Vcb->McbList));
@@ -2747,6 +2747,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
             }
 
             if (VcbResourceInitialized) {
+                ExDeleteResourceLite(&Vcb->FcbLock);
                 ExDeleteResourceLite(&Vcb->McbLock);
                 ExDeleteResourceLite(&Vcb->MetaInode);
                 ExDeleteResourceLite(&Vcb->MetaBlock);
