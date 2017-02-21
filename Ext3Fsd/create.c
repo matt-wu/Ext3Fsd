@@ -729,7 +729,8 @@ Ext2OverwriteEa(
         //
         // Check Ea Buffer validity.
         //
-        Status = IoCheckEaBufferValidity(EaBuffer, EaBufferLength, &Iosb->Information);
+        Status = IoCheckEaBufferValidity((PFILE_FULL_EA_INFORMATION)EaBuffer,
+                                          EaBufferLength, (PULONG)&Iosb->Information);
         if (!NT_SUCCESS(Status))
             __leave;
 

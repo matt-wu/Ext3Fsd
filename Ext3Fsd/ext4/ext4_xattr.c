@@ -28,7 +28,7 @@ static ext4_fsblk_t ext4_new_meta_blocks(void *icb, struct inode *inode,
 
 	status = Ext2NewBlock((PEXT2_IRP_CONTEXT)icb,
 		inode->i_sb->s_priv,
-		0, goal,
+		0, (ULONG)goal,
 		&block,
 		&blockcnt);
 	if (count)
@@ -45,7 +45,7 @@ static ext4_fsblk_t ext4_new_meta_blocks(void *icb, struct inode *inode,
 static void ext4_free_blocks(void *icb, struct inode *inode,
 	ext4_fsblk_t block, int count, int flags)
 {
-	Ext2FreeBlock((PEXT2_IRP_CONTEXT)icb, inode->i_sb->s_priv, block, count);
+	Ext2FreeBlock((PEXT2_IRP_CONTEXT)icb, inode->i_sb->s_priv, (ULONG)block, count);
 	inode->i_blocks -= count * (inode->i_sb->s_blocksize >> 9);
 	return;
 }
@@ -861,7 +861,7 @@ static int ext4_xattr_write_to_disk(struct ext4_xattr_ref *xattr_ref)
 	BOOL block_modified = FALSE;
 	void *ibody_data = NULL;
 	void *block_data = NULL;
-	__s32 inode_size_rem, block_size_rem;
+	size_t inode_size_rem, block_size_rem;
 	struct ext4_xattr_ibody_header *ibody_header = NULL;
 	struct ext4_xattr_header *block_header = NULL;
 	struct ext4_xattr_entry *entry = NULL;

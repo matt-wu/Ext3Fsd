@@ -64,8 +64,8 @@ static int Ext2IterateAllEa(struct ext4_xattr_ref *xattr_ref, struct ext4_xattr_
 	}
 	pEaIterator->FullEa->NextEntryOffset = 0;
 	pEaIterator->FullEa->Flags = 0;
-	pEaIterator->FullEa->EaNameLength = item->name_len;
-	pEaIterator->FullEa->EaValueLength = item->data_size;
+	pEaIterator->FullEa->EaNameLength = (UCHAR)item->name_len;
+	pEaIterator->FullEa->EaValueLength = (USHORT)item->data_size;
 	RtlCopyMemory(&pEaIterator->FullEa->EaName[0],
 		item->name,
 		item->name_len);
@@ -75,8 +75,8 @@ static int Ext2IterateAllEa(struct ext4_xattr_ref *xattr_ref, struct ext4_xattr_
 
 	// Link FullEa and LastFullEa together
 	if (pEaIterator->LastFullEa) {
-		pEaIterator->LastFullEa->NextEntryOffset =
-			(PCHAR)pEaIterator->FullEa - (PCHAR)pEaIterator->LastFullEa;
+		pEaIterator->LastFullEa->NextEntryOffset = (ULONG)
+			((PCHAR)pEaIterator->FullEa - (PCHAR)pEaIterator->LastFullEa);
 	}
 
 	pEaIterator->LastFullEa = pEaIterator->FullEa;
@@ -237,7 +237,7 @@ Ext2QueryEa (
 				FullEa->NextEntryOffset = 0;
 				FullEa->Flags = 0;
 				FullEa->EaNameLength = GetEa->EaNameLength;
-				FullEa->EaValueLength = ItemSize;
+				FullEa->EaValueLength = (USHORT)ItemSize;
 				RtlCopyMemory(&FullEa->EaName[0],
 					&GetEa->EaName[0],
 					GetEa->EaNameLength);
@@ -258,11 +258,12 @@ Ext2QueryEa (
 						ItemSize,
 						&ItemSize
 				))));
-				FullEa->EaValueLength = ItemSize;
+				FullEa->EaValueLength = (USHORT)ItemSize;
 
 				// Link FullEa and LastFullEa together
 				if (LastFullEa)
-					LastFullEa->NextEntryOffset = (PCHAR)FullEa - (PCHAR)LastFullEa;
+					LastFullEa->NextEntryOffset = (ULONG)((PCHAR)FullEa - 
+                                                          (PCHAR)LastFullEa);
 
 				LastFullEa = FullEa;
 				FullEa = (PFILE_FULL_EA_INFORMATION)
