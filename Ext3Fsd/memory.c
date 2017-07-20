@@ -2317,7 +2317,7 @@ Ext2InitializeVcb( IN PEXT2_IRP_CONTEXT IrpContext,
 
         /* Mount the volume RO if we encounter unsupported ro_compat features */
         if (FlagOn(sb->s_feature_ro_compat, ~EXT4_FEATURE_RO_COMPAT_SUPP)) {
-            SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
+            SetLongFlag(Vcb->Flags, VCB_RO_COMPAT_READ_ONLY);
         }
 
         /* Recognize the filesystem as Ext3fs if it supports journalling */
