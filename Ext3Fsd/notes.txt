@@ -1,12 +1,13 @@
 ==================================
-Release Notes for Ext2Fsd V0.68
+Release Notes for Ext2Fsd V0.69
 ==================================
 
 Features implemented or bugfix:
 
-    1, FIXME: System hang caused by a deadlock in cache manipulation
-    2, Optimization: Reaper mechanism improved (global locks removed)
-    3, Feature: supporting multiple instances & users for Ext2Mgr
+    1, FIXME: superblock corruption of EXT4 volumes with 64BIT mode enabled
+    2, FIXME: possible corruption by race conditions in buffer-head reapering
+    3, FIXME: possible deadlock issues (when flushing) caused by BCB locks
+    4, FIXME: miscellaneous minor updates of Ext2Fsd code base
 
 Supported Ext3/4 features:
 
@@ -23,8 +24,9 @@ Supported Ext3/4 features:
 
 Unsupported Ext3/4 features:
 
-    1, journal: log-based operations, external journal
-    2, EA (extended attributes), ACL support
+    1, 64BIT mode (to support 2^64 blocks)
+    2, journal: log-based operations, external journal
+    3, EA (extended attributes), ACL support
 
 Features to be implemented in next release:
     1, Extents management improvement

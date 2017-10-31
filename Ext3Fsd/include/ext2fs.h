@@ -41,7 +41,7 @@
 
 /* STRUCTS & CONSTS******************************************************/
 
-#define EXT2FSD_VERSION                 "0.68"
+#define EXT2FSD_VERSION                 "0.69"
 
 
 /* WDK DEFINITIONS ******************************************************/
@@ -708,7 +708,7 @@ typedef struct _EXT2_VCB {
     // Sector size in bits
     ULONG                       SectorBits;
 
-    // Aligned size (Page or Block)
+    // Minimal i/o size: min(PageSize, BlockSize)
     ULONGLONG                   IoUnitSize;
 
     // Bits of aligned size

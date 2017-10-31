@@ -27,6 +27,15 @@ Everyone can get to him at http://www.acc.umu.se/~bosse/.
 ======================
  Revision history
 ======================
+53, V0.69    2017-11-01
+
+Modifications from V0.68:
+
+    1, FIXME: superblock corruption of EXT4 volumes with 64BIT mode enabled
+    2, FIXME: possible corruption by race conditions in buffer-head reapering
+    3, FIXME: possible deadlock issues (when flushing) caused by BCB locks
+    4, FIXME: miscellaneous minor updates of Ext2Fsd code base
+
 52, V0.68    2016-07-09
 
 Modifications from V0.66:
