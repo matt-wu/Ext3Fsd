@@ -3,7 +3,7 @@ Introduction
 ------------
 
     Ext3Fsd is an ext2/3/4 file system driver for Windows (2K/2003/XP/7/8/10).
-    It's a freeware, everyone can modify or distribute under GNU GPLv2.
+    It's a free and open-source software, everyone can modify or distribute under GNU GPLv2.
 
     
 Development Website
